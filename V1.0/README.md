@@ -1,2 +1,2 @@
-\## A simple abstraction layer that makes Winapi convenient!
+\## A Simple Abstraction Layer That Makes WinAPI Convenient!
 
