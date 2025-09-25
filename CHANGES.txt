@@ -1,0 +1,22 @@
+V1.0
+
+Created ws::Texture class.
+
+V1.1
+
+Split shape and sprite functionality into ws::Sprite and ws::Shape.
+Both classes inherit from ws::Drawable and can both be drawn using window.draw(ws::Drawable &draw).
+
+
+Fixed Sprite scaling
+Fixed Sprite Origin
+Fixed Sprite setTextureRect()
+
+Added View class and changed related API.
+
+
+
+
+
+
+
