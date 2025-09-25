@@ -23,8 +23,8 @@ int main()
 	ws::Sprite lolly;
 	lolly.setTexture(tlolly);
 	lolly.x = -100;
-	lolly.y = 440;// - lolly.getTextureRect().bottom;
-	lolly.setOrigin(0,tlolly.height); // ORIGIN is BROKEN
+	lolly.y = 440;
+	lolly.setOrigin({0,tlolly.height});
 	tlolly.setTransparentMask(RGB(0,0,255));
 	
 	window.toggleFullscreen();
@@ -34,11 +34,11 @@ int main()
 	{
 
 		lolly.x += 5;
-		if(lolly.x > window.view.world.width)
+		if(lolly.x > window.view.getSize().x)
 			lolly.x = -100;
 
 		y -= 0.1;
-		lolly.setOrigin(0,tlolly.height - y); // ORIGIN is BROKEN
+		lolly.setOrigin({0,LONG(tlolly.height - y)});
 	
 
 		window.clear(RGB(70,230,255));
