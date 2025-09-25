@@ -1,5 +1,4 @@
 #include "graphics.h"
-#include "camera.h"
 #include "shift.h"
 
 #include <vector>
