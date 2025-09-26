@@ -35,35 +35,49 @@ namespace ws // - Win32 Simple
 		public:
 		
 		
-		UINT_PTR timerID = NULL;
-		int ID = 1;
 		
 		Timer()
 		{
+			LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            frequency = static_cast<double>(freq.QuadPart);
 			restart();
-			if(!timerID)
-			{
-				std::cerr << "Timer Creation Failed!\n";
-			}
 		}
 		
 		~Timer()
 		{
-			KillTimer(NULL,ID);
 		}
 		
 		void restart()
 		{
-			timerID = SetTimer(nullptr,ID,1000,TimerProc);
-			
+	        
+            LARGE_INTEGER counter;
+            QueryPerformanceCounter(&counter);
+            startTime = counter.QuadPart;
 		}
 		
 		
+	    double getSeconds() const
+	    {
+	        LARGE_INTEGER currentTime;
+	        QueryPerformanceCounter(&currentTime);
+	        return static_cast<double>(currentTime.QuadPart - startTime) / frequency;
+	      
+	    }
+	    
+	    double getMilliSeconds() const
+	    {
+	        return getSeconds() * 1000.0;
+	    }
+	    
+	    double getMicroSeconds() const
+	    {
+	        return getMilliSeconds() * 1000.0;
+	    }
+	
 		private:
-			
-		VOID CALLBACK TimerProc(HWND hWnd, UINT msg, UINT_PTR timerId, DWORD time) {
-    		
-		}
+		    LONGLONG startTime = 0;
+		    double frequency = 1.0;	
 		
 			
 	};
@@ -1068,7 +1082,7 @@ namespace ws // - Win32 Simple
 		        
 		        
 		        if (!LegacyAlpha.hdcMem || !LegacyAlpha.hbmp) {
-		            setTransparency(transparencyColor, alpha); // Recreate buffers just in case someone tries to use the isTransparent variable directly instead of using the setTransparency function.
+		            setChromaKey(transparencyColor, alpha,"legacy"); // Recreate buffers just in case someone tries to use the isTransparent variable directly instead of using the setTransparency function.
 		        }		        
 		        
 		        

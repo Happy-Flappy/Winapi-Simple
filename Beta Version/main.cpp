@@ -22,37 +22,63 @@ int main()
 	float x = 1;
 	float y = -1;
 	
+	
+	
+	
+	ws::Timer timer;
+	
+	
+	int frameCount = 0;
+	
+	
+	
+	double timeperframe = 1.f/60.f;
+	double timesincelastupdate = 0;
+	
 	while(window.isOpen())
 	{
+		
+		timesincelastupdate += timer.getSeconds();
+		timer.restart();
+		
+		
+		while(timesincelastupdate > timeperframe)
+        {
+        	timesincelastupdate -= timeperframe;
+        	
+        	
+			
+			
+			if(shape.x < 0)
+			{
+				x = 5;
+			}
+			if(shape.x > window.view.getSize().x)
+			{
+				x = -5;
+			}
+			if(shape.y < 0)
+			{
+				y = 5;
+			}
+			if(shape.y > window.view.getSize().y)
+			{
+				y = -5;
+			}
+			
+			
+			
+			
+			shape.x += x;
+			shape.y += y;
+		}
+		
 		window.clear(RGB(0,0,255));
-		
-		
-		if(shape.x < 0)
-		{
-			x = 1;
-		}
-		if(shape.x > window.view.getSize().x)
-		{
-			x = -1;
-		}
-		if(shape.y < 0)
-		{
-			y = 1;
-		}
-		if(shape.y > window.view.getSize().y)
-		{
-			y = -1;
-		}
-		
-		
-		
-		
-		shape.x += x;
-		shape.y += y;
-		
+
 		window.draw(shape);
 		
 		window.display();
+		
 	}
 	
 }
