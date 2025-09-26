@@ -30,6 +30,52 @@ namespace ws // - Win32 Simple
 	
 	
 	
+	class Timer
+	{
+		public:
+		
+		
+		UINT_PTR timerID = NULL;
+		int ID = 1;
+		
+		Timer()
+		{
+			restart();
+			if(!timerID)
+			{
+				std::cerr << "Timer Creation Failed!\n";
+			}
+		}
+		
+		~Timer()
+		{
+			KillTimer(NULL,ID);
+		}
+		
+		void restart()
+		{
+			timerID = SetTimer(nullptr,ID,1000,TimerProc);
+			
+		}
+		
+		
+		private:
+			
+		VOID CALLBACK TimerProc(HWND hWnd, UINT msg, UINT_PTR timerId, DWORD time) {
+    		
+		}
+		
+			
+	};
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	struct Vector2f 
 	{
@@ -664,7 +710,7 @@ namespace ws // - Win32 Simple
 		
 		HWND hwnd;
 	    int x,y,width, height;		
-
+		bool isTransparent = false;
 
 		private:
 			
@@ -686,7 +732,7 @@ namespace ws // - Win32 Simple
 		
 		public:
 		
-		Window(int width,int height,std::string title)
+		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW)
 		{
 			
 			view.setRect({0,0,width,height});//Sets world rect
@@ -719,7 +765,7 @@ namespace ws // - Win32 Simple
 			0,
 			CLASS_NAME,
 			TO_LPCSTR(title),
-			WS_OVERLAPPEDWINDOW,
+			style,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
 			width,
@@ -781,6 +827,8 @@ namespace ws // - Win32 Simple
         	DeleteDC(backBufferDC);
             DeleteObject(stretchBufferBitmap);
         	DeleteDC(stretchBufferDC);
+        	DeleteObject(LegacyAlpha.hbmp);
+		    DeleteDC(LegacyAlpha.hdcMem);
         }
 		
 		
@@ -793,27 +841,72 @@ namespace ws // - Win32 Simple
 		}
 		
 		
-    
-
+    	
+    	private:
+		BYTE alpha = 255;
 	    COLORREF transparencyColor = RGB(-1,0,0); 
+		public:	
 			
-	    void setTransparentMask(COLORREF color) {
+	    void setChromaKey(COLORREF color = RGB(-1,-1,-1),BYTE alphaValue = 255,std::string type = "modern") 
+		{
+			
 	        transparencyColor = color;
+	        alpha = alphaValue;
+	        if(type == "legacy")
+	        	legacyTransparency = true;
+	        else
+	        	legacyTransparency = false;
+	        
 	        
 	    	COLORREF c = transparencyColor;
 	    	
-	    	if(!(GetRValue(c) < 0 || GetRValue(c) > 255 | GetGValue(c) < 0 || GetGValue(c) > 255 | GetBValue(c) < 0 || GetBValue(c) > 255))
+	    	if(!(GetRValue(c) < 0 || GetRValue(c) > 255 | GetGValue(c) < 0 || GetGValue(c) > 255 | GetBValue(c) < 0 || GetBValue(c) > 255)    ||    alpha < 255)
 	    	{
-	    		//is valid color
-	    		
-	    		LONG_PTR style = GetWindowLongPtr(hwnd,GWL_STYLE);
+	    		//is valid color or semi-transparent
+				
+				LONG_PTR style = GetWindowLongPtr(hwnd,GWL_STYLE);
 	    		style |= WS_EX_LAYERED;
 	    		SetWindowLongPtrA(hwnd,GWL_EXSTYLE,style);
-	    		SetLayeredWindowAttributes(hwnd,c,0,LWA_COLORKEY);
+	    		
+	    		bool legacy = legacyTransparency;
+	    		
+	    		if(!legacy)
+	    		{
+					SetLayeredWindowAttributes(hwnd,c,alpha,LWA_COLORKEY | LWA_ALPHA);
+	    		}
+	    		else
+	    		{
+				
+	    			//setup for ARGB 32bit transparency - legacy
+		    		HDC hdc = GetDC(hwnd);
+					LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
+			        
+					BITMAPINFO bmi = {0};
+			        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+			        bmi.bmiHeader.biWidth = width;
+			        bmi.bmiHeader.biHeight = -height;
+			        bmi.bmiHeader.biPlanes = 1;
+			        bmi.bmiHeader.biBitCount = 32;
+			        bmi.bmiHeader.biCompression = BI_RGB;
+			        
+			        LegacyAlpha.hbmp = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &LegacyAlpha.pvBits, NULL, 0);
+			        SelectObject(LegacyAlpha.hdcMem, LegacyAlpha.hbmp);
+
+				}
+
+
+	    		isTransparent = true;
+
 	    		
 			}
+			else
+				isTransparent = false;
 	        
 	    }	
+		
+		
+		
+		
 		
 		
 		
@@ -830,7 +923,7 @@ namespace ws // - Win32 Simple
 	        if (fullscreen == isFullscreen) return;
 	        
 	        if (fullscreen) {
-	            windowedStyle = GetWindowLong(hwnd, GWL_STYLE);
+	            windowedStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
 	            GetWindowRect(hwnd, &windowedRect);
 	            
 	            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
@@ -922,22 +1015,6 @@ namespace ws // - Win32 Simple
 		
 	    void clear(COLORREF color = RGB(255, 255, 255)) {
 	    	
-	    	COLORREF c = transparencyColor;
-	    	
-	    	if(!(GetRValue(c) < 0 || GetRValue(c) > 255 | GetGValue(c) < 0 || GetGValue(c) > 255 | GetBValue(c) < 0 || GetBValue(c) > 255))
-	    	{
-	    		//valid color
-	    		
-	    		
-	    		
-	    		
-	    		
-	    		
-			}
-	    	
-	    	
-	    	
-	    	
 	        HBRUSH brush = CreateSolidBrush(color);
 	        RECT rect = {0, 0, view.getSize().x, view.getSize().y};
 	        FillRect(backBufferDC, &rect, brush);
@@ -967,8 +1044,6 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
-		
 	    void display() 
 		{
 
@@ -984,14 +1059,53 @@ namespace ws // - Win32 Simple
 			view.getSize().x, 
 			view.getSize().y, 
 			SRCCOPY);
+
+
+			COLORREF c = transparencyColor;
+			
+		    if(isTransparent && legacyTransparency)
+	    	{
+		        
+		        
+		        if (!LegacyAlpha.hdcMem || !LegacyAlpha.hbmp) {
+		            setTransparency(transparencyColor, alpha); // Recreate buffers just in case someone tries to use the isTransparent variable directly instead of using the setTransparency function.
+		        }		        
+		        
+		        
+		        // Copy from stretch buffer to ARGB buffer
+		        BitBlt(LegacyAlpha.hdcMem, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
+		        
+		        
+		        BLENDFUNCTION blend = {AC_SRC_OVER, 0, alpha, 0};
+		        POINT ptDst = {0, 0};
+		        SIZE size = {width, height};
+		        POINT ptSrc = {0, 0};
+		        
+		        UpdateLayeredWindow(hwnd, hdc, &ptDst, &size, LegacyAlpha.hdcMem, &ptSrc, transparencyColor, &blend, ULW_ALPHA | ULW_COLORKEY);
+		        
+		        
+		    }
+		    else 
+		    {
+		        BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
+		        InvalidateRect(hwnd, NULL, FALSE);
+		        UpdateWindow(hwnd);
+		    }
+
+
+
 			
 			
-			BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
-			
-			ReleaseDC(hwnd, hdc);
-			
-			InvalidateRect(hwnd, NULL, FALSE);
-        	UpdateWindow(hwnd);
+//			BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
+//			
+//			ReleaseDC(hwnd, hdc);
+//			
+//			
+//			
+//			
+//			
+//			InvalidateRect(hwnd, NULL, FALSE);
+//        	UpdateWindow(hwnd);
 	    }		
 		
 		
@@ -1081,6 +1195,27 @@ namespace ws // - Win32 Simple
 			        stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height); 	//this will also likely need to change to accomodate the viewport size.
 			        SelectObject(stretchBufferDC, stretchBufferBitmap);
 			        
+			        
+				    // RECREATE TRANSPARENCY BUFFERS WHEN SIZE CHANGES
+				    if (isTransparent) {
+				        if (LegacyAlpha.hbmp) DeleteObject(LegacyAlpha.hbmp);
+				        if (LegacyAlpha.hdcMem) DeleteDC(LegacyAlpha.hdcMem);
+				        
+				        LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
+				        BITMAPINFO bmi = {0};
+				        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+				        bmi.bmiHeader.biWidth = width;
+				        bmi.bmiHeader.biHeight = -height;
+				        bmi.bmiHeader.biPlanes = 1;
+				        bmi.bmiHeader.biBitCount = 32;
+				        bmi.bmiHeader.biCompression = BI_RGB;
+				        
+				        LegacyAlpha.hbmp = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &LegacyAlpha.pvBits, NULL, 0);
+				        SelectObject(LegacyAlpha.hdcMem, LegacyAlpha.hbmp);
+				    }			        
+			        
+			        
+			        
 			        ReleaseDC(hwnd, hdc);
 						                
 	                clear();
@@ -1096,10 +1231,17 @@ namespace ws // - Win32 Simple
 				
 		
 		
+		struct LEGACY_ALPHA
+		{
+		
+			void* pvBits = NULL;
+			HBITMAP hbmp = NULL;
+			HDC hdcMem = NULL;
+		}LegacyAlpha;
 		
 		bool isFullscreen = false;
-		bool isTransparent = false;
-	    RECT windowedRect; // Stores window position/size when not fullscreen
+		bool legacyTransparency = false;
+		RECT windowedRect; // Stores window position/size when not fullscreen
     	DWORD windowedStyle; // Stores window style when not fullscreen
 		
 		

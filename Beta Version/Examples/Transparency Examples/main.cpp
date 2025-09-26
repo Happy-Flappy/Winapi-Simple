@@ -5,10 +5,10 @@
 
 int main()
 {
-	ws::Window window(960,540,"My Window");
+	ws::Window window(960,540,"My Window",WS_OVERLAPPEDWINDOW);
 	
 	
-	window.setChromaKey(RGB(0,0,255));
+	window.setChromaKey(RGB(0,0,255),100);
 	window.setLayerAfter(HWND_TOPMOST);
 	
 	
