@@ -5,6 +5,8 @@
 
 
 
+
+
 #define NOMINMAX        
 #define STRICT          
 #define WIN32_LEAN_AND_MEAN
@@ -21,9 +23,23 @@
 #include <iomanip>
 
 
+
+
+
+
+
+
+
+
 namespace ws // - Win32 Simple
 {
 
+	
+	
+	
+	
+	
+	
 	
 	
 	
@@ -48,12 +64,14 @@ namespace ws // - Win32 Simple
 		{
 		}
 		
-		void restart()
+		double restart()
 		{
-	        
+	        double seconds = getSeconds();
             LARGE_INTEGER counter;
             QueryPerformanceCounter(&counter);
             startTime = counter.QuadPart;
+            
+            return seconds;
 		}
 		
 		
@@ -86,8 +104,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
-	
-	
+
 	
 	
 	
@@ -97,11 +114,7 @@ namespace ws // - Win32 Simple
 	};
 	
 	
-	
-	
-	
-	
-	
+
 	
 	
 	
@@ -209,7 +222,9 @@ namespace ws // - Win32 Simple
 		    	long int x = world.right / factor;
 		    	long int y = world.bottom / factor;
 				setPortSize({x,y});	// If factor is 2, that means that the visible world area is half as much because it is zooming in and will  be stretching into the viewport.
-	    	}
+	    		world.left += x;
+	    		world.top += y;
+			}
 		}
 
 
@@ -230,39 +245,36 @@ namespace ws // - Win32 Simple
 		
 	    POINT toWorld(POINT pos) 
 	    {
-	        
-			
-			POINT worldSize = getSize();
-			POINT viewSize = getPortSize();
-			
-			POINT worldPoint;
-	        
-	        
-	        float scaleX = static_cast<float>(worldSize.x) / viewSize.x;
-	        float scaleY = static_cast<float>(worldSize.y) / viewSize.y;
-	        
-	        worldPoint.x = static_cast<int>(pos.x * scaleX);
-	        worldPoint.y = static_cast<int>(pos.y * scaleY);
-	        
-	        return worldPoint;
+		    POINT worldSize = getSize();
+		    POINT viewSize = getPortSize();
+		    POINT viewPos = getPos();
+		    
+		    POINT worldPoint;
+		    
+		    float scaleX = static_cast<float>(worldSize.x) / viewSize.x;
+		    float scaleY = static_cast<float>(worldSize.y) / viewSize.y;
+		    
+		    worldPoint.x = static_cast<int>(pos.x * scaleX) + viewPos.x;
+		    worldPoint.y = static_cast<int>(pos.y * scaleY) + viewPos.y;
+		    
+		    return worldPoint;
 	    }
 	    
 	    POINT toWindow(POINT pos) 
 	    {
-	    	POINT worldSize = getSize();
-			POINT viewSize = getPortSize();
-			
-	    	
-	    	
-	        POINT windowPoint;
-	        
-	        float scaleX = static_cast<float>(viewSize.x) / worldSize.x;
-	        float scaleY = static_cast<float>(viewSize.y) / worldSize.y;
-	        
-	        windowPoint.x = static_cast<int>(pos.x * scaleX);
-	        windowPoint.y = static_cast<int>(pos.y * scaleY);
-	        
-	        return windowPoint;
+		    POINT worldSize = getSize();
+		    POINT viewSize = getPortSize();
+		    POINT viewPos = getPos();
+		    
+		    POINT windowPoint;
+		    
+		    float scaleX = static_cast<float>(viewSize.x) / worldSize.x;
+		    float scaleY = static_cast<float>(viewSize.y) / worldSize.y;
+		    
+		    windowPoint.x = static_cast<int>((pos.x - viewPos.x) * scaleX);
+		    windowPoint.y = static_cast<int>((pos.y - viewPos.y) * scaleY);
+		    
+		    return windowPoint;
 	    }
 				
 		
@@ -281,24 +293,7 @@ namespace ws // - Win32 Simple
 	};
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
 	
 	
 	
@@ -318,18 +313,7 @@ namespace ws // - Win32 Simple
 	}
 		
 	
-	
-	
-	
-	
-	
-	
 
-	
-	
-	
-	
-	
 	
 	
 	
@@ -446,8 +430,8 @@ namespace ws // - Win32 Simple
 	    
 	    
 	    
-	    COLORREF transparencyColor = RGB(-1,0,0); 
-			
+	    COLORREF transparencyColor = CLR_INVALID; // Add this member variable
+	
 	    void setTransparentMask(COLORREF color) {
 	        transparencyColor = color;
 	    }	    
@@ -457,8 +441,7 @@ namespace ws // - Win32 Simple
 	};
 	
 	
-	
-	
+		
 	
 	
 	class Drawable
@@ -501,7 +484,7 @@ namespace ws // - Win32 Simple
 		}
 	
 		
-		virtual void draw(HDC hdc) = 0;
+		virtual void draw(HDC hdc,View &view) = 0;
 		virtual bool contains(POINT pos) = 0;
 		
 		
@@ -543,30 +526,44 @@ namespace ws // - Win32 Simple
 		}
 		
 		
-		virtual void draw(HDC hdc)  override
+		virtual void draw(HDC hdc,View &view)  override
 		{
 			
-	    	POINT o = getScaledOrigin();
-	    	
-	       	if (!textureRef || !textureRef->isValid()) return;
-	        
-	        HDC hMemDC = CreateCompatibleDC(hdc);
-	        HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, textureRef->bitmap);
-	        
-	        TransparentBlt(hdc,
-	            x - o.x, 
-	            y - o.y, 
-	            getScaledWidth(), 
-	            getScaledHeight(),
-	            hMemDC,
-	            rect.left, 
-	            rect.top, 
-	            rect.right, 
-	            rect.bottom,
-	            textureRef->transparencyColor);
-	            
-	        SelectObject(hMemDC, hOldBitmap);
-	        DeleteDC(hMemDC);			
+		    if (!textureRef || !textureRef->isValid()) return;
+		    
+		    POINT o = getScaledOrigin();
+		    
+		    // Apply view transformation to position
+		    POINT viewPos = view.getPos();
+		    int drawX = (x - o.x) - viewPos.x;
+		    int drawY = (y - o.y) - viewPos.y;
+		    
+		    // Only draw if visible in current view
+		    if (drawX + getScaledWidth() < 0 || drawY + getScaledHeight() < 0 ||
+		        drawX >= view.getPortSize().x || drawY >= view.getPortSize().y) {
+		        return; // Culling: skip if not visible
+		    }
+		    
+		    HDC hMemDC = CreateCompatibleDC(hdc);
+		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
+		    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, textureRef->bitmap);
+		    
+		    TransparentBlt(hdc,
+		        drawX, 
+		        drawY, 
+		        getScaledWidth(), 
+		        getScaledHeight(),
+		        hMemDC,
+		        rect.left, 
+		        rect.top, 
+		        rect.right,
+		        rect.bottom,
+		        textureRef->transparencyColor);
+		        
+		    SelectObject(hMemDC, hOldBitmap);
+		    DeleteDC(hMemDC);
+			
+
 		}
 		
 		
@@ -658,18 +655,29 @@ namespace ws // - Win32 Simple
 
 
 
-	    virtual void draw(HDC hdc)  override
+	    virtual void draw(HDC hdc,View &view)  override
 	    {
-	    	POINT o = getScaledOrigin();
-	        HBRUSH brush = CreateSolidBrush(color);
-	        RECT rect = {
-	            x - o.x, 
-	            y - o.y, 
-	            x - o.x + getScaledWidth(), 
-	            y - o.y + getScaledHeight()
-	        };
-	        FillRect(hdc, &rect, brush);
-	        DeleteObject(brush);
+		    POINT o = getScaledOrigin();
+		    POINT viewPos = view.getPos();
+		    
+		    int drawX = (x - o.x) - viewPos.x;
+		    int drawY = (y - o.y) - viewPos.y;
+		    
+		    // Culling check
+		    if (drawX + getScaledWidth() < 0 || drawY + getScaledHeight() < 0 ||
+		        drawX >= view.getPortSize().x || drawY >= view.getPortSize().y) {
+		        return;
+		    }
+		    
+		    HBRUSH brush = CreateSolidBrush(color);
+		    RECT rect = {
+		        drawX, 
+		        drawY, 
+		        drawX + getScaledWidth(), 
+		        drawY + getScaledHeight()
+		    };
+		    FillRect(hdc, &rect, brush);
+		    DeleteObject(brush);
 	    }
 
 
@@ -680,41 +688,7 @@ namespace ws // - Win32 Simple
 	};
 	
 
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
 	
 	
 	
@@ -893,6 +867,7 @@ namespace ws // - Win32 Simple
 				
 	    			//setup for ARGB 32bit transparency - legacy
 		    		HDC hdc = GetDC(hwnd);
+					SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
 					LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
 			        
 					BITMAPINFO bmi = {0};
@@ -1028,11 +1003,25 @@ namespace ws // - Win32 Simple
 		
 		
 	    void clear(COLORREF color = RGB(255, 255, 255)) {
+
+
+			//Update back buffer to contain the visible world area. 
+			
+//	        HDC hdc = GetDC(hwnd);
+//			
+//			DeleteObject(backBufferBitmap);
+//	        backBufferBitmap = CreateCompatibleBitmap(hdc, view.getSize().x, view.getSize().y);
+//	        SelectObject(backBufferDC, backBufferBitmap);
+//
+//	        DeleteObject(hdc);
+
 	    	
 	        HBRUSH brush = CreateSolidBrush(color);
 	        RECT rect = {0, 0, view.getSize().x, view.getSize().y};
 	        FillRect(backBufferDC, &rect, brush);
 	        DeleteObject(brush);
+	        
+
 	    }
 		
 		
@@ -1049,7 +1038,7 @@ namespace ws // - Win32 Simple
 		
 		void draw(Drawable &draw)
 		{
-		    draw.draw(backBufferDC);
+		    draw.draw(backBufferDC,view);
 		}
 		
 		
@@ -1060,19 +1049,26 @@ namespace ws // - Win32 Simple
 		
 	    void display() 
 		{
-
-			HDC hdc = GetDC(hwnd);
-			StretchBlt(stretchBufferDC, 
-			0, 
+			
+			
+			
+			
+		    HDC hdc = GetDC(hwnd);
+		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
+		    
+		    // Just copy the entire back buffer to stretch buffer
+		    StretchBlt(stretchBufferDC, 
+		    0, 
 			0, 
 			width, 
 			height,
-        	backBufferDC, 
-			0, 
+		    backBufferDC, 
+		    0, 
 			0, 
 			view.getSize().x, 
-			view.getSize().y, 
-			SRCCOPY);
+			view.getSize().y,  // Always copy from (0,0) of world
+		    SRCCOPY);
+			
 
 
 			COLORREF c = transparencyColor;
@@ -1087,8 +1083,10 @@ namespace ws // - Win32 Simple
 		        
 		        
 		        // Copy from stretch buffer to ARGB buffer
+		        SetLayout(LegacyAlpha.hdcMem, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
 		        BitBlt(LegacyAlpha.hdcMem, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
-		        
+	
+
 		        
 		        BLENDFUNCTION blend = {AC_SRC_OVER, 0, alpha, 0};
 		        POINT ptDst = {0, 0};
@@ -1101,25 +1099,13 @@ namespace ws // - Win32 Simple
 		    }
 		    else 
 		    {
-		        BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
-		        InvalidateRect(hwnd, NULL, FALSE);
+		        BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);	        
+				InvalidateRect(hwnd, NULL, FALSE);
 		        UpdateWindow(hwnd);
 		    }
 
+			ReleaseDC(hwnd, hdc);
 
-
-			
-			
-//			BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
-//			
-//			ReleaseDC(hwnd, hdc);
-//			
-//			
-//			
-//			
-//			
-//			InvalidateRect(hwnd, NULL, FALSE);
-//        	UpdateWindow(hwnd);
 	    }		
 		
 		
@@ -1182,7 +1168,8 @@ namespace ws // - Win32 Simple
 	                return 0;
 	            }
 	                
-	            case WM_SIZE:
+	            case WM_SIZE: {
+				
 				   
 				    
 					width = LOWORD(lParam);
@@ -1200,10 +1187,7 @@ namespace ws // - Win32 Simple
 					
 	                
 			        HDC hdc = GetDC(hwnd);
-			        
-			        DeleteObject(backBufferBitmap);
-			        backBufferBitmap = CreateCompatibleBitmap(hdc, view.getSize().x, view.getSize().y);
-			        SelectObject(backBufferDC, backBufferBitmap);
+			        			        
 			        
 			        DeleteObject(stretchBufferBitmap);
 			        stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height); 	//this will also likely need to change to accomodate the viewport size.
@@ -1234,6 +1218,16 @@ namespace ws // - Win32 Simple
 						                
 	                clear();
 	                return 0;
+	            	break;
+				}
+				
+				
+				case WM_MOVE:
+				{
+					x = GET_X_LPARAM(lParam);
+					y = GET_Y_LPARAM(lParam);
+				}
+				
 	        }
             
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -1278,6 +1272,75 @@ namespace ws // - Win32 Simple
 	
 	// Initialize the static map
     std::map<HWND, Window*> Window::windowInstances;
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+	namespace Global
+	{
+	
+		POINT getMousePos(Window &window)
+		{
+			
+		    POINT p;
+		    if(!GetCursorPos(&p))
+		    {
+		        return {0,0};
+		    }
+		    
+		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
+		    p = window.view.toWorld(p);
+		    return p;
+		}
+		
+		POINT getMousePos()
+		{
+				
+			POINT p;
+			if(!GetCursorPos(&p))
+			{
+				return {0,0};
+			}
+			
+			return p;
+		
+		}
+		
+		bool getMouseButton(int vmButton)
+		{
+			if (GetAsyncKeyState(vmButton) & 0x8000)
+				return true;
+			
+			return false;	
+		}
+		
+		bool getKey(char vmKey)
+		{
+			if (GetAsyncKeyState(vmKey))
+			{
+				return true;
+			}
+			return false;
+		}
+	}
+	
+    
+    
+    
     
 	
 }
