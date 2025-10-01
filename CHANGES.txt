@@ -14,6 +14,22 @@ Fixed Sprite setTextureRect()
 
 Added View class and changed related API.
 
+V1.2
+
+Added Global Input System 
+- ws::Global::getMousePos(ws::Window &window)
+- ws::Global::getMousePos()
+- ws::Global::getKey(char vmKey)
+- ws::Global::getMouseButton(char vmButton)
+
+
+Added Window Transparency
+Added ws::View::toWorld()
+Added ws::View::toWindow()
+Added setLayerAfter() for Z positioning of window.
+Added ws::Line class and bool ws::Line::intersects(ws::Line &otherLine).
+Added ws::Timer class.
+
 
 
 

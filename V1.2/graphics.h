@@ -689,6 +689,120 @@ namespace ws // - Win32 Simple
 	
 
 
+
+
+
+
+
+
+	class Line : public ws::Drawable 
+	{
+	
+		public:
+		
+		POINT start;
+		POINT end;
+		COLORREF color = RGB(0,0,255);
+		int width = 2;
+	    
+	    
+	    
+	    
+	    Line(POINT start = {0,0},POINT end = {0,0},int width = 2,COLORREF color = RGB(0,0,255))
+	    {
+	    	this->start = start;
+	    	this->end = end;
+	    	this->width = width;
+	    	this->color = color;
+		}
+	    
+	    
+	    private:
+		virtual void draw(HDC hdc, ws::View &view) override {
+	        // Create and select a blue pen
+	        HPEN hPen = CreatePen(PS_SOLID, width, color);
+	        HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
+	        
+	        // Apply view transformation
+	        POINT viewPos = view.getPos();
+	        int drawX1 = start.x - viewPos.x;
+	        int drawY1 = start.y - viewPos.y;
+	        int drawX2 = end.x - viewPos.x;
+	        int drawY2 = end.y - viewPos.y;
+	        
+	        // Draw a line
+	        MoveToEx(hdc, drawX1, drawY1, NULL);
+	        LineTo(hdc, drawX2, drawY2);
+	        
+	        // Restore the old pen and delete the created pen
+	        SelectObject(hdc, hOldPen);
+	        DeleteObject(hPen);
+	        
+	        
+	
+	    }
+	    
+	    
+	    private:
+	    virtual bool contains(POINT pos) override
+	    { 
+	    	return false;
+		}
+		
+		
+		public:
+			
+		bool onSegment(POINT p, POINT q, POINT r)
+	    {
+	        if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
+	            q.y <= std::max(p.y, r.y) && q.y >= std::min(p.y, r.y))
+	            return true;
+	        return false;
+	    }
+		
+		// Returns: 0 = collinear, 1 = clockwise, 2 = counterclockwise
+	    int orientation(POINT p, POINT q, POINT r)
+	    {
+	        long long val = (long long)(q.y - p.y) * (r.x - q.x) - 
+	                       (long long)(q.x - p.x) * (r.y - q.y);
+	        
+	        if (val == 0) return 0;  // Collinear
+	        return (val > 0) ? 1 : 2; // Clockwise or counterclockwise
+	    }			
+		
+	    bool intersects(Line &otherLine)
+	    {
+	        POINT p1 = this->start;
+	        POINT p2 = this->end;
+	        POINT p3 = otherLine.start;
+	        POINT p4 = otherLine.end;
+	        
+	        // Calculate orientation values
+	        int o1 = orientation(p1, p2, p3);
+	        int o2 = orientation(p1, p2, p4);
+	        int o3 = orientation(p3, p4, p1);
+	        int o4 = orientation(p3, p4, p2);
+	        
+	        // General case: lines intersect if orientations are different
+	        if (o1 != o2 && o3 != o4)
+	            return true;
+	        
+	        // Special cases: check if points are collinear and lie on segments
+	        if (o1 == 0 && onSegment(p1, p3, p2)) return true;
+	        if (o2 == 0 && onSegment(p1, p4, p2)) return true;
+	        if (o3 == 0 && onSegment(p3, p1, p4)) return true;
+	        if (o4 == 0 && onSegment(p3, p2, p4)) return true;
+	        
+	        return false;
+	    }
+	    
+	};
+
+
+
+
+
+
 	
 	
 	
@@ -705,8 +819,6 @@ namespace ws // - Win32 Simple
 		bool isRunning = true;
 		std::queue<MSG> msgQ;
 		
-	    HDC backBufferDC;
-	    HBITMAP backBufferBitmap;
 
 				
 		public:		
@@ -717,8 +829,10 @@ namespace ws // - Win32 Simple
 		
         HBITMAP stretchBufferBitmap;
         HDC stretchBufferDC;		
-		
-		public:
+
+	    HDC backBufferDC;
+	    HBITMAP backBufferBitmap;
+
 		
 		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW)
 		{
@@ -1002,7 +1116,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-	    void clear(COLORREF color = RGB(255, 255, 255)) {
+	    void clear(COLORREF color = RGB(0,0,0)) {
 
 
 			//Update back buffer to contain the visible world area. 
