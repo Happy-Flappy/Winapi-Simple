@@ -113,9 +113,9 @@ int main()
 
 	
 	ws::Poly poly;
-	poly.filled = false;
+	poly.filled = true;
 	poly.borderColor = RGB(120,120,250); 
-	poly.closed = false;
+	poly.closed = true;
 	
 	
 	ws::Timer timer;

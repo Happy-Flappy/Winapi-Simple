@@ -36,5 +36,5 @@ V1.3 - Beta
 
 Added ws::Poly class that makes a polygon.
 Fixed bug where a transparent window flips in one of the graphical copy operations.
-
+Added Sound Class 
 

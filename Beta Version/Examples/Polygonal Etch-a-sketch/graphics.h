@@ -6,10 +6,15 @@
 
 
 
-
-#define NOMINMAX        
-#define STRICT          
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif        
+#ifndef STRICT
+#define STRICT
+#endif          
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 
  
 #include <windows.h>  
@@ -664,9 +669,12 @@ namespace ws // - Win32 Simple
 		    int drawY = (y - o.y) - viewPos.y;
 		    
 		    // Culling check
-		    if (drawX + getScaledWidth() < 0 || drawY + getScaledHeight() < 0 ||
-		        drawX >= view.getPortSize().x || drawY >= view.getPortSize().y) {
-		        return;
+		    RECT spriteRect = {drawX, drawY, drawX + getScaledWidth(), drawY + getScaledHeight()};
+		    RECT viewportRect = {0, 0, view.getPortSize().x, view.getPortSize().y};
+		    RECT intersection;
+
+		    if (!IntersectRect(&intersection, &spriteRect, &viewportRect)) {
+   		    	return; // No intersection with viewport means the entire sprite is outside of view
 		    }
 		    
 		    HBRUSH brush = CreateSolidBrush(color);

@@ -6,10 +6,15 @@
 
 
 
-
-#define NOMINMAX        
-#define STRICT          
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif        
+#ifndef STRICT
+#define STRICT
+#endif          
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 
  
 #include <windows.h>  
@@ -22,7 +27,7 @@
 #include <queue>
 #include <iomanip>
 
-
+#include <mmsystem.h>
 
 
 
@@ -34,6 +39,160 @@
 namespace ws // - Win32 Simple
 {
 
+
+
+	
+	std::wstring WIDE(std::string str)
+	{
+	    int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+	    std::wstring wstr(size, 0);
+	    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
+	    return wstr;
+	}
+	
+	std::string SHORT(const std::wstring& wstr) {
+	    // Determine the size of the required buffer
+	    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
+	    if (bufferSize == 0) {
+	        return "";
+	    }
+	
+	    // Create the string and perform the conversion
+	    std::string str(bufferSize - 1, '\0'); // Subtract 1 for the null terminator
+	    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, str.data(), bufferSize, NULL, NULL);
+	
+	    return str;
+	}
+	
+	
+	
+	
+	LPCSTR TO_LPCSTR(std::string &str)
+	{
+		return LPCSTR(str.c_str());
+	}
+		
+
+
+	std::wstring GetShortPathNameSafe(const std::wstring& longPath) 
+	{
+	    // Pass NULL for the buffer to get the required size.
+	    DWORD bufferSize = GetShortPathNameW(longPath.c_str(), NULL, 0);
+	    if (bufferSize == 0) {
+	        return L""; // Return empty on failure
+	    }
+	
+	    // Allocate the buffer
+	    std::wstring shortPath(bufferSize, L'\0');
+	
+	    // Call again with the allocated buffer
+	    bufferSize = GetShortPathNameW(longPath.c_str(), shortPath.data(), bufferSize);
+	    if (bufferSize == 0) {
+	        return L""; // Return empty on failure
+	    }
+	    
+	    // Resize to the actual length and return
+	    shortPath.resize(bufferSize);
+	    return shortPath;
+	}
+
+	
+	
+	struct Vec2d
+	{
+		double x,y;	
+	};
+		
+	struct Vec2f
+	{
+		float x,y;
+	};
+	struct Vec3d
+	{
+		double x,y,z;
+	};
+	struct Vec3f
+	{
+		float x,y,z;
+	};
+	
+	
+	
+	
+	class SoundContexts
+	{
+		public:
+		~SoundContexts()
+		{
+		    // Clean up
+    		mciSendStringA("close all", NULL, 0, NULL);	
+		}
+
+
+		std::string getChannelStatus(int channel)
+		{
+			
+			std::string ID = std::to_string(channel);
+			
+			
+			
+		    char returnBuffer[128]; // Buffer to store the status string
+		    std::string command = "status " + ID + " mode";
+		    
+		    // Send the command and check for errors
+		    if (mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL) == 0) {
+		        return returnBuffer; // Returns "playing", "stopped", etc.
+		    } else {
+		        // Handle errors, such as the alias not being open
+		        return "error";
+		    }
+		}
+		
+		void PlayFile(std::string path,int channel,bool blocking = false)
+		{
+			if(blocking && getChannelStatus(channel) == "playing")
+				return;
+			//Get shortened path name because mciSendStringA does not support long paths.
+			std::wstring wpath = GetShortPathNameSafe(WIDE(path));
+			if(!wpath.empty())
+				path = SHORT(wpath);
+			else
+			{
+				std::cerr << "A sound file path could not be shortened for sound playing. An attempt will be made to play the sound anyways using the full path.\n";
+			}
+			
+			
+			std::string ID = std::to_string(channel);
+			std::string command;
+			
+			
+			
+			//Make command to close this old channel if it was already open
+			command = "close " + ID;
+			mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
+			
+			
+			//open the file and give it an alias - users do not have to see this. All they have to remember is the channel ID since this is technically different device context channels.
+			command = "open "+ path + " alias "+ID;
+			mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
+			
+			
+			//Make command for playing the file.
+			command = "play "+ID;
+			
+			//play the file
+			mciSendStringA(TO_LPCSTR(command), NULL, 0, NULL);
+		}
+		
+		void PlayStream()
+		{
+			
+		}
+		
+	}wav;
+	
+	
+	
 	
 	
 	
@@ -296,23 +455,7 @@ namespace ws // - Win32 Simple
 
 	
 	
-	
-	std::wstring WIDE(std::string str)
-	{
-	    int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
-	    std::wstring wstr(size, 0);
-	    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
-	    return wstr;
-	}
-	
-	
-	
-	LPCSTR TO_LPCSTR(std::string &str)
-	{
-		return LPCSTR(str.c_str());
-	}
-		
-	
+
 
 	
 	
@@ -664,9 +807,12 @@ namespace ws // - Win32 Simple
 		    int drawY = (y - o.y) - viewPos.y;
 		    
 		    // Culling check
-		    if (drawX + getScaledWidth() < 0 || drawY + getScaledHeight() < 0 ||
-		        drawX >= view.getPortSize().x || drawY >= view.getPortSize().y) {
-		        return;
+		    RECT spriteRect = {drawX, drawY, drawX + getScaledWidth(), drawY + getScaledHeight()};
+		    RECT viewportRect = {0, 0, view.getPortSize().x, view.getPortSize().y};
+		    RECT intersection;
+
+		    if (!IntersectRect(&intersection, &spriteRect, &viewportRect)) {
+   		    	return; // No intersection with viewport means the entire sprite is outside of view
 		    }
 		    
 		    HBRUSH brush = CreateSolidBrush(color);
@@ -1048,6 +1194,10 @@ namespace ws // - Win32 Simple
 	        }
 	    }
 	};
+	
+	
+	
+	
 
 
 
