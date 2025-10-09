@@ -26,6 +26,7 @@
 
 #include <queue>
 #include <iomanip>
+#include <cmath>
 
 #include <mmsystem.h>
 
@@ -115,6 +116,28 @@ namespace ws // - Win32 Simple
 	{
 		float x,y,z;
 	};
+	
+	
+	struct IntRect
+	{
+		int left,top,width,height;	
+	};
+	
+	struct FloatRect
+	{
+		float left,top,width,height;
+	};
+	
+	struct DoubleRect
+	{
+		double left,top,width,height;
+	};
+	
+	
+	
+	
+	
+	
 	
 	
 	
@@ -266,11 +289,6 @@ namespace ws // - Win32 Simple
 
 	
 	
-	
-	struct Vector2f 
-	{
-		float x,y;
-	};
 	
 	
 
@@ -594,9 +612,9 @@ namespace ws // - Win32 Simple
 		int x = 0,y = 0,z = 0;
 		int width = 1,height = 1;
 		
-		Vector2f scale = {1,1};		
+		Vec2f scale = {1,1};		
 		
-		void setScale(Vector2f s)	
+		void setScale(Vec2f s)	
 		{
 			scale.x = s.x;
 			scale.y = s.y;
@@ -863,7 +881,6 @@ namespace ws // - Win32 Simple
 		}
 	    
 	    
-	    private:
 		virtual void draw(HDC hdc, ws::View &view) override {
 	        // Create and select a blue pen
 	        HPEN hPen = CreatePen(PS_SOLID, width, color);
@@ -1143,7 +1160,6 @@ namespace ws // - Win32 Simple
 	
 	
 	
-		private:
 	    
 	
 	
@@ -1198,6 +1214,140 @@ namespace ws // - Win32 Simple
 	
 	
 	
+
+
+
+
+
+
+
+
+	
+	class Radial : public Drawable
+	{
+		public:
+		Poly poly;
+		
+		Radial()
+		{
+			poly.fillColor = RGB(0,0,255);
+			poly.borderColor = RGB(0,0,200);
+			poly.borderWidth = 2;
+			poly.closed = true;
+			poly.filled = true;
+			make();
+		}
+		
+		void make(int points = 500)
+		{
+			poly.clear();
+			
+			double inc = (2*3.14)/points; 
+			
+			for(double a=0;a<(2*3.14);a+=inc)
+			{
+				int resx = static_cast<int>(std::cos(a) * getRadius());
+				int resy = static_cast<int>(std::sin(a) * getRadius());
+				poly.addVertex(center.x + resx,center.y + resy);
+			}
+			m_points = points;
+			
+			updateDrawableProperties();
+		}
+		
+		
+		
+		void setPosition(int posx,int posy)
+		{
+			center = {posx,posy};
+			make(m_points);
+		}
+		
+		void setPosition(POINT pos)
+		{
+			center = pos;
+			make(m_points);
+		}
+		
+		void setPointCount(int count)
+		{
+			m_points = count;
+			make(m_points);
+		}
+		
+		void setRadius(int size)
+		{
+			radius = size;
+			make(m_points);
+		}
+		
+		void setFillColor(COLORREF color)
+		{
+			poly.fillColor = color; 
+		}
+		
+		void setBorderColor(COLORREF color)
+		{
+			poly.borderColor = color;
+		}
+		
+		void setBorderWidth(int size)
+		{
+			poly.borderWidth = size;
+		}
+		
+		
+		int getRadius()
+		{
+			return radius;
+		}
+		
+		POINT getPosition()
+		{
+			return center;
+		}
+		
+		int getPointCount()
+		{
+			return m_points;
+		}
+		
+		
+	    virtual void draw(HDC hdc, View &view) override
+	    {
+	        poly.draw(hdc, view);
+	    }
+	    
+	    virtual bool contains(POINT pos) override
+	    {
+	        return poly.contains(pos);
+	    }	
+		
+		
+		private:
+		POINT center;
+		int m_points = 500;
+		int radius = 10;
+		
+		
+		void updateDrawableProperties()
+	    {
+	        // Set Drawable's position and size based on the poly's bounding rect
+	        RECT bounds = poly.getBoundingRect();
+	        x = bounds.left;
+	        y = bounds.top;
+	        width = bounds.right - bounds.left;
+	        height = bounds.bottom - bounds.top;
+	    }
+		
+	};
+
+
+
+
+
+
+
 
 
 
