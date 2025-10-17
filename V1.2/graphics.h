@@ -397,7 +397,6 @@ namespace ws // - Win32 Simple
 	        }
 
 
-
 			bitmap = (HBITMAP)LoadImageW(
 			NULL,
 			WIDE(path).c_str(),
