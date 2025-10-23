@@ -18,7 +18,8 @@
 
  
 #include <windows.h>  
-#include <windowsx.h>    
+#include <windowsx.h>  
+#include <commctrl.h>  
 #include <iostream>
 #include <string>
 #include <cstdlib>      
@@ -37,10 +38,29 @@
 
 
 
-namespace ws // - Win32 Simple
+
+
+namespace ws // WINAPI CONVERTERS
 {
-
-
+	bool ResolveRelativePath(std::string path)
+	{
+		// Convert to absolute path to ensure proper resolution
+	    std::filesystem::path filePath(path);
+	    if (filePath.is_relative()) {
+	        // Get executable directory and resolve relative path
+	        char exePath[MAX_PATH];
+	        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+	        filePath = exeDir / filePath;
+	    }
+	    
+	    if (!std::filesystem::exists(filePath)) {
+	        std::cerr << "File not found at: " << filePath.string() << std::endl;
+	        return false;
+	    }
+	    path = filePath.string();
+	    return true;
+	}
 
 	
 	std::wstring WIDE(std::string str)
@@ -68,7 +88,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
-	LPCSTR TO_LPCSTR(std::string &str)
+	LPCSTR TO_LPCSTR(std::string str)
 	{
 		return LPCSTR(str.c_str());
 	}
@@ -97,7 +117,14 @@ namespace ws // - Win32 Simple
 	    return shortPath;
 	}
 
-	
+		
+}
+
+
+
+
+namespace ws //DATA TYPES
+{
 	
 	struct Vec2d
 	{
@@ -108,6 +135,12 @@ namespace ws // - Win32 Simple
 	{
 		float x,y;
 	};
+	
+	struct Vec2i
+	{
+		int x,y;
+	};
+	
 	struct Vec3d
 	{
 		double x,y,z;
@@ -115,6 +148,10 @@ namespace ws // - Win32 Simple
 	struct Vec3f
 	{
 		float x,y,z;
+	};
+	struct Vec3i
+	{
+		int x,y,z;
 	};
 	
 	
@@ -133,14 +170,16 @@ namespace ws // - Win32 Simple
 		double left,top,width,height;
 	};
 	
-	
-	
-	
-	
-	
-	
-	
-	
+		
+}
+
+
+
+
+
+
+namespace ws //SOUND AND VIDEO ENTITIES
+{
 	
 	class Wav
 	{
@@ -596,82 +635,15 @@ namespace ws // - Win32 Simple
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	class Timer
-	{
-		public:
 		
-		
-		
-		Timer()
-		{
-			LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
-            frequency = static_cast<double>(freq.QuadPart);
-			restart();
-		}
-		
-		~Timer()
-		{
-		}
-		
-		double restart()
-		{
-	        double seconds = getSeconds();
-            LARGE_INTEGER counter;
-            QueryPerformanceCounter(&counter);
-            startTime = counter.QuadPart;
-            
-            return seconds;
-		}
-		
-		
-	    double getSeconds() const
-	    {
-	        LARGE_INTEGER currentTime;
-	        QueryPerformanceCounter(&currentTime);
-	        return static_cast<double>(currentTime.QuadPart - startTime) / frequency;
-	      
-	    }
-	    
-	    double getMilliSeconds() const
-	    {
-	        return getSeconds() * 1000.0;
-	    }
-	    
-	    double getMicroSeconds() const
-	    {
-	        return getMilliSeconds() * 1000.0;
-	    }
-	
-		private:
-		    LONGLONG startTime = 0;
-		    double frequency = 1.0;	
-		
-			
-	};
-	
-	
-	
-	
-	
+}
 
-	
-	
-	
-	
 
-	
-	
-	
+
+namespace ws //GRAPHICS ENTITIES
+{
+
+
 	class View
 	{
 		public:
@@ -845,16 +817,9 @@ namespace ws // - Win32 Simple
 		
 			
 	};
-	
-	
-
-	
-	
 
 
-	
-	
-	
+
 	
 	
 	class Texture
@@ -935,6 +900,9 @@ namespace ws // - Win32 Simple
 	        }
 
 
+			if(!ResolveRelativePath(path))
+				return false;
+
 
 			bitmap = (HBITMAP)LoadImageW(
 			NULL,
@@ -975,8 +943,337 @@ namespace ws // - Win32 Simple
 	    }	    
 	    
 	    
+	    
+	    
+	    COLORREF getPixel(int Xindex,int Yindex)
+	    {
+			
+			
+			HDC hdc = CreateCompatibleDC(NULL);
+			if(!hdc)
+				return RGB(0,0,0);
+			
+			
+			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
+			
+			
+			COLORREF result = GetPixel(hdc,Xindex,Yindex);
+			
+			
+	        SelectObject(hdc, oldbitmap);
+	        DeleteDC(hdc);	    	
+	        
+	        return result;
+		}
+		
+		
+		
+		
+		bool setPixel(COLORREF color,int Xindex,int Yindex)
+		{
+		
+			HDC hdc = CreateCompatibleDC(NULL);
+			if(!hdc)
+				return false;
+			
+			
+			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
+			
+			color = RGB(GetBValue(color),GetGValue(color),GetRValue(color));//convert to BGR for HBITMAP. COLORREF is RGB. HBITMAP is BGR
+			
+			SetPixel(hdc,Xindex,Yindex,color);
+			
+			
+	        SelectObject(hdc, oldbitmap);
+	        DeleteDC(hdc);	    	
+	        
+	        return true;			
+		}
 			
 	};
+	
+	
+	
+	
+	class PixelArray
+	{
+			
+		private:
+		
+		COLORREF* pixels = nullptr;
+		
+		int getPixelIndex(int x,int y)	
+		{
+			return (y * width + x);	
+		}
+		
+		public:	
+		int width = 0;
+		int height = 0;
+		
+		
+		PixelArray()
+		{
+			
+		}
+		
+		~PixelArray()
+		{
+			clear();
+		}
+		
+		
+		
+	    // Copy constructor
+	    PixelArray(const PixelArray& other)
+	    {
+	        if (other.pixels && other.width > 0 && other.height > 0)
+	        {
+	            create(other.width, other.height);
+	            for (int x = 0; x < width; x++)
+	            {
+	                for (int y = 0; y < height; y++)
+	                {
+	                    pixels[getPixelIndex(x,y)] = other.pixels[getPixelIndex(x,y)];
+	                }
+	            }
+	        }
+	    }
+	    
+	    // Assignment operator
+	    PixelArray& operator=(const PixelArray& other)
+	    {
+	        if (this != &other)
+	        {
+	            clear();
+	            if (other.pixels && other.width > 0 && other.height > 0)
+	            {
+	                create(other.width, other.height);
+	                for (int x = 0; x < width; x++)
+	                {
+	                    for (int y = 0; y < height; y++)
+	                    {
+	                         pixels[getPixelIndex(x,y)] = other.pixels[getPixelIndex(x,y)];
+	                    }
+	                }
+	            }
+	        }
+	        return *this;
+	    }
+	    
+	    // Move constructor
+	    PixelArray(PixelArray&& other) noexcept
+	        : pixels(other.pixels), width(other.width), height(other.height)
+	    {
+	        other.pixels = nullptr;
+	        other.width = 0;
+	        other.height = 0;
+	    }
+	    
+	    // Move assignment operator
+	    PixelArray& operator=(PixelArray&& other) noexcept
+	    {
+	        if (this != &other)
+	        {
+	            clear();
+	            pixels = other.pixels;
+	            width = other.width;
+	            height = other.height;
+	            
+	            other.pixels = nullptr;
+	            other.width = 0;
+	            other.height = 0;
+	        }
+	        return *this;
+	    }		
+		
+		
+		
+		
+		
+		
+		
+		void clear()
+		{
+			if(pixels)
+			{
+				delete[] pixels;
+				pixels = nullptr;
+			}
+			width = 0;
+			height = 0;
+		}
+		
+		
+		
+		
+		bool create(int w,int h)
+		{
+			
+			clear();
+			
+			if(w <= 0 || h <= 0)
+				return false;
+			
+			width = w;
+			height = h;
+			
+			
+			pixels = new COLORREF[width * height];
+			
+	
+			for(int a=0;a<width * height;a++)
+			{
+				pixels[a] = RGB(0,0,0);
+			}
+			
+			return true;
+		}
+		
+		
+		
+		
+		
+		bool convertToPixel(Texture &texture)
+		{
+			//convert HBITMAP to COLORREFS
+			//INIT PIXELS AS 2D ARRAY USING WIDTH AND HEIGHT FROM HBITMAP.
+			
+			if(!texture.isValid())
+				return false;
+			
+			width = texture.width;
+			height = texture.height;
+			
+			
+			create(width,height);
+			
+			for(int x=0;x<width;x++)
+			{
+				for(int y=0;y<height;y++)
+				{
+					pixels[getPixelIndex(x,y)] = texture.getPixel(x,y);
+				}
+			}	
+			
+	        return true;
+						
+		}
+		
+		
+		bool sendToTexture(Texture &texture)
+		{
+			
+	        if (!pixels || width <= 0 || height <= 0)
+	            return false;
+	        
+	        
+	        
+	        
+	        
+	        // Create device context
+	        HDC hdc = CreateCompatibleDC(NULL);
+	        if (!hdc)
+	            return false;
+	        
+	        
+	        // Create bitmap
+	        BITMAPINFO bmi = {};
+	        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	        bmi.bmiHeader.biWidth = width;
+	        bmi.bmiHeader.biHeight = -height;  // Negative for top-down
+	        bmi.bmiHeader.biPlanes = 1;
+	        bmi.bmiHeader.biBitCount = 32;
+	        bmi.bmiHeader.biCompression = BI_RGB;
+	        
+			
+			
+			void* pBits = nullptr;
+	        HBITMAP hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, NULL, 0);
+	        if (!hBitmap)
+	        {
+	            DeleteDC(hdc);
+	            return false;
+	        }
+	        
+	        // Copy pixels to the bitmap (bitmap expects row-major order: [y][x])
+	        COLORREF* pPixels = (COLORREF*)pBits;
+
+			//Convert RGB data to BGR for HBITMAP
+			for (int i = 0; i < width * height; i++)
+		    {
+		        COLORREF srcPixel = pixels[i];
+		        BYTE r = GetRValue(srcPixel);
+		        BYTE g = GetGValue(srcPixel); 
+		        BYTE b = GetBValue(srcPixel);
+		        
+		        // Convert RGB to BGR for bitmap
+		        pPixels[i] = RGB(b, g, r);
+		    }
+
+			
+		    if (texture.bitmap)
+		    {
+		        DeleteObject(texture.bitmap);
+		    }	        
+	        
+	        // Set up the texture
+	        texture.bitmap = hBitmap;
+	        texture.width = width;
+	        texture.height = height;
+	        
+	        // Clean up
+	        DeleteDC(hdc);
+	        
+	        return true;
+		}
+		
+		
+		
+		
+		
+		void setPixel(COLORREF color,int x,int y)
+		{
+			if(x >=0 && x < width && y >=0 && y < height)
+				pixels[getPixelIndex(x,y)] = color;
+			
+		}
+		
+		COLORREF getPixel(int x,int y)
+		{
+			if(x >=0 && x < width && y >=0 && y < height)
+				return pixels[getPixelIndex(x,y)];
+			return RGB(0,0,0);
+		}
+		
+		
+		
+		bool setMask(COLORREF startColor,COLORREF endColor)
+		{
+			
+			if(width <=0 || height <=0)
+				return false;
+				
+			for(int x=0;x<width;x++)
+			{
+				for(int y=0;y<height;y++)
+				{
+					COLORREF c = getPixel(x,y);
+					if(c == startColor)
+					{
+						setPixel(endColor,x,y);
+					}
+					
+				}
+			}
+			
+			return true;
+		}		
+		
+		
+		
+	};
+	
 	
 	
 		
@@ -1650,11 +1947,13 @@ namespace ws // - Win32 Simple
 		void move(POINT delta)
 		{
 			setPosition(center.x + delta.x,center.y + delta.y);
+			make(m_points);
 		}
 		
 		void move(int deltaX,int deltaY)
 		{
 			setPosition(center.x + deltaX,center.y + deltaY);
+			make(m_points);
 		}
 		
 		
@@ -1673,16 +1972,19 @@ namespace ws // - Win32 Simple
 		void setFillColor(COLORREF color)
 		{
 			poly.fillColor = color; 
+			make(m_points);
 		}
 		
 		void setBorderColor(COLORREF color)
 		{
 			poly.borderColor = color;
+			make(m_points);
 		}
 		
 		void setBorderWidth(int size)
 		{
 			poly.borderWidth = size;
+			make(m_points);
 		}
 		
 		
@@ -1731,15 +2033,74 @@ namespace ws // - Win32 Simple
 		
 	};
 
+	
+}
 
 
 
 
 
 
+namespace ws //SYSTEM ENTITIES
+{
+	
+	class Timer
+	{
+		public:
+		
+		
+		
+		Timer()
+		{
+			LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            frequency = static_cast<double>(freq.QuadPart);
+			restart();
+		}
+		
+		~Timer()
+		{
+		}
+		
+		double restart()
+		{
+	        double seconds = getSeconds();
+            LARGE_INTEGER counter;
+            QueryPerformanceCounter(&counter);
+            startTime = counter.QuadPart;
+            
+            return seconds;
+		}
+		
+		
+	    double getSeconds() const
+	    {
+	        LARGE_INTEGER currentTime;
+	        QueryPerformanceCounter(&currentTime);
+	        return static_cast<double>(currentTime.QuadPart - startTime) / frequency;
+	      
+	    }
+	    
+	    double getMilliSeconds() const
+	    {
+	        return getSeconds() * 1000.0;
+	    }
+	    
+	    double getMicroSeconds() const
+	    {
+	        return getMilliSeconds() * 1000.0;
+	    }
+	
+		private:
+		    LONGLONG startTime = 0;
+		    double frequency = 1.0;	
+		
+			
+	};
+	
+	
 
-
-
+	
 	
 	
 	
@@ -1771,8 +2132,20 @@ namespace ws // - Win32 Simple
 	    HBITMAP backBufferBitmap;
 
 		
+		INITCOMMONCONTROLSEX icex;
+		
 		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW)
 		{
+			
+			style |= WS_CLIPCHILDREN;
+			
+			//This is for initialization of winapi child objects sucg as buttons and textboxes.
+			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+			icex.dwICC = ICC_STANDARD_CLASSES;  // Enables a set of common controls.
+			InitCommonControlsEx(&icex);
+			///////////////////////////////
+			
+			
 			
 			view.setRect({0,0,width,height});//Sets world rect
 			view.setPortRect({0,0,width,height});//Sets viewport rect
@@ -2148,8 +2521,8 @@ namespace ws // - Win32 Simple
 		    else 
 		    {
 		        BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);	        
-				InvalidateRect(hwnd, NULL, FALSE);
-		        UpdateWindow(hwnd);
+//				InvalidateRect(hwnd, NULL, FALSE);
+//		        UpdateWindow(hwnd);
 		    }
 
 			ReleaseDC(hwnd, hdc);
@@ -2277,6 +2650,17 @@ namespace ws // - Win32 Simple
 					y = GET_Y_LPARAM(lParam);
 				}
 				
+				case WM_COMMAND:
+				{
+					MSG msg;
+					msg.hwnd = hwnd;
+					msg.lParam = lParam;
+					msg.wParam = wParam;
+					msg.message = WM_COMMAND;
+					
+		            msgQ.push(msg);
+				}
+				
 	        }
             
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -2323,21 +2707,15 @@ namespace ws // - Win32 Simple
     std::map<HWND, Window*> Window::windowInstances;
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+		
+}
+
+
+
+
+namespace ws //GLOBAL INPUT
+{
     
 	namespace Global
 	{
@@ -2387,10 +2765,216 @@ namespace ws // - Win32 Simple
 		}
 	}
 	
-    
-    
-    
-    
+}
+
+
+
+
+
+namespace ws //CHILD WINDOW API
+{
+	
+	
+	
+	
+	int maxControlID = 0;
+	
+	
+	
+	class Child
+	{
+		public:
+		
+		HWND hwnd = NULL;
+		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
+		std::string titleText = "Title";
+		int x = 0,y = 0,width = 100,height = 100;
+		int controlID = 0; // Default control ID
+
+
+		Child()
+		{
+			controlID = maxControlID+1;
+			maxControlID++;
+		}
+
+        virtual ~Child()
+        {
+            if (hwnd && IsWindow(hwnd))
+            {
+                DestroyWindow(hwnd);
+            }
+        }				
+		
+		void setPosition(int xPos,int yPos)
+		{
+			x = xPos;
+			y = yPos;
+			if(hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}		
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			x = pos.x;
+			y = pos.y;
+			if(hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			return {x,y};
+		}
+		
+		void setSize(ws::Vec2i size)
+		{
+			width = size.x;
+			height = size.y;
+			if(hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		
+		void setSize(int w,int h)
+		{
+			width = w;
+			height = h;
+			if(hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		
+		ws::Vec2i getSize()
+		{
+			return {width,height};
+		}
+				
+		void addStyle(DWORD addedStyle)
+		{
+            style |= addedStyle;
+			if (hwnd)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style);
+                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+		}
+		
+		void removeStyle(DWORD removedStyle)
+		{
+			
+			style &= ~removedStyle;
+			if (hwnd)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style);
+                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }			
+		}
+		
+        bool hasStyle(DWORD checkStyle)
+        {
+            if (hwnd)
+            {
+                DWORD currentStyle = GetWindowLong(hwnd, GWL_STYLE);
+                return (currentStyle & checkStyle) != 0;
+            }
+            return (style & checkStyle) != 0;
+        }
+		
+		void setTitle(std::string newText)
+		{
+			titleText = newText;
+			if (hwnd)
+                SetWindowTextA(hwnd, titleText.c_str());
+            
+		}
+		
+		std::string getTitle()
+		{
+			return titleText;
+		}
+		
+		
+		
+		bool contains(ws::Vec2i point)
+		{
+			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
+		}
+			
+	};
+	
+	
+	
+	
+	
+	
+	class Button : public Child
+	{
+		public:
+		
+		
+		Button()
+		{
+		}
+		
+		
+		bool init(ws::Window &parent)
+		{
+			
+			if(!parent.hwnd)
+			{
+				std::cerr << "Child Error: Selected parent is not valid!\n";
+				return false;
+			}
+			
+			addStyle(BS_DEFPUSHBUTTON);
+			
+			
+			hwnd = CreateWindowEx(
+			0,
+			ws::TO_LPCSTR("BUTTON"),
+			ws::TO_LPCSTR(getTitle()),
+			style,
+			getPosition().x,
+			getPosition().y,
+			getSize().x,
+			getSize().y,
+			parent.hwnd,
+            (HMENU)(UINT_PTR)controlID,
+            GetModuleHandle(nullptr),
+            nullptr);			
+			
+		    if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create Button!\n";
+	            return false;
+	        }	
+		
+			ShowWindow(hwnd,SW_SHOW);
+			UpdateWindow(hwnd);
+		
+			return true;		
+		}
+		
+		
+		
+	    bool isPressed(MSG &msg)
+	    {
+	    	
+	    	
+	        if(msg.message == WM_COMMAND && HIWORD(msg.wParam) == BN_CLICKED)
+	        {
+	            if(LOWORD(msg.wParam) == controlID)
+	            {
+	                return true;
+	            }
+	        }
+	        return false;
+	    }
+
+	};
+	
+	
 	
 }
 
