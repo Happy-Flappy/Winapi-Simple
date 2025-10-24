@@ -1,4 +1,4 @@
-#include "graphics.h"
+#include "winsimple.h"
 #include "camera.h"  
 #include <vector>
 #include <algorithm>
@@ -173,6 +173,7 @@ class Mesh3D
 	
 	
 	std::vector<ws::Poly> polygons;
+	
 	bool getPolygons()
 	{
 		polygons.clear();		
@@ -296,9 +297,36 @@ class Mesh3D
 		return true;
 	}
 	
+
 	
+
+
+
+
+	unsigned int lastDraw = 10000000;
+	HDC canvasDC;
+	void updateDraw(ws::Window &window,int processAmount = 50)
+	{
+		if(lastDraw >= tree.polygons.size())
+		{
+			//empty canvasDC
+			lastDraw = 0;
+		}
+		for(unsigned int a = lastDraw; a < tree.polygons.size() && a < processAmount; a++)
+		{
+			tree.polygons[a].draw(canvasDC,window.view);
+		}
+		lastDraw += processAmount;
+		
+		
+	}
+
+
 	
-	
+	void draw(ws::Window &window)
+	{
+		//add canvasDC to window buffer DC without replacing pixels below canvasDC's non-transparent pixels.
+	}
 	
     // Set color for a specific face
     void setFaceColor(int faceIndex, COLORREF color)
@@ -527,6 +555,15 @@ void MakeMap(Mesh3D &mesh)
 
 
 
+
+
+
+
+
+
+
+
+
 int main()
 {
 	ws::Texture tmap;
@@ -663,12 +700,16 @@ int main()
 //		}
         
         
-        tree.getDividedPolygons(); 
-		for(auto& polys : tree.polygons)
-        {
-        	window.draw(polys);
-		}
-        
+        tree.getPolygons(); 
+		ws::Timer frameRate;
+		
+		updateDraw(window);
+		
+		std::cerr << "FPS:" << frameRate.getSeconds() << "\n";
+    
+		
+		
+		
 		
         window.display();
     }

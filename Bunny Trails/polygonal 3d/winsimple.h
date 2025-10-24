@@ -2398,6 +2398,7 @@ namespace ws //SYSTEM ENTITIES
 	        }
             
 			return isRunning;
+
 		}
 		
 		
@@ -2570,6 +2571,8 @@ namespace ws //SYSTEM ENTITIES
 	
         LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
+
+
             switch (uMsg) {
 	            case WM_DESTROY:
 	                PostQuitMessage(0);
@@ -2650,18 +2653,18 @@ namespace ws //SYSTEM ENTITIES
 					y = GET_Y_LPARAM(lParam);
 				}
 				
-				case WM_COMMAND:
-				{
-					MSG msg;
-					msg.hwnd = hwnd;
-					msg.lParam = lParam;
-					msg.wParam = wParam;
-					msg.message = WM_COMMAND;
-					
-		            msgQ.push(msg);
-				}
 				
 	        }
+	        
+	        
+	        //Secondary message adding because not all messages are received always.
+		    MSG msg;
+		    msg.hwnd = hwnd;
+		    msg.lParam = lParam;
+		    msg.wParam = wParam;
+		    msg.message = uMsg;
+		    msgQ.push(msg);
+            
             
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
         }
@@ -2781,17 +2784,34 @@ namespace ws //CHILD WINDOW API
 	
 	
 	
+	
 	class Child
 	{
 		public:
 		
+		ws::Window *parentRef = nullptr;
 		HWND hwnd = NULL;
 		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
+		DWORD textStyle = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
 		std::string titleText = "Title";
 		int x = 0,y = 0,width = 100,height = 100;
-		int controlID = 0; // Default control ID
+		unsigned int controlID = 0;
+		COLORREF backgroundColor = RGB(0,0,0);
+		COLORREF textColor = RGB(255,255,255);
+		COLORREF borderColor = RGB(0,0,0);
+		
+		private:
+		
+		int litX = 0,litY = 0,litWidth = 0,litHeight = 0;
+		
 
+		void setPosLit()
+		{
+			SetWindowPos(hwnd, nullptr, litX, litY, litWidth, litHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+		}
 
+		public:
+		
 		Child()
 		{
 			controlID = maxControlID+1;
@@ -2810,43 +2830,51 @@ namespace ws //CHILD WINDOW API
 		{
 			x = xPos;
 			y = yPos;
-			if(hwnd)
-				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+			
+			update();
 		}		
 		
 		void setPosition(ws::Vec2i pos)
 		{
 			x = pos.x;
 			y = pos.y;
-			if(hwnd)
-				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+			update();
 		}
 		
 		ws::Vec2i getPosition()
 		{
 			return {x,y};
 		}
+
+		ws::Vec2i getLiteralPosition()
+		{
+			return {litX,litY};
+		}
 		
 		void setSize(ws::Vec2i size)
 		{
 			width = size.x;
 			height = size.y;
-			if(hwnd)
-				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+			update();
 		}
 		
 		void setSize(int w,int h)
 		{
 			width = w;
 			height = h;
-			if(hwnd)
-				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+			update();
 		}
 		
 		ws::Vec2i getSize()
 		{
 			return {width,height};
 		}
+
+		ws::Vec2i getLiteralSize()
+		{
+			return {litWidth,litHeight};
+		}
+
 				
 		void addStyle(DWORD addedStyle)
 		{
@@ -2857,6 +2885,7 @@ namespace ws //CHILD WINDOW API
                 SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
             }
+            update();
 		}
 		
 		void removeStyle(DWORD removedStyle)
@@ -2868,7 +2897,8 @@ namespace ws //CHILD WINDOW API
                 SetWindowLong(hwnd, GWL_STYLE, style);
                 SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }			
+            }	
+			update();		
 		}
 		
         bool hasStyle(DWORD checkStyle)
@@ -2886,7 +2916,7 @@ namespace ws //CHILD WINDOW API
 			titleText = newText;
 			if (hwnd)
                 SetWindowTextA(hwnd, titleText.c_str());
-            
+            update();
 		}
 		
 		std::string getTitle()
@@ -2900,7 +2930,117 @@ namespace ws //CHILD WINDOW API
 		{
 			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
 		}
+		
+		
+		
+		void update(MSG *getMsg = nullptr)
+		{
 			
+			if(!parentRef)
+				return;
+			if(!hwnd)
+				return;
+
+
+
+			int windowWidth = parentRef->width;
+			int windowHeight = parentRef->height;
+
+		    POINT originalSize = parentRef->view.getSize();
+		    
+		    
+		    
+		    if (originalSize.x <= 0 || originalSize.y <= 0) 
+		        return;
+		        
+		    if (windowWidth <= 0 || windowHeight <= 0) 
+		        return;
+		        
+
+			
+		    float wScale = static_cast<float>(windowWidth) / originalSize.x;
+		    float hScale = static_cast<float>(windowHeight) / originalSize.y;
+			
+			
+			litX = static_cast<int>(x * wScale);
+			litY = static_cast<int>(y * hScale);
+			litWidth = static_cast<int>(width * wScale);
+			litHeight = static_cast<int>(height * hScale);
+			
+			setPosLit();
+			
+			
+			if(getMsg != nullptr)
+			{
+				MSG &msg = *getMsg;
+			
+				if(msg.message == WM_DRAWITEM)
+				{
+				    LPDRAWITEMSTRUCT pDrawItem = (LPDRAWITEMSTRUCT)msg.lParam;
+				    
+				    if (pDrawItem->CtlID == controlID)
+				    {
+				        HDC hdc = pDrawItem->hDC;
+				        RECT rc = pDrawItem->rcItem;
+				        
+				        // Draw background
+				        HBRUSH hBrush = CreateSolidBrush(backgroundColor);
+				        FillRect(hdc, &rc, hBrush);
+				        DeleteObject(hBrush);
+				        
+				        // Draw border
+				        if (pDrawItem->itemState & ODS_SELECTED)
+				        {
+				            DrawEdge(hdc, &rc, BDR_SUNKENOUTER, BF_RECT);
+				        }
+				        else
+				        {
+				            DrawEdge(hdc, &rc, BDR_RAISEDINNER, BF_RECT);
+				        }
+				        
+				        // Draw text
+				        SetBkMode(hdc, TRANSPARENT);
+				        SetTextColor(hdc, textColor);
+				        
+				        DrawTextA(hdc, getTitle().c_str(), -1, &rc, 
+				                 textStyle);
+				        
+				        InvalidateRect(hwnd, NULL, TRUE);
+				    }
+				}	
+				
+						
+			}
+			
+			
+			
+		}
+		
+		
+		void setFillColor(COLORREF color)
+	    {
+	        backgroundColor = color;
+	        if (hwnd)
+	            InvalidateRect(hwnd, NULL, TRUE);
+	    }
+	    
+	    void setTextColor(COLORREF color)
+	    {
+	        textColor = color;
+	        if (hwnd)
+	            InvalidateRect(hwnd, NULL, TRUE);
+	    }
+		
+		void setBorderColor(COLORREF color)
+		{
+			borderColor = color;
+			if (hwnd)
+			    InvalidateRect(hwnd, NULL, TRUE);
+		}
+		
+		
+		
+		
 	};
 	
 	
@@ -2914,7 +3054,7 @@ namespace ws //CHILD WINDOW API
 		
 		
 		Button()
-		{
+		{	
 		}
 		
 		
@@ -2927,7 +3067,9 @@ namespace ws //CHILD WINDOW API
 				return false;
 			}
 			
-			addStyle(BS_DEFPUSHBUTTON);
+			parentRef = &parent;
+			
+			
 			
 			
 			hwnd = CreateWindowEx(
@@ -2974,6 +3116,115 @@ namespace ws //CHILD WINDOW API
 
 	};
 	
+
+
+
+	class Slider : public Child
+	{
+		public:
+		
+		
+		Slider()
+		{
+		}
+		
+		
+		bool init(ws::Window &parent)
+		{
+			
+			if(!parent.hwnd)
+			{
+				std::cerr << "Child Error: Selected parent is not valid!\n";
+				return false;
+			}
+			
+			parentRef = &parent;
+			
+			addStyle(TBS_HORZ);
+			addStyle(TBS_AUTOTICKS);
+			
+			
+			hwnd = CreateWindowEx(
+			0,
+			TRACKBAR_CLASS,
+			LPCSTR(""),//No window text
+			style,
+			getPosition().x,
+			getPosition().y,
+			getSize().x,
+			getSize().y,
+			parent.hwnd,
+            (HMENU)(UINT_PTR)controlID,
+            GetModuleHandle(nullptr),
+            nullptr);			
+			
+		    if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create Button!\n";
+	            return false;
+	        }	
+		
+			ShowWindow(hwnd,SW_SHOW);
+			UpdateWindow(hwnd);
+			
+			setRange(0,100);
+		
+			return true;		
+		}
+		
+		
+		
+	    bool getScroll(MSG &msg)
+	    {
+	    	
+	        if((msg.message == WM_HSCROLL || msg.message == WM_VSCROLL) && (HWND)msg.lParam == hwnd)
+	        {
+	            slidePos = (int)SendMessage(hwnd, TBM_GETPOS, 0, 0);
+	            
+				return true;
+	        }
+	        return false;
+	    }
+	    
+	    
+	    void setHorizontal()
+	    {
+	    	removeStyle(TBS_VERT);
+	    	addStyle(TBS_HORZ);
+	    	update();
+		}
+		
+		void setVertical()
+		{
+	    	removeStyle(TBS_HORZ);
+	    	addStyle(TBS_VERT);	
+			update();		
+		}
+		
+        
+		void setRange(int minimum = 0,int maximum = 100)
+		{
+			SendMessage(hwnd, TBM_SETRANGEMIN, TRUE, minimum);
+			SendMessage(hwnd, TBM_SETRANGEMAX, TRUE, maximum);
+		}
+		
+		void setSlidePosition(int pos = 0)
+		{
+			SendMessage(hwnd, TBM_SETPOS, TRUE, pos);
+			slidePos = pos; 
+		}
+		
+		int getSlidePosition()
+		{
+			return slidePos;
+		}
+		
+		
+		private:
+			int slidePos = 0;
+		
+	};
+
 	
 	
 }

@@ -1,4 +1,4 @@
-#include "graphics.h"
+#include "winsimple.h"
 
 
 
@@ -10,14 +10,45 @@ int main()
 
 	ws::Button buttonSmaller;
 	buttonSmaller.init(window);
-	buttonSmaller.setTitle("Smaller");
+	buttonSmaller.setText("Smaller");
 	buttonSmaller.setSize(100,100);
+	buttonSmaller.setFillColor(RGB(255,0,0));
 	
 	ws::Button buttonLarger;
 	buttonLarger.init(window);
-	buttonLarger.setTitle("Larger");
+	buttonLarger.setText("Larger");
 	buttonLarger.setSize(100,100);
 	buttonLarger.setPosition(960-100,0);
+	
+	
+	ws::Slider slider;
+	slider.init(window);
+	slider.setRange(0,1000);
+	slider.setPosition(0,150);
+	slider.setSlidePosition(50);
+	slider.setVertical();
+	
+	
+	
+	ws::Slider slider2;
+	slider2.init(window);
+	slider2.setRange(0,255);
+	slider2.setSize(960,20);
+	slider2.setHorizontal();
+	slider2.setPosition(0,540 - 20);
+	slider2.setSlidePosition(255);
+
+
+
+
+	ws::TextBox textbox;
+	textbox.setPosition(960 - 200, 540 - 100 - 20);
+	textbox.setSize(200,100);
+	textbox.init(window);
+
+
+
+
 	
 	
 	ws::Radial radial;
@@ -27,15 +58,28 @@ int main()
 	radial.setBorderColor(RGB(200,130,0));
 	
 	
+	
+
+
+	
 	float radius = 100;
 	
 	while(window.isOpen())
 	{
+				
+		
 		
 		MSG msg;
 		
 		while(window.pollEvent(msg))
 		{
+
+			buttonSmaller.update(&msg); //Updates size and settings
+			buttonLarger.update(&msg);
+			slider.update(&msg);
+			slider2.update(&msg);
+			textbox.update(&msg);
+
 			
 			if(buttonSmaller.isPressed(msg))
 			{
@@ -48,6 +92,21 @@ int main()
 				radius ++;
 				radial.setRadius(radius);
 			}
+			
+			
+			if(slider.getScroll(msg))
+			{
+				std::cerr << slider.getSlidePosition() << "\n";
+				radial.setRadius(slider.getSlidePosition());
+			}
+			
+			if(slider2.getScroll(msg))
+			{
+				std::cerr << "FillColor: "<<slider2.getSlidePosition() << "\n";
+				radial.setFillColor(RGB(slider2.getSlidePosition(),160,0));
+			}
+			
+			
 			
 		}
 		
