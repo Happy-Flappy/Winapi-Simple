@@ -49,6 +49,8 @@ V1.4 - Beta
 
 Added Button class.
 Removed redundant display code in window.update() function.
+Added Slider class
+Added Textbox class
 
 
 V1.4 - Plans
