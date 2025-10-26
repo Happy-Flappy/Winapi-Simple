@@ -37,6 +37,9 @@
 
 
 
+
+
+
 namespace ws // WINAPI CONVERTERS
 {
 	bool ResolveRelativePath(std::string path)
@@ -120,62 +123,35 @@ namespace ws // WINAPI CONVERTERS
 
 
 
-
-namespace ws // DATA TYPES
+namespace ws //DATA TYPES
 {
 	
 	struct Vec2d
 	{
 		double x,y;	
-        Vec2d() = default;
-        Vec2d(double x, double y) : x(x), y(y) {}
 	};
 		
 	struct Vec2f
 	{
 		float x,y;
-        Vec2f() = default;
-        Vec2f(float x, float y) : x(x), y(y) {}
 	};
 	
 	struct Vec2i
 	{
 		int x,y;
-		
-		//POINT to Vec2i
-		Vec2i(const POINT& p) : x(p.x), y(p.y) {}
-		
-		//Vec2i to POINT
-        operator POINT() const {
-            POINT p;
-            p.x = x;
-            p.y = y;
-            return p;
-        }		
-        
-        
-        Vec2i() = default;
-        
-        // Constructor for direct initialization
-        Vec2i(int x, int y) : x(x), y(y) {}       
-        
 	};
 	
 	struct Vec3d
 	{
 		double x,y,z;
-
 	};
 	struct Vec3f
 	{
 		float x,y,z;
-        Vec3f() = default;
-        Vec3f(float x, float y,float z) : x(x), y(y), z(z) {}
 	};
 	struct Vec3i
 	{
 		int x,y,z;
-		
 	};
 	
 	
@@ -201,7 +177,8 @@ namespace ws // DATA TYPES
 
 
 
-namespace ws // SOUND AND VIDEO ENTITIES
+
+namespace ws //SOUND AND VIDEO ENTITIES
 {
 	
 	class Wav
@@ -663,9 +640,7 @@ namespace ws // SOUND AND VIDEO ENTITIES
 
 
 
-
-
-namespace ws // GRAPHICS ENTITIES
+namespace ws //GRAPHICS ENTITIES
 {
 
 
@@ -1962,16 +1937,11 @@ namespace ws // GRAPHICS ENTITIES
 			make(m_points);
 		}
 		
-		
-		void setPosition(ws::Vec2i pos)
+		void setPosition(POINT pos)
 		{
-			center.x = pos.x;
-			center.y = pos.y;
-			
+			center = pos;
 			make(m_points);
 		}
-		
-		
 		
 		
 		void move(POINT delta)
@@ -2070,168 +2040,8 @@ namespace ws // GRAPHICS ENTITIES
 
 
 
-namespace ws // INPUT SYSTEM 1
-{
-    
-    
-	class Input
-	{
-		private:
-		
-		
-	
-		struct Variables
-		{
-			bool keyTapped[256];
-			bool keyDown[256];
-			int count = 256;
-			POINT mousePos = {0,0};
-			bool mouseLeft = false;
-			bool mouseMiddle = false;
-			bool mouseRight = false;
-			bool mouseLeftTap = false;
-			bool mouseMiddleTap = false;
-			bool mouseRightTap = false;		
-			
-		}var;
-	    
-	    
-	    
-		public:
-	
-		bool Key(char vmKey,bool tapping=false)
-		{
-			int k = int(vmKey);
-			return tapping ? var.keyTapped[k] : var.keyDown[k];
-		}
-		
-		
-		
-		
-		
-		// Reset frame-specific states (call this at start of each frame)
-	    void beginFrame()
-	    {
-	        for(int i = 0; i < var.count; ++i) {
-	            var.keyTapped[i] = false;
-	        }
-	        var.mouseLeftTap = false;
-	        var.mouseRightTap = false;
-	        var.mouseMiddleTap = false;
-	    }
-		
-		
-		
-		
-		ws::Vec2i getPosition()
-		{
-			return {var.mousePos.x, var.mousePos.y};
-		}
-		
-		
-		bool MouseLeft(bool tapping = false)
-		{
-			return (tapping ? var.mouseLeftTap : var.mouseLeft);
-		}
-		
-		bool MouseRight(bool tapping = false)
-		{
-			return (tapping ? var.mouseRightTap : var.mouseRight);
-		}
-		
-		bool MouseMiddle(bool tapping = false)
-		{
-			return (tapping ? var.mouseMiddleTap : var.mouseMiddle);
-		}
-		
-		
-		
-		
-		
-		
-		
-		void update(MSG &m)
-		{
-			
-			
-			
-			if(m.message == WM_KEYDOWN) 
-			{
-				char keyCode = m.wParam;
-				int k = int(keyCode);
-	            if (!var.keyDown[k]) // Only trigger once per press 
-				{  
-	            	var.keyTapped[k] = true;
-	            }
-	            var.keyDown[k] = true;
-	                
-	        }
-	
-	        if (m.message == WM_KEYUP) 
-			{
-				int k = int(m.wParam);
-	            var.keyDown[k] = false;
-	        }
-	
-	
-			if(m.message == WM_MOUSEMOVE)
-			{
-				int x = GET_X_LPARAM(m.lParam);
-				int y = GET_Y_LPARAM(m.lParam);
-				var.mousePos.x = x;
-				var.mousePos.y = y;
-			}
-	
-	
-			if(m.message == WM_LBUTTONDOWN)
-			{
-				if(!var.mouseLeft)
-					var.mouseLeftTap = true;
-				var.mouseLeft = true;
-				
-			}
-			if(m.message == WM_RBUTTONDOWN)
-			{
-				if(!var.mouseRight)
-					var.mouseRightTap = true;
-				var.mouseRight = true;
-			}
-			if(m.message == WM_MBUTTONDOWN)
-			{
-				if(!var.mouseRight)
-					var.mouseRightTap = true;
-				var.mouseMiddle = true;
-			}
-			
-			
-			if(m.message == WM_LBUTTONUP)
-			{
-				var.mouseLeft = false;
-			}
-			if(m.message == WM_RBUTTONUP)
-			{
-				var.mouseRight = false;
-			}
-			if(m.message == WM_MBUTTONUP)
-			{
-				var.mouseMiddle = false;
-			}
-			
-			
-			
-		}
-		
-		
-	};
 
-	
-}
-
-
-
-
-
-namespace ws // SYSTEM ENTITIES
+namespace ws //SYSTEM ENTITIES
 {
 	
 	class Timer
@@ -2302,14 +2112,11 @@ namespace ws // SYSTEM ENTITIES
 	    int x,y,width, height;		
 		bool isTransparent = false;
 
-		ws::Input input;
-
-
 		private:
 			
 		bool isRunning = true;
 		std::queue<MSG> msgQ;
-		DWORD style = WS_OVERLAPPEDWINDOW;
+		
 
 				
 		public:		
@@ -2327,12 +2134,10 @@ namespace ws // SYSTEM ENTITIES
 		
 		INITCOMMONCONTROLSEX icex;
 		
-		Window(int width,int height,std::string title="",DWORD newStyle = WS_OVERLAPPEDWINDOW)
+		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW)
 		{
 			
-			style = newStyle;
-			
-			addStyle(WS_CLIPCHILDREN);
+			style |= WS_CLIPCHILDREN;
 			
 			//This is for initialization of winapi child objects sucg as buttons and textboxes.
 			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -2426,11 +2231,6 @@ namespace ws // SYSTEM ENTITIES
 		}
 		
 		
-		Window()
-		{
-			//Empty constructor
-		}
-		
 		
         ~Window()
         {
@@ -2453,47 +2253,6 @@ namespace ws // SYSTEM ENTITIES
 		}
 		
 		
-		
-		void addStyle(DWORD addedStyle)
-		{
-            style |= addedStyle;
-			if (hwnd)
-            {
-                SetWindowLong(hwnd, GWL_STYLE, style);
-                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }
-		}
-		
-		void removeStyle(DWORD removedStyle)
-		{
-			
-			style &= ~removedStyle;
-			if (hwnd)
-            {
-                SetWindowLong(hwnd, GWL_STYLE, style);
-                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }		
-		}
-		
-        bool hasStyle(DWORD checkStyle)
-        {
-            if (hwnd)
-            {
-                DWORD currentStyle = GetWindowLong(hwnd, GWL_STYLE);
-                return (currentStyle & checkStyle) != 0;
-            }
-        }
-        
-        
-        DWORD getStyle()
-        {
-        	return style;
-		}
-        
-        
-        
     	
     	private:
 		BYTE alpha = 255;
@@ -2624,10 +2383,7 @@ namespace ws // SYSTEM ENTITIES
 		
 		bool isOpen()
 		{
-			
-			input.beginFrame();
-			
-			MSG msg;
+	        MSG msg;
 	        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 	            if (msg.message == WM_QUIT) {
 	                isRunning = false;
@@ -2637,7 +2393,6 @@ namespace ws // SYSTEM ENTITIES
 	            TranslateMessage(&msg);
 	            DispatchMessage(&msg);
 	            
-	            input.update(msg);
 	            msgQ.push(msg);
 	            
 	        }
@@ -2661,9 +2416,6 @@ namespace ws // SYSTEM ENTITIES
 	        
 	        message = msgQ.front();
 	        msgQ.pop();
-	        
-	        
-	        
 	        return true;
 	    }	
 		
@@ -2965,12 +2717,13 @@ namespace ws // SYSTEM ENTITIES
 
 
 
-namespace ws // INPUT SYSTEM 2
+namespace ws //GLOBAL INPUT
 {
+    
 	namespace Global
 	{
 	
-		POINT getMousePos(ws::Window &window)
+		POINT getMousePos(Window &window)
 		{
 			
 		    POINT p;
@@ -3013,12 +2766,15 @@ namespace ws // INPUT SYSTEM 2
 			}
 			return false;
 		}
-	}	
+	}
+	
 }
 
 
 
-namespace ws // CHILD WINDOW API
+
+
+namespace ws //CHILD WINDOW API
 {
 	
 	
@@ -3606,9 +3362,6 @@ namespace ws // CHILD WINDOW API
 	
 	
 }
-
-
-
 
 
 #endif

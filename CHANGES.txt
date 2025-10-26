@@ -51,6 +51,8 @@ Added Button class.
 Removed redundant display code in window.update() function.
 Added Slider class
 Added Textbox class
+Added Label class
+Added conversion constructors to and from ws::Vec2i and POINT.
 
 
 V1.4 - Plans

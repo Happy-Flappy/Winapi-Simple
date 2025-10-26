@@ -5,110 +5,38 @@
 
 int main()
 {
-	
 	ws::Window window(960,540,"");
-
-	ws::Button buttonSmaller;
-	buttonSmaller.init(window);
-	buttonSmaller.setText("Smaller");
-	buttonSmaller.setSize(100,100);
-	buttonSmaller.setFillColor(RGB(255,0,0));
-	
-	ws::Button buttonLarger;
-	buttonLarger.init(window);
-	buttonLarger.setText("Larger");
-	buttonLarger.setSize(100,100);
-	buttonLarger.setPosition(960-100,0);
-	
-	
-	ws::Slider slider;
-	slider.init(window);
-	slider.setRange(0,1000);
-	slider.setPosition(0,150);
-	slider.setSlidePosition(50);
-	slider.setVertical();
-	
-	
-	
-	ws::Slider slider2;
-	slider2.init(window);
-	slider2.setRange(0,255);
-	slider2.setSize(960,20);
-	slider2.setHorizontal();
-	slider2.setPosition(0,540 - 20);
-	slider2.setSlidePosition(255);
-
-
-
-
-	ws::TextBox textbox;
-	textbox.setPosition(960 - 200, 540 - 100 - 20);
-	textbox.setSize(200,100);
-	textbox.init(window);
-
-
-
-
-	
 	
 	ws::Radial radial;
-	radial.setRadius(100);
-	radial.setPosition(300,300);
-	radial.setFillColor(RGB(255,160,0));
-	radial.setBorderColor(RGB(200,130,0));
+	radial.setRadius(500);
 	
 	
-	
-
-
-	
-	float radius = 100;
+	ws::Input myInput;
 	
 	while(window.isOpen())
 	{
-				
 		
 		
-		MSG msg;
+		myInput = window.input;//This option if you want to pass the input data to a function instead of the entire window.
 		
-		while(window.pollEvent(msg))
-		{
-
-			buttonSmaller.update(&msg); //Updates size and settings
-			buttonLarger.update(&msg);
-			slider.update(&msg);
-			slider2.update(&msg);
-			textbox.update(&msg);
-
-			
-			if(buttonSmaller.isPressed(msg))
-			{
-				radius --;
-				radial.setRadius(radius);
-			}
-			
-			if(buttonLarger.isPressed(msg))
-			{
-				radius ++;
-				radial.setRadius(radius);
-			}
-			
-			
-			if(slider.getScroll(msg))
-			{
-				std::cerr << slider.getSlidePosition() << "\n";
-				radial.setRadius(slider.getSlidePosition());
-			}
-			
-			if(slider2.getScroll(msg))
-			{
-				std::cerr << "FillColor: "<<slider2.getSlidePosition() << "\n";
-				radial.setFillColor(RGB(slider2.getSlidePosition(),160,0));
-			}
-			
-			
-			
-		}
+		
+		ws::Vec2i mouse = myInput.getPosition(); 
+		mouse = window.view.toWorld(mouse); //Vec2i going into function that expects POINT. New operators in Vec2i struct allows this.
+		
+		
+		//POINT going into function expecting Vec2i
+		POINT p = mouse;
+		radial.setPosition(p);
+		
+		
+		int difference = 0;
+		
+		if(window.input.Key(VK_UP,true))
+			difference = 50;
+		if(window.input.Key(VK_DOWN,true))
+			difference = -50;
+		
+		radial.setRadius(radial.getRadius() + difference);
 		
 		
 		window.clear();
@@ -116,5 +44,8 @@ int main()
 		window.display();
 	}
 	
-	return 0;
+	
+	
+	
+	
 }
