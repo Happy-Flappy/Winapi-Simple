@@ -32,7 +32,7 @@
 #include <mmsystem.h>
 #include <filesystem>
 #include <cwchar>
-
+#include <cstring>
 
 
 
@@ -181,7 +181,22 @@ namespace ws // DATA TYPES
 	
 	struct IntRect
 	{
-		int left,top,width,height;	
+		int left,top,width,height;
+		
+		//IntRect to RECT
+		operator RECT() const {
+            RECT r;
+            r.left = left;
+            r.top = top;
+            r.right = left + width;
+            r.bottom = top + height;
+            return r;
+        }				
+        
+        IntRect(RECT &r) : left(r.left) , top(r.top),width(r.right - r.left),height(r.bottom - r.top) {}
+		
+		IntRect() = default;
+			
 	};
 	
 	struct FloatRect
@@ -669,6 +684,74 @@ namespace ws // GRAPHICS ENTITIES
 {
 
 
+
+    class RGBA {
+    public:
+        BYTE r, g, b, a;
+        
+        // Constructors
+        RGBA() : r(0), g(0), b(0), a(255) {} // Default: opaque black
+        RGBA(BYTE red, BYTE green, BYTE blue, BYTE alpha = 255) 
+            : r(red), g(green), b(blue), a(alpha) {}
+        RGBA(COLORREF color, BYTE alpha = 255) 
+            : r(GetRValue(color)), g(GetGValue(color)), b(GetBValue(color)), a(alpha) {}
+        
+        // Conversion to COLORREF (ignores alpha)
+		template<typename T>
+		operator T() const {
+		    if constexpr (std::is_same_v<T, COLORREF>) {
+		        return RGB(r, g, b);
+		    } else if constexpr (std::is_same_v<T, DWORD>) {
+		        return (a << 24) | (r << 16) | (g << 8) | b;
+		    }
+		    return 0;
+		}
+
+        
+        // Predefined colors
+        static RGBA Transparent() { return RGBA(0, 0, 0, 0); }
+        static RGBA Black() { return RGBA(0, 0, 0, 255); }
+        static RGBA White() { return RGBA(255, 255, 255, 255); }
+        static RGBA Red() { return RGBA(255, 0, 0, 255); }
+        static RGBA Green() { return RGBA(0, 255, 0, 255); }
+        static RGBA Blue() { return RGBA(0, 0, 255, 255); }
+		static RGBA Orange() { return RGBA(255,150,0,255); }
+        
+        // Utility methods
+        bool isTransparent() const { return a == 0; }
+        bool isOpaque() const { return a == 255; }
+        float getOpacity() const { return static_cast<float>(a) / 255.0f; }
+        
+        void setOpacity(float opacity) {
+            a = static_cast<BYTE>(opacity * 255);
+        }
+        
+        // Blend with another color (simple alpha blending)
+        RGBA blend(const RGBA& other) const {
+            if (a == 0) return other;
+            if (other.a == 0) return *this;
+            if (a == 255) return *this;
+            if (other.a == 255) return other;
+            
+            float alpha1 = static_cast<float>(a) / 255.0f;
+            float alpha2 = static_cast<float>(other.a) / 255.0f;
+            float outAlpha = alpha1 + alpha2 * (1 - alpha1);
+            
+            if (outAlpha == 0) return RGBA::Transparent();
+            
+            BYTE outR = static_cast<BYTE>((r * alpha1 + other.r * alpha2 * (1 - alpha1)) / outAlpha);
+            BYTE outG = static_cast<BYTE>((g * alpha1 + other.g * alpha2 * (1 - alpha1)) / outAlpha);
+            BYTE outB = static_cast<BYTE>((b * alpha1 + other.b * alpha2 * (1 - alpha1)) / outAlpha);
+            BYTE outA = static_cast<BYTE>(outAlpha * 255);
+            
+            return RGBA(outR, outG, outB, outA);
+        }
+    };
+
+
+
+
+
 	class View
 	{
 		public:
@@ -847,95 +930,120 @@ namespace ws // GRAPHICS ENTITIES
 
 	
 	
+	
+	
+	
+
 	class Texture
 	{
-		public:
-		
-		HBITMAP bitmap;
-		int width = 0;
-		int height = 0;
 		
 		
-		Texture() = default;
+		private:
+			
+
+		unsigned int stride = 0;
+		COLORREF transparencyColor = CLR_INVALID;
+		bool transparent = false;
 		
-		Texture(std::string path)
+
+		int calculateStride(int width, int bitsPerPixel) 
 		{
-			load(path);
+		    return ((width * (bitsPerPixel / 8) + 3) & ~3);
+		    //A bunch of byte dependent stuff that converts the byte index to integer index.
+		}		
+
+
+		
+		public:
+		HBITMAP bitmap;
+		int width=0,height=0;	
+		void* pvBits = NULL;	
+		BITMAPINFO bmi;	
+
+
+
+
+
+		Texture(int wide=1,int high=1)
+		{
+			create(wide,high);
 		}
 		
 		
-	    ~Texture()
-	    {
-	        if (bitmap != NULL)
-	        {
-	            DeleteObject(bitmap);
-	            bitmap = NULL;
-	        }
-	    }		
 		
+		~Texture()
+		{
+			if(bitmap)
+			{
+	            DeleteObject(bitmap);
+	            bitmap = nullptr;
+	            pvBits = nullptr;	
+	            width = 0;
+	            height = 0;
+			}
+		}
 
 
 
 
-	    Texture(Texture&& other) noexcept
-	        : bitmap(other.bitmap), width(other.width), height(other.height)
-	    {
-	        other.bitmap = NULL;
-	        other.width = 0;
-	        other.height = 0;
+	    bool isValid() const 
+	    { 
+	        return bitmap != nullptr && pvBits != nullptr; 
 	    }
 
 
+	
+	
+		void create(int nWidth,int nHeight)
+		{
+			
+			
+
+			
+			ZeroMemory(&bmi, sizeof(bmi));
+			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth = nWidth;
+			bmi.bmiHeader.biHeight = -nHeight; // A negative height makes the image a top-down DIB
+			bmi.bmiHeader.biPlanes = 1;
+			bmi.bmiHeader.biBitCount = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;	
+			bmi.bmiHeader.biSizeImage = nWidth * nHeight * 4; // Important for alpha		
+			
+	        HDC hdcMem = CreateCompatibleDC(NULL);
+	        bitmap = CreateDIBSection(hdcMem, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0);
+	        SelectObject(hdcMem, bitmap);
+	        DeleteDC(hdcMem);
+			
+			if(!bitmap)
+			{
+				std::cerr << "Failed to Create DIB!\n";
+				bitmap = nullptr;
+				
+				return;
+			}
 		
-	    Texture& operator=(Texture&& other) noexcept
-	    {
-	        if (this != &other)
-	        {
-	            if (bitmap != NULL)
-	            {
-	                DeleteObject(bitmap);
-	            }
-	            
-	            bitmap = other.bitmap;
-	            width = other.width;
-	            height = other.height;
-	            
-	            other.bitmap = NULL;
-	            other.width = 0;
-	            other.height = 0;
-	        }
-	        return *this;
-	    }		
+			width = nWidth;
+			height = nHeight;
+			stride = calculateStride(nWidth, 32); 
+			
+			
+			clear(RGBA::Transparent());
+			
+		}
 		
-		
-	
-	
-	
-	
+
+
+
+
 		bool load(std::string path)
 		{
-
-
-	        if (bitmap != NULL)
-	        {
-	            DeleteObject(bitmap);
-	            bitmap = NULL;
-	            width = 0;
-	            height = 0;
-	        }
-
-
-			if(!ResolveRelativePath(path))
-				return false;
-
-
 			bitmap = (HBITMAP)LoadImageW(
 			NULL,
 			WIDE(path).c_str(),
 			IMAGE_BITMAP,
 			0,
 			0,
-			LR_LOADFROMFILE
+			LR_LOADFROMFILE | LR_CREATEDIBSECTION | LR_VGACOLOR
 			);
 			
 			
@@ -945,360 +1053,136 @@ namespace ws // GRAPHICS ENTITIES
 				std::cerr << "Failed to load image at " << std::quoted(path) << ".\n";
 				return false;
 			}
-			
-            BITMAP bm;
-            GetObject(bitmap, sizeof(BITMAP), &bm);
-            width = bm.bmWidth;
-            height = bm.bmHeight;		
-			
-			return true;
-		}
-		
-	    bool isValid() const
-	    {
-	        return bitmap != NULL;
-	    }		
-	    
-	    
-	    
-	    COLORREF transparencyColor = CLR_INVALID; // Add this member variable
-	
-	    void setTransparentMask(COLORREF color) {
-	        transparencyColor = color;
-	    }	    
-	    
-	    
-	    
-	    
-	    COLORREF getPixel(int Xindex,int Yindex)
-	    {
-			
-			
-			HDC hdc = CreateCompatibleDC(NULL);
-			if(!hdc)
-				return RGB(0,0,0);
-			
-			
-			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
-			
-			
-			COLORREF result = GetPixel(hdc,Xindex,Yindex);
-			
-			
-	        SelectObject(hdc, oldbitmap);
-	        DeleteDC(hdc);	    	
-	        
-	        return result;
-		}
-		
-		
-		
-		
-		bool setPixel(COLORREF color,int Xindex,int Yindex)
-		{
-		
-			HDC hdc = CreateCompatibleDC(NULL);
-			if(!hdc)
-				return false;
-			
-			
-			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
-			
-			color = RGB(GetBValue(color),GetGValue(color),GetRValue(color));//convert to BGR for HBITMAP. COLORREF is RGB. HBITMAP is BGR
-			
-			SetPixel(hdc,Xindex,Yindex,color);
-			
-			
-	        SelectObject(hdc, oldbitmap);
-	        DeleteDC(hdc);	    	
-	        
-	        return true;			
-		}
-			
-	};
-	
-	
-	
-	
-	class PixelArray
-	{
-			
-		private:
-		
-		COLORREF* pixels = nullptr;
-		
-		int getPixelIndex(int x,int y)	
-		{
-			return (y * width + x);	
-		}
-		
-		public:	
-		int width = 0;
-		int height = 0;
-		
-		
-		PixelArray()
-		{
-			
-		}
-		
-		~PixelArray()
-		{
-			clear();
-		}
-		
-		
-		
-	    // Copy constructor
-	    PixelArray(const PixelArray& other)
-	    {
-	        if (other.pixels && other.width > 0 && other.height > 0)
-	        {
-	            create(other.width, other.height);
-	            for (int x = 0; x < width; x++)
-	            {
-	                for (int y = 0; y < height; y++)
-	                {
-	                    pixels[getPixelIndex(x,y)] = other.pixels[getPixelIndex(x,y)];
-	                }
-	            }
-	        }
-	    }
-	    
-	    // Assignment operator
-	    PixelArray& operator=(const PixelArray& other)
-	    {
-	        if (this != &other)
-	        {
-	            clear();
-	            if (other.pixels && other.width > 0 && other.height > 0)
-	            {
-	                create(other.width, other.height);
-	                for (int x = 0; x < width; x++)
-	                {
-	                    for (int y = 0; y < height; y++)
-	                    {
-	                         pixels[getPixelIndex(x,y)] = other.pixels[getPixelIndex(x,y)];
-	                    }
-	                }
-	            }
-	        }
-	        return *this;
-	    }
-	    
-	    // Move constructor
-	    PixelArray(PixelArray&& other) noexcept
-	        : pixels(other.pixels), width(other.width), height(other.height)
-	    {
-	        other.pixels = nullptr;
-	        other.width = 0;
-	        other.height = 0;
-	    }
-	    
-	    // Move assignment operator
-	    PixelArray& operator=(PixelArray&& other) noexcept
-	    {
-	        if (this != &other)
-	        {
-	            clear();
-	            pixels = other.pixels;
-	            width = other.width;
-	            height = other.height;
-	            
-	            other.pixels = nullptr;
-	            other.width = 0;
-	            other.height = 0;
-	        }
-	        return *this;
-	    }		
-		
-		
-		
-		
-		
-		
-		
-		void clear()
-		{
-			if(pixels)
-			{
-				delete[] pixels;
-				pixels = nullptr;
-			}
-			width = 0;
-			height = 0;
-		}
-		
-		
-		
-		
-		bool create(int w,int h)
-		{
-			
-			clear();
-			
-			if(w <= 0 || h <= 0)
-				return false;
-			
-			width = w;
-			height = h;
-			
-			
-			pixels = new COLORREF[width * height];
-			
-	
-			for(int a=0;a<width * height;a++)
-			{
-				pixels[a] = RGB(0,0,0);
-			}
-			
-			return true;
-		}
-		
-		
-		
-		
-		
-		bool convertToPixel(Texture &texture)
-		{
-			//convert HBITMAP to COLORREFS
-			//INIT PIXELS AS 2D ARRAY USING WIDTH AND HEIGHT FROM HBITMAP.
-			
-			if(!texture.isValid())
-				return false;
-			
-			width = texture.width;
-			height = texture.height;
-			
-			
-			create(width,height);
-			
-			for(int x=0;x<width;x++)
-			{
-				for(int y=0;y<height;y++)
-				{
-					pixels[getPixelIndex(x,y)] = texture.getPixel(x,y);
-				}
-			}	
-			
-	        return true;
-						
-		}
-		
-		
-		bool sendToTexture(Texture &texture)
-		{
-			
-	        if (!pixels || width <= 0 || height <= 0)
-	            return false;
-	        
-	        
-	        
-	        
-	        
-	        // Create device context
-	        HDC hdc = CreateCompatibleDC(NULL);
-	        if (!hdc)
-	            return false;
-	        
-	        
-	        // Create bitmap
-	        BITMAPINFO bmi = {};
-	        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	        bmi.bmiHeader.biWidth = width;
-	        bmi.bmiHeader.biHeight = -height;  // Negative for top-down
-	        bmi.bmiHeader.biPlanes = 1;
-	        bmi.bmiHeader.biBitCount = 32;
-	        bmi.bmiHeader.biCompression = BI_RGB;
-	        
-			
-			
-			void* pBits = nullptr;
-	        HBITMAP hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, NULL, 0);
-	        if (!hBitmap)
-	        {
-	            DeleteDC(hdc);
-	            return false;
-	        }
-	        
-	        // Copy pixels to the bitmap (bitmap expects row-major order: [y][x])
-	        COLORREF* pPixels = (COLORREF*)pBits;
 
-			//Convert RGB data to BGR for HBITMAP
-			for (int i = 0; i < width * height; i++)
-		    {
-		        COLORREF srcPixel = pixels[i];
-		        BYTE r = GetRValue(srcPixel);
-		        BYTE g = GetGValue(srcPixel); 
-		        BYTE b = GetBValue(srcPixel);
-		        
-		        // Convert RGB to BGR for bitmap
-		        pPixels[i] = RGB(b, g, r);
-		    }
 
+			BITMAP bmp;
+			int success = GetObject(bitmap, sizeof(BITMAP), &bmp);			
 			
-		    if (texture.bitmap)
-		    {
-		        DeleteObject(texture.bitmap);
-		    }	        
-	        
-	        // Set up the texture
-	        texture.bitmap = hBitmap;
-	        texture.width = width;
-	        texture.height = height;
-	        
-	        // Clean up
-	        DeleteDC(hdc);
-	        
-	        return true;
-		}
-		
-		
-		
-		
-		
-		void setPixel(COLORREF color,int x,int y)
-		{
-			if(x >=0 && x < width && y >=0 && y < height)
-				pixels[getPixelIndex(x,y)] = color;
-			
-		}
-		
-		COLORREF getPixel(int x,int y)
-		{
-			if(x >=0 && x < width && y >=0 && y < height)
-				return pixels[getPixelIndex(x,y)];
-			return RGB(0,0,0);
-		}
-		
-		
-		
-		bool setMask(COLORREF startColor,COLORREF endColor)
-		{
-			
-			if(width <=0 || height <=0)
+			if(success == 0)
 				return false;
 				
-			for(int x=0;x<width;x++)
+			width = bmp.bmWidth;
+			height = bmp.bmHeight;	
+			stride = calculateStride(width, bmp.bmBitsPixel); 
+			
+			if(bmp.bmBitsPixel != 32)
 			{
-				for(int y=0;y<height;y++)
-				{
-					COLORREF c = getPixel(x,y);
-					if(c == startColor)
-					{
-						setPixel(endColor,x,y);
-					}
-					
-				}
+				
 			}
 			
 			return true;
-		}		
+		}
+
+		
+		
+
 		
 		
 		
+	    int getPixelIndex(int x, int y)	
+	    {
+	        // Convert from pixel coordinates to actual memory index
+	        return y * (stride / sizeof(DWORD)) + x;
+	    }
+	    
+	    ws::Vec2i getPixelIndex(int index)
+	    {
+	        // Convert from memory index to pixel coordinates
+	        int pixelsPerRow = stride / sizeof(DWORD);
+	        int y = index / pixelsPerRow;
+	        int x = index % pixelsPerRow;
+	        return ws::Vec2i(x, y);
+	    }
+				
+		
+		
+		bool setPixel(ws::RGBA color,int index)
+		{
+
+	        if (!pvBits || index < 0 || index >= width * height)
+	            return false;
+	            
+	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
+	        pPixels[index] = color;
+	        return true;
+		}
+		
+		
+		bool setPixel(ws::RGBA color,int x,int y)
+		{
+			
+	        if (!pvBits || x < 0 || x >= width || y < 0 || y >= height)
+	            return false;
+	            
+	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
+	        int index = getPixelIndex(x, y);
+	        pPixels[index] = color; // Uses DWORD conversion operator
+	        return true;
+		}
+		
+		
+		ws::RGBA getPixel(int index)
+		{
+	        if (!pvBits || index < 0 || index >= width * height)
+	            return RGBA::Transparent();
+	            
+	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
+	        DWORD pixel = pPixels[index];
+	        
+	        return ws::RGBA(
+	            (pixel >> 16) & 0xFF,  // R
+	            (pixel >> 8) & 0xFF,   // G
+	            (pixel) & 0xFF,        // B
+	            (pixel >> 24) & 0xFF   // A
+	        );	
+		}
+		
+		
+		
+		ws::RGBA getPixel(int x,int y)
+		{
+	        if (!pvBits || x < 0 || x >= width || y < 0 || y >= height)
+	            return RGBA::Transparent();
+	            
+	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
+	        int index = getPixelIndex(x, y);
+	        DWORD pixel = pPixels[index];
+	        
+	        return RGBA(
+	            (pixel >> 16) & 0xFF,  // R
+	            (pixel >> 8) & 0xFF,   // G
+	            (pixel) & 0xFF,        // B
+	            (pixel >> 24) & 0xFF   // A
+	        );	
+		}
+		
+
+
+
+	    void clear(ws::RGBA color = RGBA::Transparent()) 
+		{
+	        if (!pvBits) return;
+	        
+	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
+	        DWORD clearValue = color; // Uses DWORD conversion operator
+	        
+	        for (int i = 0; i < width * height; i++) {
+	            pPixels[i] = clearValue;
+	        }
+	    }
+	    
+	    
+		void fillRect(ws::RGBA color, int x, int y, int w, int h) {
+	        for (int iy = y; iy < y + h && iy < height; iy++) {
+	            for (int ix = x; ix < x + w && ix < width; ix++) {
+	                setPixel(color, ix, iy);
+	            }
+	        }
+	    }
+		
+
 	};
-	
+
 	
 	
 		
@@ -1309,7 +1193,7 @@ namespace ws // GRAPHICS ENTITIES
 		public:
 		
 		int x = 0,y = 0,z = 0;
-		int width = 1,height = 1;
+		int width = 100,height = 100;
 		
 		Vec2f scale = {1,1};		
 		
@@ -1407,19 +1291,25 @@ namespace ws // GRAPHICS ENTITIES
 		    HDC hMemDC = CreateCompatibleDC(hdc);
 		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
 		    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, textureRef->bitmap);
-		    
-		    TransparentBlt(hdc,
-		        drawX, 
-		        drawY, 
-		        getScaledWidth(), 
-		        getScaledHeight(),
-		        hMemDC,
-		        rect.left, 
-		        rect.top, 
-		        rect.right,
-		        rect.bottom,
-		        textureRef->transparencyColor);
-		        
+
+
+			BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+
+
+	        // AlphaBlend with stretching - same parameters as StretchBlt
+	        AlphaBlend(hdc,
+	            drawX,                                  // Destination X
+	            drawY,                                  // Destination Y  
+	            getScaledWidth(),                       // Destination Width (scaled)
+	            getScaledHeight(),                      // Destination Height (scaled)
+	            hMemDC,
+	            rect.left,                              // Source X
+	            rect.top,                               // Source Y
+	            rect.right,                             // Source Width 
+	            rect.bottom,                            // Source Height
+	            blend);                                 // Alpha blending function
+	        	    
+				        
 		    SelectObject(hMemDC, hOldBitmap);
 		    DeleteDC(hMemDC);
 			
@@ -1430,6 +1320,9 @@ namespace ws // GRAPHICS ENTITIES
 		
 		void setTexture(Texture &texture)
 		{
+			if (!texture.isValid()) {
+		        std::cerr << "Warning: Setting invalid texture to sprite!\n";
+		    }
 			textureRef = &texture;
 			rect.left = 0;
 			rect.top = 0;
@@ -1495,7 +1388,7 @@ namespace ws // GRAPHICS ENTITIES
 	{
 		public:
 		
-		COLORREF color = RGB(125,255,255);
+		COLORREF color = RGB(100,200,100);
 		
 		Shape()
 		{
@@ -1908,6 +1801,8 @@ namespace ws // GRAPHICS ENTITIES
 	            DeleteObject(hBrush);
 	        }
 	    }
+	    
+	    
 	};
 	
 	
@@ -2063,6 +1958,352 @@ namespace ws // GRAPHICS ENTITIES
 		
 	};
 
+	
+	
+	
+	
+	
+
+	
+	
+	
+	
+	class Text : public Drawable
+	{
+		
+		private:
+		
+		COLORREF textColor;
+		std::string text = "";
+
+		//FONT PROPERTIES
+		int charHeight = 16,charWidth = 0;
+		bool italic = false;
+		bool underline = false;
+		bool strikeout = false;
+		bool bold = false;
+		
+		int escapement = 0;
+		int rotation = 0;
+		
+		DWORD characterSet = DEFAULT_CHARSET;
+		DWORD outPrecision = OUT_DEFAULT_PRECIS;
+		DWORD clipPrecision = CLIP_DEFAULT_PRECIS;
+		DWORD quality = DEFAULT_QUALITY;
+		DWORD pitch = DEFAULT_PITCH;
+		std::string fontName = "Arial";
+		
+		
+		public:
+		
+		HFONT font;		
+		DWORD style = DT_WORDBREAK | DT_LEFT | DT_TOP;
+		
+		
+		
+		void make()
+		{
+			DWORD boldness = bold ? FW_BOLD : FW_NORMAL;
+			DWORD ital = italic ? TRUE : FALSE;
+			DWORD under = underline ? TRUE : FALSE;
+			DWORD strike = strikeout ? TRUE : FALSE;
+			
+			
+			font = CreateFontW(charHeight * scale.y,charWidth * scale.x,escapement,rotation,boldness,ital,under,strike,characterSet,outPrecision,clipPrecision,quality,pitch,ws::WIDE(fontName).c_str());
+		}
+		
+		
+		void setCharHeight(int h)
+		{
+			charHeight = h;
+			make();
+		}
+		
+		
+		int getCharHeight()
+		{
+			return charHeight;
+		}
+		
+		void setCharWidth(int w)
+		{
+			charWidth = w;
+			make();
+		}
+		
+		int getCharWidth()
+		{
+			return charWidth;
+		}
+		
+		
+		
+		
+		void setBold(bool isBold = true)
+		{
+			bold = isBold;
+			make();
+		}
+		
+		
+		bool getBold()
+		{
+			return bold;
+		}
+		
+		void setItalic(bool boolean = true)
+		{
+			italic = boolean;
+			make();
+		}
+		
+		bool getItalic()
+		{
+			return italic;
+		}
+		
+		void setUnderline(bool boolean = true)
+		{
+			underline = boolean;
+			make();
+		}
+		
+		
+		bool getUnderline()
+		{
+			return underline;
+		}
+		
+		void setStrikeout(bool boolean = true)
+		{
+			strikeout = boolean;
+			make();
+		}
+		
+		bool getStrikeout()
+		{
+			return strikeout;
+		}
+		
+		
+		void setEscapement(int val = 0)
+		{
+			escapement = val;
+			make();
+		}
+		
+		
+		int getEscapement()
+		{
+			return escapement;
+		}
+		
+		void setRotation(int val = 0)
+		{
+			rotation = val;
+			make();
+		}
+		
+		int getRotation()
+		{
+			return rotation;
+		}
+		
+		
+		
+		//DWORDS
+		void setCharacterSet(DWORD dWord)
+		{
+			characterSet = dWord;
+			make();
+		}
+		
+		
+		DWORD getCharacterSet()
+		{
+			return characterSet;
+		}
+		
+		void setOutPrecision(DWORD dWord)
+		{
+			outPrecision = dWord;
+			make();
+		}
+		
+		DWORD getOutPrecision()
+		{
+			return outPrecision;
+		}
+		
+		void setClipPrecision(DWORD dWord)
+		{
+			clipPrecision = dWord;
+			make();
+		}
+		
+		DWORD getClipPrecision()
+		{
+			return clipPrecision;
+		}
+		
+		void setQuality(DWORD dWord)
+		{
+			quality = dWord;
+			make();
+		}	
+		
+		DWORD getQuality()
+		{
+			return quality;
+		}
+		
+		void setPitch(DWORD dWord)
+		{
+			pitch = dWord;
+			make();
+		}
+		
+		DWORD getPitch()
+		{
+			return pitch;
+		}		
+		
+		
+		
+		
+		
+		
+		//////////////////////
+		
+		Text()
+		{
+			charHeight = 16;
+			charWidth = 0;
+			make();
+		}
+		
+		
+		~Text()
+		{
+			DeleteObject(font);
+		}
+		
+		
+		
+		
+		void setSize(int w,int h)
+		{
+			width = w;
+			height = h;
+		}
+		
+		void setSize(ws::Vec2i size)
+		{
+			width = size.x;
+			height = size.y;
+		}
+		
+		
+		
+		ws::Vec2i getSize()
+		{
+			return {width,height};
+		}
+		
+		
+		
+		void setPoints(int left,int top,int right,int bottom)
+		{
+			x = left;
+			y = top;
+			width = right - x;
+			height = bottom - y;
+		}
+		
+		
+		void setPoints(RECT rect)
+		{
+			x = rect.left;
+			y = rect.top;
+			width = rect.right - rect.left;
+			height = rect.bottom - rect.top;
+		}
+		
+		
+		
+		
+		
+		
+		void setString(std::string str)
+		{
+			text = str;
+		}
+		
+		std::string getString()
+		{
+			return text;
+		}
+		
+		void setColor(COLORREF color)
+		{
+			textColor = color;
+		}
+		
+		COLORREF getColor()
+		{
+			return textColor;
+		}
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			x = pos.x;
+			y = pos.y;
+		}
+		
+		void setPosition(int posx,int posy)
+		{
+			x = posx;
+			y = posy;
+		}
+		
+		
+		ws::Vec2i getPosition()
+		{
+			return {x,y};
+		}
+		
+		
+		void setStyle(DWORD newStyle)
+		{
+			style = newStyle;
+		}
+		
+		DWORD getStyle()
+		{
+			return style;
+		}
+		
+	    virtual void draw(HDC hdc, View &view) override
+	    {
+	        
+	        SelectObject(hdc, font);			
+				
+			
+			
+			SetTextColor(hdc, textColor);
+	        SetBkMode(hdc, TRANSPARENT);
+	        
+	        RECT rect = {x,y,x + width,y + height};
+	        
+	        DrawTextW(hdc, ws::WIDE(text).c_str(), -1, &rect, style);
+	    }
+	    
+	    virtual bool contains(POINT pos) override
+	    {
+	    	return false;
+	    }				
+	};
+	
 	
 }
 
@@ -2310,7 +2551,9 @@ namespace ws // SYSTEM ENTITIES
 		bool isRunning = true;
 		std::queue<MSG> msgQ;
 		DWORD style = WS_OVERLAPPEDWINDOW;
-
+		
+		
+	    bool legacyTransparency = false;
 				
 		public:		
 		
@@ -2318,12 +2561,10 @@ namespace ws // SYSTEM ENTITIES
 		View view;
 		
 		
-        HBITMAP stretchBufferBitmap;
-        HDC stretchBufferDC;		
-
-	    HDC backBufferDC;
-	    HBITMAP backBufferBitmap;
-
+        ws::Texture backBuffer;
+		ws::Texture displayBuffer;
+		HDC backBufferDC;
+		HDC displayBufferDC;
 		
 		INITCOMMONCONTROLSEX icex;
 		
@@ -2333,6 +2574,11 @@ namespace ws // SYSTEM ENTITIES
 			style = newStyle;
 			
 			addStyle(WS_CLIPCHILDREN);
+			addStyle(WS_EX_LAYERED);
+			
+			SetLayeredWindowAttributes(hwnd, 0, 255,LWA_ALPHA);
+			
+			
 			
 			//This is for initialization of winapi child objects sucg as buttons and textboxes.
 			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -2359,7 +2605,7 @@ namespace ws // SYSTEM ENTITIES
 		    wc.hInstance = hInstance;
 		    wc.lpszClassName = CLASS_NAME;
 		    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-		    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+		    wc.hbrBackground = nullptr;
 		
 		    if (!RegisterClass(&wc)) {
 		        std::cerr << "Failed to register window class!" << std::endl;
@@ -2395,17 +2641,20 @@ namespace ws // SYSTEM ENTITIES
 			
 			
 			
-				
+			
+			backBuffer.create(view.getSize().x,view.getSize().y);
+			displayBuffer.create(width,height);
+
 	        HDC hdc = GetDC(hwnd);
 	        backBufferDC = CreateCompatibleDC(hdc);
-	        backBufferBitmap = CreateCompatibleBitmap(hdc, view.getSize().x, view.getSize().y);
-	        SelectObject(backBufferDC, backBufferBitmap);
+	        SelectObject(backBufferDC, backBuffer.bitmap);
 	        
-			stretchBufferDC = CreateCompatibleDC(hdc);
-            stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height);
-            SelectObject(stretchBufferDC, stretchBufferBitmap);
+			displayBufferDC = CreateCompatibleDC(hdc);
+            SelectObject(displayBufferDC, displayBuffer.bitmap);
 			
 			ReleaseDC(hwnd, hdc);			
+						
+					
 			
 			
 			clear();
@@ -2422,25 +2671,22 @@ namespace ws // SYSTEM ENTITIES
             UpdateWindow(hwnd);
 
 
+			//enable anti-aliasing
+	        SetStretchBltMode(backBufferDC, HALFTONE);
+	        SetGraphicsMode(backBufferDC, GM_ADVANCED);
+	        //Force original orientation to avoid rotations in copy operations.
+			SetLayout(backBufferDC, LAYOUT_BITMAPORIENTATIONPRESERVED);
+			
 			
 		}
 		
-		
-		Window()
-		{
-			//Empty constructor
-		}
 		
 		
         ~Window()
         {
             windowInstances.erase(hwnd);
-            DeleteObject(backBufferBitmap);
         	DeleteDC(backBufferDC);
-            DeleteObject(stretchBufferBitmap);
-        	DeleteDC(stretchBufferDC);
-        	DeleteObject(LegacyAlpha.hbmp);
-		    DeleteDC(LegacyAlpha.hdcMem);
+        	DeleteDC(displayBufferDC);    
         }
 		
 		
@@ -2450,6 +2696,7 @@ namespace ws // SYSTEM ENTITIES
 		void setView(View &v)
 		{
 			view = v;
+			backBuffer.create(view.getSize().x,view.getSize().y);
 		}
 		
 		
@@ -2495,72 +2742,9 @@ namespace ws // SYSTEM ENTITIES
         
         
     	
-    	private:
-		BYTE alpha = 255;
-	    COLORREF transparencyColor = RGB(-1,0,0); 
 		public:	
 			
-	    void setChromaKey(COLORREF color = RGB(-1,-1,-1),BYTE alphaValue = 255,std::string type = "modern") 
-		{
-			
-	        transparencyColor = color;
-	        alpha = alphaValue;
-	        if(type == "legacy")
-	        	legacyTransparency = true;
-	        else
-	        	legacyTransparency = false;
-	        
-	        
-	    	COLORREF c = transparencyColor;
-	    	
-	    	if(!(GetRValue(c) < 0 || GetRValue(c) > 255 || GetGValue(c) < 0 || GetGValue(c) > 255 || GetBValue(c) < 0 || GetBValue(c) > 255)    ||    alpha < 255)
-	    	{
-	    		//is valid color or semi-transparent
-				
-				LONG_PTR style = GetWindowLongPtr(hwnd,GWL_STYLE);
-	    		style |= WS_EX_LAYERED;
-	    		SetWindowLongPtrA(hwnd,GWL_EXSTYLE,style);
-	    		
-	    		bool legacy = legacyTransparency;
-	    		
-	    		if(!legacy)
-	    		{
-					SetLayeredWindowAttributes(hwnd,c,alpha,LWA_COLORKEY | LWA_ALPHA);
-	    		}
-	    		else
-	    		{
-				
-	    			//setup for ARGB 32bit transparency - legacy
-		    		HDC hdc = GetDC(hwnd);
-					SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
-					LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
-			        
-					BITMAPINFO bmi = {0};
-			        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-			        bmi.bmiHeader.biWidth = width;
-			        bmi.bmiHeader.biHeight = -height;
-			        bmi.bmiHeader.biPlanes = 1;
-			        bmi.bmiHeader.biBitCount = 32;
-			        bmi.bmiHeader.biCompression = BI_RGB;
-			        
-			        LegacyAlpha.hbmp = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &LegacyAlpha.pvBits, NULL, 0);
-			        SelectObject(LegacyAlpha.hdcMem, LegacyAlpha.hbmp);
 
-				}
-
-
-	    		isTransparent = true;
-
-	    		
-			}
-			else
-				isTransparent = false;
-				
-				
-			view.setPortSize({width,height});
-	        
-	    }	
-		
 		
 		
 		
@@ -2678,19 +2862,13 @@ namespace ws // SYSTEM ENTITIES
 		
 		
 		
-	    void clear(COLORREF color = RGB(0,0,0)) {
-
-
-			//Update back buffer to contain the visible world area. 
-
-
-	    	
-	        HBRUSH brush = CreateSolidBrush(color);
-	        RECT rect = {0, 0, view.getSize().x, view.getSize().y};
-	        FillRect(backBufferDC, &rect, brush);
-	        DeleteObject(brush);
-	        
-
+	    void clear(ws::RGBA color = ws::RGBA(0,0,0,255)) 
+		{
+			
+	        if (backBuffer.isValid()) {
+	            backBuffer.clear(color);
+	        }
+			
 	    }
 		
 		
@@ -2698,7 +2876,10 @@ namespace ws // SYSTEM ENTITIES
 		
 		
 		
-		
+	    void drawPixel(int x, int y, ws::RGBA color)
+	    {
+	        backBuffer.setPixel(x, y, color);
+	    }		
 		
 		
 		
@@ -2707,8 +2888,6 @@ namespace ws // SYSTEM ENTITIES
 		
 		void draw(Drawable &draw)
 		{
-			
-		    SetLayout(backBufferDC, LAYOUT_BITMAPORIENTATIONPRESERVED);
 		    draw.draw(backBufferDC,view);
 		}
 		
@@ -2716,72 +2895,48 @@ namespace ws // SYSTEM ENTITIES
 		
 		
 		
+	
 		
 		
-	    void display() 
+		void display() 
 		{
-			
-			
-			
-			
 		    HDC hdc = GetDC(hwnd);
 		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
 		    
-		    // Just copy the entire back buffer to stretch buffer
-		    StretchBlt(stretchBufferDC, 
-		    0, 
-			0, 
-			width, 
-			height,
-		    backBufferDC, 
-		    0, 
-			0, 
-			view.getSize().x, 
-			view.getSize().y,  
-		    SRCCOPY);
-			
+		    
+			BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+            POINT ptDst = {x, y};
+            SIZE size = {width, height};
+            POINT ptSrc = {0, 0};
+            
+            // Scale from back buffer to display buffer with AlphaBlend
+            AlphaBlend(displayBufferDC, 
+            0, 0, width, height,
+            backBufferDC, 
+        	0, 0, view.getSize().x, view.getSize().y,  
+            blend);
+		
+		    if(GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
+			{
+				    
+		        HDC hdcScreen = GetDC(NULL);
+		        // Update layered window directly from display buffer
+		        UpdateLayeredWindow(hwnd, hdcScreen, &ptDst, &size, 
+		                          displayBufferDC, &ptSrc, 
+		                          0, &blend, 
+		                          ULW_ALPHA);
+				ReleaseDC(NULL, hdcScreen);
 
-
-			
-		    if(isTransparent && legacyTransparency)
-	    	{
-		        
-		        
-		        if (!LegacyAlpha.hdcMem || !LegacyAlpha.hbmp) {
-		            setChromaKey(transparencyColor, alpha,"legacy"); // Recreate buffers just in case someone tries to use the isTransparent variable directly instead of using the setTransparency function.
-		        }		        
-		        
-		        
-		        // Copy from stretch buffer to ARGB buffer
-		        SetLayout(LegacyAlpha.hdcMem, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
-		        BitBlt(LegacyAlpha.hdcMem, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
-	
-
-		        
-		        BLENDFUNCTION blend = {AC_SRC_OVER, 0, alpha, 0};
-		        POINT ptDst = {0, 0};
-		        SIZE size = {width, height};
-		        POINT ptSrc = {0, 0};
-		        
-		        UpdateLayeredWindow(hwnd, hdc, &ptDst, &size, LegacyAlpha.hdcMem, &ptSrc, transparencyColor, &blend, ULW_ALPHA | ULW_COLORKEY);
-		        
-		        
 		    }
-		    else 
+		    else
 		    {
-		        BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);	        
-//				InvalidateRect(hwnd, NULL, FALSE);
-//		        UpdateWindow(hwnd);
-		    }
-
-			ReleaseDC(hwnd, hdc);
-
-	    }		
-		
-		
-		
-		
-		
+		    	BitBlt(hdc, 0, 0, width, height, displayBufferDC, 0, 0, SRCCOPY);
+			}
+		    
+		    
+		    ReleaseDC(hwnd, hdc);
+		}	
+				
 		
 		
 		
@@ -2832,16 +2987,25 @@ namespace ws // SYSTEM ENTITIES
 	            	
 	                PAINTSTRUCT ps;
 	                HDC hdc = BeginPaint(hwnd, &ps);
-	             
+	             	
+	             	
+				    
 	             	SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-	                // Draw the back buffer to the screen
-	                BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
+	                
+	                //BitBlt(hdc, 0, 0, width, height, displayBufferDC, 0, 0, SRCCOPY);
+
+				    
+
+
+	             	
 	                
 	                EndPaint(hwnd, &ps);
 	                return 0;
 	            }
-	                
-	            case WM_SIZE: {
+
+
+				case WM_SIZE:	                
+				{
 				
 				   
 				    
@@ -2856,42 +3020,12 @@ namespace ws // SYSTEM ENTITIES
 					
 					view.setPortSize({width,height});
 					
-					
-					
-	                
-			        HDC hdc = GetDC(hwnd);
-			        			        
-			        
-			        DeleteObject(stretchBufferBitmap);
-			        stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height); 	//this will also likely need to change to accomodate the viewport size.
-			        SelectObject(stretchBufferDC, stretchBufferBitmap);
-			        
-			        
-				    // RECREATE TRANSPARENCY BUFFERS WHEN SIZE CHANGES
-				    if (isTransparent) {
-				        if (LegacyAlpha.hbmp) DeleteObject(LegacyAlpha.hbmp);
-				        if (LegacyAlpha.hdcMem) DeleteDC(LegacyAlpha.hdcMem);
-				        
-				        LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
-				        BITMAPINFO bmi = {0};
-				        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-				        bmi.bmiHeader.biWidth = width;
-				        bmi.bmiHeader.biHeight = -height;
-				        bmi.bmiHeader.biPlanes = 1;
-				        bmi.bmiHeader.biBitCount = 32;
-				        bmi.bmiHeader.biCompression = BI_RGB;
-				        
-				        LegacyAlpha.hbmp = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &LegacyAlpha.pvBits, NULL, 0);
-				        SelectObject(LegacyAlpha.hdcMem, LegacyAlpha.hbmp);
-				    }			        
-			        
-			        
-			        
-			        ReleaseDC(hwnd, hdc);
+					displayBuffer.create(width, height);
 						                
 	                clear();
-	                return 0;
-	            	break;
+	                
+	                
+	            	return 0;
 				}
 				
 				
@@ -2923,16 +3057,8 @@ namespace ws // SYSTEM ENTITIES
 				
 		
 		
-		struct LEGACY_ALPHA
-		{
-		
-			void* pvBits = NULL;
-			HBITMAP hbmp = NULL;
-			HDC hdcMem = NULL;
-		}LegacyAlpha;
 		
 		bool isFullscreen = false;
-		bool legacyTransparency = false;
 		RECT windowedRect; // Stores window position/size when not fullscreen
     	DWORD windowedStyle; // Stores window style when not fullscreen
 		

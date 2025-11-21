@@ -53,6 +53,10 @@ Added Slider class
 Added Textbox class
 Added Label class
 Added conversion constructors to and from ws::Vec2i and POINT.
+Added RGBA class and modified window class to use it for transparency.
+Modified window class to use ws::Texture instead of lower level winapi.
+Modified ws::Texture to use DIB section instead of basic GDI. Better for transparency and pixel access.
+*GRAPHICS IS BROKEN*
 
 
 V1.4 - Plans
