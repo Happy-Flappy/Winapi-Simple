@@ -684,71 +684,102 @@ namespace ws // GRAPHICS ENTITIES
 {
 
 
+	class BGRA 
+	{
+	    public:
+	    BYTE b, g, r, a; 
+	    
+	    // Constructors
+	    BGRA() : b(0), g(0), r(0), a(255) {} // Default: opaque black
+	    BGRA(BYTE blue, BYTE green, BYTE red, BYTE alpha = 255) 
+	        : b(blue), g(green), r(red), a(alpha) {}
+	    BGRA(COLORREF color, BYTE alpha = 255) 
+	        : b(GetBValue(color)), g(GetGValue(color)), r(GetRValue(color)), a(alpha) {}
+        
+		
 
-    class RGBA {
-    public:
-        BYTE r, g, b, a;
-        
-        // Constructors
-        RGBA() : r(0), g(0), b(0), a(255) {} // Default: opaque black
-        RGBA(BYTE red, BYTE green, BYTE blue, BYTE alpha = 255) 
-            : r(red), g(green), b(blue), a(alpha) {}
-        RGBA(COLORREF color, BYTE alpha = 255) 
-            : r(GetRValue(color)), g(GetGValue(color)), b(GetBValue(color)), a(alpha) {}
-        
-        // Conversion to COLORREF (ignores alpha)
-		template<typename T>
-		operator T() const {
-		    if constexpr (std::is_same_v<T, COLORREF>) {
-		        return RGB(r, g, b);
-		    } else if constexpr (std::is_same_v<T, DWORD>) {
-		        return (a << 24) | (r << 16) | (g << 8) | b;
-		    }
-		    return 0;
-		}
+		
 
-        
-        // Predefined colors
-        static RGBA Transparent() { return RGBA(0, 0, 0, 0); }
-        static RGBA Black() { return RGBA(0, 0, 0, 255); }
-        static RGBA White() { return RGBA(255, 255, 255, 255); }
-        static RGBA Red() { return RGBA(255, 0, 0, 255); }
-        static RGBA Green() { return RGBA(0, 255, 0, 255); }
-        static RGBA Blue() { return RGBA(0, 0, 255, 255); }
-		static RGBA Orange() { return RGBA(255,150,0,255); }
-        
-        // Utility methods
-        bool isTransparent() const { return a == 0; }
-        bool isOpaque() const { return a == 255; }
-        float getOpacity() const { return static_cast<float>(a) / 255.0f; }
-        
-        void setOpacity(float opacity) {
-            a = static_cast<BYTE>(opacity * 255);
-        }
-        
-        // Blend with another color (simple alpha blending)
-        RGBA blend(const RGBA& other) const {
-            if (a == 0) return other;
-            if (other.a == 0) return *this;
-            if (a == 255) return *this;
-            if (other.a == 255) return other;
-            
-            float alpha1 = static_cast<float>(a) / 255.0f;
-            float alpha2 = static_cast<float>(other.a) / 255.0f;
-            float outAlpha = alpha1 + alpha2 * (1 - alpha1);
-            
-            if (outAlpha == 0) return RGBA::Transparent();
-            
-            BYTE outR = static_cast<BYTE>((r * alpha1 + other.r * alpha2 * (1 - alpha1)) / outAlpha);
-            BYTE outG = static_cast<BYTE>((g * alpha1 + other.g * alpha2 * (1 - alpha1)) / outAlpha);
-            BYTE outB = static_cast<BYTE>((b * alpha1 + other.b * alpha2 * (1 - alpha1)) / outAlpha);
-            BYTE outA = static_cast<BYTE>(outAlpha * 255);
-            
-            return RGBA(outR, outG, outB, outA);
-        }
-    };
+	    COLORREF TO_COLORREF() const {
+	        return RGB(r, g, b);
+	    }
+	    
+	    DWORD TO_DWORD() const {
+	        // For DIB sections: [BB] [GG] [RR] [AA]
+	        return (b << 0) | (g << 8) | (r << 16) | (a << 24);
+	    }
+
+	    
+	    
+	    
+	    
+	    
+	    // Predefined colors
+	    static BGRA Transparent() { return BGRA(0, 0, 0, 0); }
+	    static BGRA Black() { return BGRA(0, 0, 0, 255); }
+	    static BGRA White() { return BGRA(255, 255, 255, 255); }
+	    static BGRA Red() { return BGRA(0, 0, 255, 255); }
+	    static BGRA Green() { return BGRA(0, 255, 0, 255); }
+	    static BGRA Blue() { return BGRA(255, 0, 0, 255); }
+	    static BGRA Orange() { return BGRA(0, 150, 255, 255); }
+	    
+	    // Utility methods
+	    bool isTransparent() const { return a == 0; }
+	    bool isOpaque() const { return a == 255; }
+	    float getOpacity() const { return static_cast<float>(a) / 255.0f; }
+	    
+	    void setOpacity(float opacity) {
+	        a = static_cast<BYTE>(opacity * 255);
+	    }
+	    
+	    // Blend with another color (simple alpha blending)
+	    BGRA blend(const BGRA& other) const {
+	        if (a == 0) return other;
+	        if (other.a == 0) return *this;
+	        if (a == 255) return *this;
+	        if (other.a == 255) return other;
+	        
+	        float alpha1 = static_cast<float>(a) / 255.0f;
+	        float alpha2 = static_cast<float>(other.a) / 255.0f;
+	        float outAlpha = alpha1 + alpha2 * (1 - alpha1);
+	        
+	        if (outAlpha == 0) return BGRA::Transparent();
+	        
+	        BYTE outB = static_cast<BYTE>((b * alpha1 + other.b * alpha2 * (1 - alpha1)) / outAlpha);
+	        BYTE outG = static_cast<BYTE>((g * alpha1 + other.g * alpha2 * (1 - alpha1)) / outAlpha);
+	        BYTE outR = static_cast<BYTE>((r * alpha1 + other.r * alpha2 * (1 - alpha1)) / outAlpha);
+	        BYTE outA = static_cast<BYTE>(outAlpha * 255);
+	        
+	        return BGRA(outB, outG, outR, outA);
+	    }
+	    
+	    void debugPrint() const {
+	    	
+	    	DWORD test;
+	    	test = TO_DWORD();
+	    	
+	        std::cout << "BGRA(" << (int)b << "," << (int)g << "," << (int)r << "," << (int)a << ") -> DWORD: 0x" 
+	                  << std::hex << test << std::dec << " (";
+	        
+	        BYTE* bytes = (BYTE*)&test;
+	        std::cout << "Bytes: ";
+	        for(int i = 0; i < 4; i++) {
+	            std::cout << (int)bytes[i] << " ";
+	        }
+	        std::cout << ")" << std::endl;
+	    }        
+	};
 
 
+	BGRA TO_BGRA(DWORD word)
+	{
+		BYTE z,x,c,v;
+		z = (word >> 0) & 0xFF;
+		x = (word >> 8) & 0xFF;
+		c = (word >> 16) & 0xFF;
+		v = (word >> 24) & 0xFF;
+		return BGRA(z,x,c,v);
+	}
 
 
 
@@ -1027,7 +1058,7 @@ namespace ws // GRAPHICS ENTITIES
 			stride = calculateStride(nWidth, 32); 
 			
 			
-			clear(RGBA::Transparent());
+			clear(BGRA::Transparent());
 			
 		}
 		
@@ -1065,17 +1096,78 @@ namespace ws // GRAPHICS ENTITIES
 			height = bmp.bmHeight;	
 			stride = calculateStride(width, bmp.bmBitsPixel); 
 			
-			if(bmp.bmBitsPixel != 32)
-			{
-				
-			}
-			
-			return true;
+		    if(bmp.bmBitsPixel == 32) {
+		        width = bmp.bmWidth;
+		        height = bmp.bmHeight;
+		        stride = calculateStride(width, 32);
+		        pvBits = bmp.bmBits;
+		        return true;
+		    }
+		    
+		    // Convert to 32-bit
+		    return convertTo32Bit(bmp);
 		}
 
 		
 		
 
+		
+		
+		bool convertTo32Bit(BITMAP& sourceBmp)
+		{
+		    width = sourceBmp.bmWidth;
+		    height = sourceBmp.bmHeight;
+		    
+		    // Create a new 32-bit DIB section (like in create())
+		    HDC hdcMem = CreateCompatibleDC(NULL);
+		    
+		    ZeroMemory(&bmi, sizeof(bmi));
+		    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+		    bmi.bmiHeader.biWidth = width;
+		    bmi.bmiHeader.biHeight = -height; // Top-down
+		    bmi.bmiHeader.biPlanes = 1;
+		    bmi.bmiHeader.biBitCount = 32;
+		    bmi.bmiHeader.biCompression = BI_RGB;
+		    bmi.bmiHeader.biSizeImage = width * height * 4;
+		    
+		    HBITMAP newBitmap = CreateDIBSection(hdcMem, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0);
+		    SelectObject(hdcMem, newBitmap);
+		    
+		    if(!newBitmap) {
+		        std::cerr << "Failed to create 32-bit DIB section for conversion!\n";
+		        DeleteDC(hdcMem);
+		        return false;
+		    }
+		    
+		    // Copy and convert the source bitmap
+		    HDC hdcSource = CreateCompatibleDC(NULL);
+		    SelectObject(hdcSource, bitmap);
+		    
+		    // Use BitBlt to copy and convert the format
+		    BitBlt(hdcMem, 0, 0, width, height, hdcSource, 0, 0, SRCCOPY);
+		    
+		    // Set alpha channel to 255 (fully opaque) for all pixels
+		    DWORD* pixels = static_cast<DWORD*>(pvBits);
+		    for(int i = 0; i < width * height; i++) {
+		        pixels[i] |= 0xFF000000; // Set alpha to 255
+		    }
+		    
+		    // Clean up old bitmap and use new one
+		    DeleteObject(bitmap);
+		    bitmap = newBitmap;
+		    
+		    DeleteDC(hdcSource);
+		    DeleteDC(hdcMem);
+		    
+		    stride = calculateStride(width, 32);
+		    std::cout << "Converted to 32-bit ARGB: " << width << "x" << height << std::endl;
+		    
+		    return true;
+		}
+		
+		
+		
+		
 		
 		
 		
@@ -1096,83 +1188,99 @@ namespace ws // GRAPHICS ENTITIES
 				
 		
 		
-		bool setPixel(ws::RGBA color,int index)
-		{
-
-	        if (!pvBits || index < 0 || index >= width * height)
-	            return false;
-	            
-	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
-	        pPixels[index] = color;
-	        return true;
-		}
+        bool setPixel(ws::BGRA color,int index)
+        {
+            if (!pvBits || index < 0 || index >= width * height)
+                return false;
+                
+            DWORD* pPixels = static_cast<DWORD*>(pvBits);
+            pPixels[index] = color.TO_DWORD();
+            return true;
+        }
 		
 		
-		bool setPixel(ws::RGBA color,int x,int y)
-		{
-			
-	        if (!pvBits || x < 0 || x >= width || y < 0 || y >= height)
-	            return false;
-	            
-	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
-	        int index = getPixelIndex(x, y);
-	        pPixels[index] = color; // Uses DWORD conversion operator
-	        return true;
-		}
+        bool setPixel(ws::BGRA color,int x,int y)
+        {
+            if (!pvBits || x < 0 || x >= width || y < 0 || y >= height)
+                return false;
+                
+            DWORD* pPixels = static_cast<DWORD*>(pvBits);
+            int index = getPixelIndex(x, y);
+            pPixels[index] = color.TO_DWORD();
+            return true;
+        }
 		
 		
-		ws::RGBA getPixel(int index)
-		{
-	        if (!pvBits || index < 0 || index >= width * height)
-	            return RGBA::Transparent();
-	            
-	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
-	        DWORD pixel = pPixels[index];
-	        
-	        return ws::RGBA(
-	            (pixel >> 16) & 0xFF,  // R
-	            (pixel >> 8) & 0xFF,   // G
-	            (pixel) & 0xFF,        // B
-	            (pixel >> 24) & 0xFF   // A
-	        );	
-		}
+        ws::BGRA getPixel(int index)
+        {
+            if (!pvBits || index < 0 || index >= width * height)
+                return BGRA::Transparent();
+                
+            DWORD* pPixels = static_cast<DWORD*>(pvBits);
+            DWORD pixel = pPixels[index];
+            
+            return TO_BGRA(pixel);
+        }
 		
 		
 		
-		ws::RGBA getPixel(int x,int y)
-		{
-	        if (!pvBits || x < 0 || x >= width || y < 0 || y >= height)
-	            return RGBA::Transparent();
-	            
-	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
-	        int index = getPixelIndex(x, y);
-	        DWORD pixel = pPixels[index];
-	        
-	        return RGBA(
-	            (pixel >> 16) & 0xFF,  // R
-	            (pixel >> 8) & 0xFF,   // G
-	            (pixel) & 0xFF,        // B
-	            (pixel >> 24) & 0xFF   // A
-	        );	
-		}
-		
+        ws::BGRA getPixel(int x,int y)
+        {
+            if (!pvBits || x < 0 || x >= width || y < 0 || y >= height)
+                return BGRA::Transparent();
+                
+            DWORD* pPixels = static_cast<DWORD*>(pvBits);
+            int index = getPixelIndex(x, y);
+            DWORD pixel = pPixels[index];
+            
+		    return TO_BGRA(pixel);	
+        }
 
 
 
-	    void clear(ws::RGBA color = RGBA::Transparent()) 
-		{
-	        if (!pvBits) return;
-	        
-	        DWORD* pPixels = static_cast<DWORD*>(pvBits);
-	        DWORD clearValue = color; // Uses DWORD conversion operator
-	        
-	        for (int i = 0; i < width * height; i++) {
-	            pPixels[i] = clearValue;
-	        }
-	    }
+        void clear(ws::BGRA color = BGRA::Transparent()) 
+        {
+            if (!pvBits) return;
+            
+            DWORD* pPixels = static_cast<DWORD*>(pvBits);
+            
+            for (int i = 0; i < width * height; i++) {
+                pPixels[i] = color.TO_DWORD();
+            }
+        }
 	    
 	    
-		void fillRect(ws::RGBA color, int x, int y, int w, int h) {
+        void testPixelSetting() {
+            std::cout << "Testing pixel setting...\n";
+            
+            // Test red pixel
+            setPixel(BGRA(0, 0, 255, 255), 0, 0);
+            BGRA result = getPixel(0, 0);
+            std::cout << "Set BGRA(0,0,255,255), got: ";
+            result.debugPrint();
+            
+            // Test green pixel  
+            setPixel(BGRA(0, 255, 0, 255), 1, 0);
+            result = getPixel(1, 0);
+            std::cout << "Set BGRA(0,255,0,255), got: ";
+            result.debugPrint();
+            
+            // Test blue pixel
+            setPixel(BGRA(255, 0, 0, 255), 2, 0);
+            result = getPixel(2, 0);
+            std::cout << "Set BGRA(255,0,0,255), got: ";
+            result.debugPrint();
+            
+            // Test semi-transparent pixel
+            setPixel(BGRA(0, 0, 255, 128), 3, 0);
+            result = getPixel(3, 0);
+            std::cout << "Set BGRA(0,0,255,128), got: ";
+            result.debugPrint();
+        }
+	    
+	    
+	    
+		void fillRect(ws::BGRA color, int x, int y, int w, int h) {
 	        for (int iy = y; iy < y + h && iy < height; iy++) {
 	            for (int ix = x; ix < x + w && ix < width; ix++) {
 	                setPixel(color, ix, iy);
@@ -1287,6 +1395,8 @@ namespace ws // GRAPHICS ENTITIES
 		        drawX >= view.getPortSize().x || drawY >= view.getPortSize().y) {
 		        return; // Culling: skip if not visible
 		    }
+
+
 		    
 		    HDC hMemDC = CreateCompatibleDC(hdc);
 		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
@@ -1305,8 +1415,8 @@ namespace ws // GRAPHICS ENTITIES
 	            hMemDC,
 	            rect.left,                              // Source X
 	            rect.top,                               // Source Y
-	            rect.right,                             // Source Width 
-	            rect.bottom,                            // Source Height
+	            width,                             // Source Width 
+	            height,                            // Source Height
 	            blend);                                 // Alpha blending function
 	        	    
 				        
@@ -2574,9 +2684,12 @@ namespace ws // SYSTEM ENTITIES
 			style = newStyle;
 			
 			addStyle(WS_CLIPCHILDREN);
-			addStyle(WS_EX_LAYERED);
 			
-			SetLayeredWindowAttributes(hwnd, 0, 255,LWA_ALPHA);
+			
+			DWORD exStyle = 0;
+		    exStyle |= WS_EX_LAYERED;
+		    
+			
 			
 			
 			
@@ -2615,7 +2728,7 @@ namespace ws // SYSTEM ENTITIES
 			
 			
 			hwnd = CreateWindowEx(
-			0,
+			exStyle,
 			CLASS_NAME,
 			TO_LPCSTR(title),
 			style,
@@ -2676,7 +2789,16 @@ namespace ws // SYSTEM ENTITIES
 	        SetGraphicsMode(backBufferDC, GM_ADVANCED);
 	        //Force original orientation to avoid rotations in copy operations.
 			SetLayout(backBufferDC, LAYOUT_BITMAPORIENTATIONPRESERVED);
-			
+
+
+		    POINT ptZero = {0, 0};
+		    SIZE size = {width, height};
+		    BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+		    
+		    HDC hdcScreen = GetDC(NULL);
+		    UpdateLayeredWindow(hwnd, hdcScreen, &ptZero, &size, 
+		                      backBufferDC, &ptZero, 0, &blend, ULW_ALPHA);
+		    ReleaseDC(NULL, hdcScreen);
 			
 		}
 		
@@ -2862,7 +2984,7 @@ namespace ws // SYSTEM ENTITIES
 		
 		
 		
-	    void clear(ws::RGBA color = ws::RGBA(0,0,0,255)) 
+	    void clear(ws::BGRA color = ws::BGRA(0,0,0,255)) 
 		{
 			
 	        if (backBuffer.isValid()) {
@@ -2876,9 +2998,9 @@ namespace ws // SYSTEM ENTITIES
 		
 		
 		
-	    void drawPixel(int x, int y, ws::RGBA color)
+	    void drawPixel(ws::BGRA color,int x, int y)
 	    {
-	        backBuffer.setPixel(x, y, color);
+	        backBuffer.setPixel(color,x, y);
 	    }		
 		
 		
@@ -2900,41 +3022,28 @@ namespace ws // SYSTEM ENTITIES
 		
 		void display() 
 		{
-		    HDC hdc = GetDC(hwnd);
-		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-		    
-		    
-			BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-            POINT ptDst = {x, y};
-            SIZE size = {width, height};
-            POINT ptSrc = {0, 0};
-            
-            // Scale from back buffer to display buffer with AlphaBlend
-            AlphaBlend(displayBufferDC, 
-            0, 0, width, height,
-            backBufferDC, 
-        	0, 0, view.getSize().x, view.getSize().y,  
-            blend);
-		
-		    if(GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
-			{
-				    
-		        HDC hdcScreen = GetDC(NULL);
-		        // Update layered window directly from display buffer
-		        UpdateLayeredWindow(hwnd, hdcScreen, &ptDst, &size, 
-		                          displayBufferDC, &ptSrc, 
-		                          0, &blend, 
-		                          ULW_ALPHA);
-				ReleaseDC(NULL, hdcScreen);
 
-		    }
-		    else
-		    {
-		    	BitBlt(hdc, 0, 0, width, height, displayBufferDC, 0, 0, SRCCOPY);
-			}
+
+			///METHOD THAT WORKS BUT DOES NOT SEPARATE SCALING FROM UPDATELAYEREDWINDOW
+		    POINT ptDst = {x, y};
+		    SIZE size = {width, height};
+		    POINT ptSrc = {0, 0};
+		    BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+
+
+			HDC hdcScreen = GetDC(NULL);
 		    
-		    
-		    ReleaseDC(hwnd, hdc);
+		    // Get directly from displayBuffer to screen
+		    UpdateLayeredWindow(hwnd, hdcScreen, &ptDst, &size, 
+		                      backBufferDC, &ptSrc, 
+		                      0, &blend, ULW_ALPHA);
+			
+
+		    ReleaseDC(NULL, hdcScreen);
+		    ////////////////////////
+
+	
+
 		}	
 				
 		
@@ -2987,16 +3096,6 @@ namespace ws // SYSTEM ENTITIES
 	            	
 	                PAINTSTRUCT ps;
 	                HDC hdc = BeginPaint(hwnd, &ps);
-	             	
-	             	
-				    
-	             	SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-	                
-	                //BitBlt(hdc, 0, 0, width, height, displayBufferDC, 0, 0, SRCCOPY);
-
-				    
-
-
 	             	
 	                
 	                EndPaint(hwnd, &ps);
