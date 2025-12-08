@@ -58,6 +58,17 @@ Modified window class to use ws::Texture instead of lower level winapi.
 Modified ws::Texture to use DIB section instead of basic GDI. Better for transparency and pixel access.
 *GRAPHICS IS BROKEN*
 
+*Abandoned Project*
+
+Fallback to V1.3
+
+Re-added  Button,Slider,Textbox,Label classes.
+Added complete conversion constructors for ws::Vec2i,ws::Vec2f,ws::Vec2d,ws::Vec3i,ws::Vec3f,ws::Vec3d,ws::IntRect,ws::FloatRect,and ws:DoubleRect.
+
+
+
+
+
 
 V1.4 - Plans
 
