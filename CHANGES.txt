@@ -64,7 +64,7 @@ Fallback to V1.3
 
 Re-added  Button,Slider,Textbox,Label classes.
 Added complete conversion constructors for ws::Vec2i,ws::Vec2f,ws::Vec2d,ws::Vec3i,ws::Vec3f,ws::Vec3d,ws::IntRect,ws::FloatRect,and ws:DoubleRect.
-
+Added flip transformations to drawable scale property. Negative scale on an axis means flipped image on that axis.
 
 
 

@@ -1482,8 +1482,8 @@ namespace ws //GRAPHICS ENTITIES
 		
 		int x = 0,y = 0,z = 0;
 		int width = 1,height = 1;
-		
 		Vec2f scale = {1,1};		
+		POINT origin = {0,0};
 		
 		void setScale(Vec2f s)	
 		{
@@ -1497,23 +1497,118 @@ namespace ws //GRAPHICS ENTITIES
 			origin.x = pos.x;
 			origin.y = pos.y;
 		}
+		
+		
+		//depreciated
+		POINT getScaledOrigin(){
+			return {0,0};
+		}
+		
+		
+		//
 	
 	
-	    int getScaledWidth() const { 
-	        return static_cast<int>(width * scale.x); 
+	    // Get the visual width after scaling (always positive)
+	    int getScaledWidth() const {
+	        return static_cast<int>(width * fabs(scale.x));
 	    }
 	    
-	    int getScaledHeight() const { 
-	        return static_cast<int>(height * scale.y); 
+	    // Get the visual height after scaling (always positive)
+	    int getScaledHeight() const {
+	        return static_cast<int>(height * fabs(scale.y));
 	    }
 	
-		POINT getScaledOrigin()
-		{
-			long int xo = static_cast<int>(origin.x * scale.x);
-			long int yo = static_cast<int>(origin.y * scale.y);
-			
-			return {xo,yo};
-		}
+	    // Get the visual bounds of the object
+	    void getBounds(int& left, int& top, int& right, int& bottom) const {
+	        // Calculate the transformation of the local bounds
+	        // Local coordinates relative to origin
+	        int localLeft = -origin.x;
+	        int localTop = -origin.y;
+	        int localRight = width - origin.x;
+	        int localBottom = height - origin.y;
+	        
+	        // Apply scale (can be negative for flipping)
+	        int scaledLeft = static_cast<int>(localLeft * scale.x);
+	        int scaledRight = static_cast<int>(localRight * scale.x);
+	        int scaledTop = static_cast<int>(localTop * scale.y);
+	        int scaledBottom = static_cast<int>(localBottom * scale.y);
+	        
+	        // Normalize (swap if negative scale flipped the bounds)
+	        if (scaledLeft > scaledRight) std::swap(scaledLeft, scaledRight);
+	        if (scaledTop > scaledBottom) std::swap(scaledTop, scaledBottom);
+	        
+	        // Translate to world coordinates
+	        left = x + scaledLeft;
+	        top = y + scaledTop;
+	        right = x + scaledRight;
+	        bottom = y + scaledBottom;
+	    }
+
+	    // Consolidated transformation function
+	    struct TransformResult {
+	        int drawX, drawY;          // Screen coordinates to draw at
+	        int visualWidth, visualHeight; // Visual dimensions on screen
+	        int srcX, srcY;            // Source texture coordinates (for Sprite)
+	        int srcWidth, srcHeight;   // Source dimensions (for Sprite, may be negative)
+	        bool visible;              // Whether the object is visible in view
+	        
+	        // Common transformation that applies to all Drawables
+	        static TransformResult calculate(const Drawable& drawable, View& view, 
+	                                         int texLeft = 0, int texTop = 0,
+	                                         int texWidth = 0, int texHeight = 0) {
+	            TransformResult result;
+	            
+	            // Get view position for culling
+	            POINT viewPos = view.getPos();
+	            
+	            // Get the visual bounds
+	            int left, top, right, bottom;
+	            drawable.getBounds(left, top, right, bottom);
+	            
+	            result.visualWidth = right - left;
+	            result.visualHeight = bottom - top;
+	            
+	            // Calculate draw position (top-left of visual bounds)
+	            result.drawX = left - viewPos.x;
+	            result.drawY = top - viewPos.y;
+	            
+	            // Culling check
+	            result.visible = !(result.drawX + result.visualWidth < 0 || 
+	                               result.drawY + result.visualHeight < 0 ||
+	                               result.drawX >= view.getPortSize().x || 
+	                               result.drawY >= view.getPortSize().y);
+	            
+	            if (!result.visible) {
+	                return result;
+	            }
+	            
+	            // Texture source calculations (only for sprites)
+	            if (texWidth > 0 && texHeight > 0) {
+	                // Determine source rectangle based on flipping
+	                if (drawable.scale.x >= 0) {
+	                    // No horizontal flip
+	                    result.srcX = texLeft;
+	                    result.srcWidth = texWidth;
+	                } else {
+	                    // Horizontal flip: start from right edge, use negative width
+	                    result.srcX = texLeft + texWidth - 1;
+	                    result.srcWidth = -texWidth;
+	                }
+	                
+	                if (drawable.scale.y >= 0) {
+	                    // No vertical flip
+	                    result.srcY = texTop;
+	                    result.srcHeight = texHeight;
+	                } else {
+	                    // Vertical flip: start from bottom edge, use negative height
+	                    result.srcY = texTop + texHeight - 1;
+	                    result.srcHeight = -texHeight;
+	                }
+	            }
+	            
+	            return result;
+	        }
+	    };
 	
 		
 		virtual void draw(HDC hdc,View &view) = 0;
@@ -1526,10 +1621,10 @@ namespace ws //GRAPHICS ENTITIES
 		
 		
 		
+		
 		private:
 				
-			POINT origin = {0,0};	
-		
+				
 		
 	};
 	
@@ -1538,6 +1633,15 @@ namespace ws //GRAPHICS ENTITIES
 	
 	class Sprite : public Drawable
 	{
+		
+		
+		private:
+			
+	    ws::Texture* textureRef = nullptr;
+	    int texLeft = 0, texTop = 0;  // Texture coordinates
+	    int texWidth = 0, texHeight = 0;  // Texture dimensions			
+		
+		
 		public:
 		
 		
@@ -1550,99 +1654,97 @@ namespace ws //GRAPHICS ENTITIES
 		
 		
 		
-		virtual bool contains(POINT pos) override
-		{
-			
-	    	POINT o = getScaledOrigin();
-			return (pos.x >= x - o.x && pos.y >= y - o.y && pos.x < x + getScaledWidth() - o.x && pos.y < y + getScaledHeight() - o.y); 
-		}
+	    virtual bool contains(POINT pos) override
+	    {
+	        int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+	        return (pos.x >= left && pos.x < right &&
+	                pos.y >= top && pos.y < bottom);
+	    }
+	    
+	    virtual void draw(HDC hdc, View &view) override
+	    {
+	        if (!textureRef || !textureRef->isValid()) {
+	            return;
+	        }
+	        
+	        // Use the common transformation calculation
+	        TransformResult tr = TransformResult::calculate(*this, view, 
+	                                                        texLeft, texTop, 
+	                                                        texWidth, texHeight);
+	        
+	        if (!tr.visible) {
+	            return;
+	        }
+	        
+	        
+		        
+	        // Create source memory DC
+	        HDC hMemDC = CreateCompatibleDC(hdc);
+	        HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, textureRef->bitmap);
+	        
+	        // Create intermediate buffer
+	        HDC hIntermediateDC = CreateCompatibleDC(hdc);
+	        HBITMAP hIntermediateBmp = CreateCompatibleBitmap(hdc, tr.visualWidth, tr.visualHeight);
+	        HBITMAP hOldIntermediateBmp = (HBITMAP)SelectObject(hIntermediateDC, hIntermediateBmp);
+	        
+	        // Clear intermediate buffer
+	        RECT intermediateRect = {0, 0, tr.visualWidth, tr.visualHeight};
+	        FillRect(hIntermediateDC, &intermediateRect, (HBRUSH)GetStockObject(BLACK_BRUSH));
+	        
+	        // Step 1: Stretch with flipping to intermediate buffer
+	        SetStretchBltMode(hIntermediateDC, HALFTONE);
+	        SetBrushOrgEx(hIntermediateDC, 0, 0, NULL);
+	        
+	        StretchBlt(hIntermediateDC,
+	                   0, 0, tr.visualWidth, tr.visualHeight,
+	                   hMemDC,
+	                   tr.srcX, tr.srcY,
+	                   tr.srcWidth, tr.srcHeight,
+	                   SRCCOPY);
+	        
+	        // Step 2: Apply transparency from intermediate to screen
+	        TransparentBlt(hdc,
+	                       tr.drawX, tr.drawY,
+	                       tr.visualWidth, tr.visualHeight,
+	                       hIntermediateDC,
+	                       0, 0,
+	                       tr.visualWidth, tr.visualHeight,
+	                       textureRef->transparencyColor);
+	        
+	        // Cleanup
+	        SelectObject(hIntermediateDC, hOldIntermediateBmp);
+	        DeleteObject(hIntermediateBmp);
+	        DeleteDC(hIntermediateDC);
+	        
+	        SelectObject(hMemDC, hOldBitmap);
+	        DeleteDC(hMemDC);
+	    }
 		
 		
-virtual void draw(HDC hdc, View &view) override
-{
-    if (!textureRef || !textureRef->isValid()) return;
-    
-    POINT o = getScaledOrigin();
-    
-    // Apply view transformation to position
-    POINT viewPos = view.getPos();
-    int drawX = (x - o.x) - viewPos.x;
-    int drawY = (y - o.y) - viewPos.y;
-    
-    // Handle position adjustment for negative scaling FIRST
-    int destWidth = getScaledWidth();
-    int destHeight = getScaledHeight();
-    
-    // Get absolute dimensions for culling check
-    int absWidth = abs(destWidth);
-    int absHeight = abs(destHeight);
-    
-    // Adjust position BEFORE culling check
-    int adjustedX = drawX;
-    int adjustedY = drawY;
-    
-    if (scale.x < 0) {
-        adjustedX += destWidth;  // destWidth is negative, so this moves position left
-    }
-    if (scale.y < 0) {
-        adjustedY += destHeight; // destHeight is negative, so this moves position up
-    }
-    
-    // FIXED: Use adjusted position and absolute dimensions for culling
-    if (adjustedX + absWidth < 0 || adjustedY + absHeight < 0 ||
-        adjustedX >= view.getPortSize().x || adjustedY >= view.getPortSize().y) {
-        return; // Culling: skip if not visible
-    }
-    
-    HDC hMemDC = CreateCompatibleDC(hdc);
-    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, textureRef->bitmap);
-    
-    // TransparentBlt handles stretching AND flipping with negative dimensions
-    TransparentBlt(hdc,
-        adjustedX, 
-        adjustedY, 
-        destWidth, 
-        destHeight,
-        hMemDC,
-        rect.left, 
-        rect.top, 
-        rect.right,
-        rect.bottom,
-        textureRef->transparencyColor);
-        
-    SelectObject(hMemDC, hOldBitmap);
-    DeleteDC(hMemDC);
-}
 		
 		
-		
-		void setTexture(Texture &texture)
-		{
-			textureRef = &texture;
-			rect.left = 0;
-			rect.top = 0;
-			rect.right = textureRef->width;
-			rect.bottom = textureRef->height;	
-			
-			width = textureRef->width;
-			height = textureRef->height;
-			
-		}
-		
-		
-		void setTextureRect(RECT r)
-		{
-			rect = r;
-			width = r.right;
-			height = r.bottom;
-		}
-		
-		
-		RECT getTextureRect()
-		{
-			return rect;
-		}
+	    void setTexture(ws::Texture& texture) {
+	        textureRef = &texture;
+	    }
+	    
+	    void setTextureRect(RECT rect) {
+	        // Assuming rect.left, rect.top are coordinates
+	        // rect.right is width, rect.bottom is height
+	        texLeft = rect.left;
+	        texTop = rect.top;
+	        texWidth = rect.right;
+	        texHeight = rect.bottom;
+	        
+	        // Set Drawable dimensions to match texture rectangle
+	        width = texWidth;
+	        height = texHeight;
+	    }
+	    
+	    RECT getTextureRect() const {
+	        return {texLeft, texTop, texWidth, texHeight};
+	    }
 		
 		Texture &getTexture()
 		{
@@ -1669,9 +1771,6 @@ virtual void draw(HDC hdc, View &view) override
 			friend class Window;
 		
 		
-		private:
-			Texture *textureRef = nullptr;
-			RECT rect;
 		
 					
 	};
