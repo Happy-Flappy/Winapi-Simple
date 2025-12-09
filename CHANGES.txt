@@ -74,6 +74,10 @@ V1.4 - Plans
 
 To be added:
 
+Replace inconsistencies in data types in functions with consistent types such as ws::Vec2f instead of POINT.
+Work on better conversion of POINT to ws::Vec2f
+Replace RECT with ws::IntRect
+
 Camera.h perspective projection class in place of view class. - in progress
 Texture stretching into polygonal shapes. - in progress
 Mesh3D - in progress
