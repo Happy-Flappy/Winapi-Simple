@@ -131,418 +131,483 @@ namespace ws // WINAPI CONVERTERS
 
 
 
+#include <type_traits>
+#include <utility>
+
 
 namespace ws //DATA TYPES
 {
+
+	// I MUST ADMIT! I did use AI to make these data types support template construction. 
+	// When it comes to templates and type constructors, these are not my strongsuits. 
+	// I just don't know it well enough to do it on my own. 
+	// I did not use AI for anything else in the library. Only for adding comments and for doing repetitive tasks such as replacing POINT with ws::Vec2f. 
 	
-	struct Vec2i
-	{
-		int x,y;
-		Vec2i() = default;
-        Vec2i(int x, int y) : x(x), y(y) {}       
-        
-		//POINT to Vec2i
-		Vec2i(const POINT& p) : x(p.x), y(p.y) {}
-		
-		//Vec2i to POINT
-        operator POINT() const {
-            POINT p;
-            p.x = x;
-            p.y = y;
-            return p;
-        }		
-        
-        
-        //Vec2i to POINT* - safe only because POINT and ws::Vec2i are exactly same layout.
-	    operator POINT*() {
-	        return reinterpret_cast<POINT*>(this);
+
+	
+	// ==================== TYPE TRAITS ====================
+	
+	// Vector type traits
+	template<typename T, typename = void>
+	struct has_xy_members : std::false_type {};
+	
+	template<typename T>
+	struct has_xy_members<T, std::void_t<
+	    decltype(std::declval<T>().x), 
+	    decltype(std::declval<T>().y)>>
+	    : std::true_type {};
+	
+	template<typename T, typename = void>
+	struct has_xyz_members : std::false_type {};
+	
+	template<typename T>
+	struct has_xyz_members<T, std::void_t<
+	    decltype(std::declval<T>().x), 
+	    decltype(std::declval<T>().y),
+	    decltype(std::declval<T>().z)>>
+	    : std::true_type {};
+	
+	// Rect type traits
+	template<typename T, typename = void>
+	struct has_width_height_style : std::false_type {};
+	
+	template<typename T>
+	struct has_width_height_style<T, std::void_t<
+	    decltype(std::declval<T>().left), 
+	    decltype(std::declval<T>().top),
+	    decltype(std::declval<T>().width),
+	    decltype(std::declval<T>().height)>> 
+	    : std::true_type {};
+	
+	template<typename T, typename = void>
+	struct has_right_bottom_style : std::false_type {};
+	
+	template<typename T>
+	struct has_right_bottom_style<T, std::void_t<
+	    decltype(std::declval<T>().left), 
+	    decltype(std::declval<T>().top),
+	    decltype(std::declval<T>().right),
+	    decltype(std::declval<T>().bottom)>>
+	    : std::true_type {};
+	
+	template<typename T>
+	struct is_rect_like : std::integral_constant<bool, 
+	    has_width_height_style<T>::value || has_right_bottom_style<T>::value> {};
+	
+	// ==================== VEC2I ====================
+	
+	struct Vec2i {
+	    int x, y;
+	    
+	    Vec2i() = default;
+	    
+	    // Constructor for any two arithmetic types
+	    template<typename T, typename U,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U>>>
+	    Vec2i(T x_val, U y_val) 
+	        : x(static_cast<int>(x_val)), 
+	          y(static_cast<int>(y_val)) {}
+	    
+	    // Constructor for any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    Vec2i(const T& other) 
+	        : x(static_cast<int>(other.x)), 
+	          y(static_cast<int>(other.y)) {}
+	    
+	    // Conversion operator to any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        return result;
 	    }
-	    //Vec2i to const POINT*
-	    operator const POINT*() const {
-	        return reinterpret_cast<const POINT*>(this);
+	    
+	    // Special POINT pointer conversions (only if layout matches!)
+	    operator POINT*() { 
+	        return reinterpret_cast<POINT*>(this); 
 	    }
-        
-        
-        #ifdef SFML_SYSTEM_HPP
-        
-		Vec2i(sf::Vector2i& i) : x(i.x), y(i.y) {}
-        
-		operator sf::Vector2i() const {
-			sf::Vector2i i;
-			i.x = x;
-        	i.y = y;
-        	return i;
-		}
-        
-		#endif       
-        
-	};
-
-	struct Vec2f
-	{
-		float x,y;
-        Vec2f() = default;
-        Vec2f(float x, float y) : x(x), y(y) {}
-        Vec2f(int x, int y) : x(x), y(y) {}
-        Vec2f(Vec2i& f) : x(f.x), y(f.y) {}
-
-
-		operator ws::Vec2i() const
-		{
-			ws::Vec2i i;
-			i.x = static_cast<int>(x);
-			i.y = static_cast<int>(y);
-			return i;
-		}
-
-
-        operator POINT() const {
-            POINT p;
-            p.x = static_cast<unsigned int>(x);
-            p.y = static_cast<unsigned int>(y);
-            return p;
-        }		
-
-        //Vec2i to POINT* - safe only because POINT and ws::Vec2i are exactly same layout.
-	    operator POINT*() {
-	        return reinterpret_cast<POINT*>(this);
+	    
+	    operator const POINT*() const { 
+	        return reinterpret_cast<const POINT*>(this); 
 	    }
-	    //Vec2i to const POINT*
-	    operator const POINT*() const {
-	        return reinterpret_cast<const POINT*>(this);
+	};
+	
+	// ==================== VEC2F ====================
+	
+	struct Vec2f {
+	    float x, y;
+	    
+	    Vec2f() = default;
+	    
+	    // Constructor for any two arithmetic types
+	    template<typename T, typename U,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U>>>
+	    Vec2f(T x_val, U y_val) 
+	        : x(static_cast<float>(x_val)), 
+	          y(static_cast<float>(y_val)) {}
+	    
+	    // Constructor for any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    Vec2f(const T& other) 
+	        : x(static_cast<float>(other.x)), 
+	          y(static_cast<float>(other.y)) {}
+	    
+	    // Conversion operator to any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        return result;
 	    }
-
-
-
-        #ifdef SFML_SYSTEM_HPP
-        Vec2f(sf::Vector2f& f) : x(f.x), y(f.y) {}
-        
-		operator sf::Vector2f() const {
-			sf::Vector2f f;
-			f.x = x;
-        	f.y = y;
-        	return f;
-		}
-        
-		#endif
-	};
-		
-	struct Vec2d
-	{
-		double x,y;	
-        Vec2d() = default;
-        Vec2d(double x, double y) : x(x), y(y) {}
-        Vec2d(float x, float y) : x(x), y(y) {}
-        Vec2d(int x, int y) : x(x), y(y) {}
-        Vec2d(Vec2f& f) : x(f.x), y(f.y) {}
-        Vec2d(Vec2i& f) : x(f.x), y(f.y) {}
-
-
-		operator ws::Vec2f() const
-		{
-			ws::Vec2f i;
-			i.x = static_cast<float>(x);
-			i.y = static_cast<float>(y);
-			return i;
-		}
-
-
-
-		operator ws::Vec2i() const
-		{
-			ws::Vec2i i;
-			i.x = static_cast<int>(x);
-			i.y = static_cast<int>(y);
-			return i;
-		}
-
-
-        operator POINT() const {
-            POINT p;
-            p.x = static_cast<unsigned int>(x);
-            p.y = static_cast<unsigned int>(y);
-            return p;
-        }		
-
-
-        //Vec2i to POINT* - safe only because POINT and ws::Vec2i are exactly same layout.
-	    operator POINT*() {
-	        return reinterpret_cast<POINT*>(this);
+	    
+	    // Special POINT pointer conversions
+	    operator POINT*() { 
+	        return reinterpret_cast<POINT*>(this); 
 	    }
-	    //Vec2i to const POINT*
-	    operator const POINT*() const {
-	        return reinterpret_cast<const POINT*>(this);
+	    
+	    operator const POINT*() const { 
+	        return reinterpret_cast<const POINT*>(this); 
 	    }
-
-        
-        
-        #ifdef SFML_SYSTEM_HPP
-        Vec2d(sf::Vector2<double>& d) : x(d.x), y(d.y) {}
-        
-		operator sf::Vector2<double>() const {
-			sf::Vector2<double> d;
-			d.x = x;
-        	d.y = y;
-        	return d;
-		}
-        
-		#endif
-	};
-		
-	
-
-	struct Vec3i
-	{
-		int x,y,z;
-        Vec3i() = default;
-        Vec3i(int x, int y,int z) : x(x), y(y), z(z) {}		
-
-
-        #ifdef SFML_SYSTEM_HPP
-        
-		Vec3i(sf::Vector3i& i) : x(i.x), y(i.y), z(i.z) {}
-        
-		operator sf::Vector3i() const {
-			sf::Vector3i i;
-			i.x = x;
-        	i.y = y;
-        	return i;
-		}
-        
-		#endif  		
-		
-	};
-
-	
-	struct Vec3f
-	{
-		float x,y,z;
-        Vec3f() = default;
-        Vec3f(float x, float y,float z) : x(x), y(y), z(z) {}
-		Vec3f(int x, int y,int z) : x(x), y(y), z(z) {}
-		Vec3f(Vec3i& i) : x(i.x), y(i.y), z(i.z) {}
-
-
-
-		operator ws::Vec3i() const {
-			ws::Vec3i i;
-			i.x = x;
-        	i.y = y;
-        	i.z = z;
-        	return i;
-		}
-
-        
-
-        #ifdef SFML_SYSTEM_HPP
-        
-		Vec3f(sf::Vector3f& i) : x(i.x), y(i.y), z(i.z) {}
-        
-		operator sf::Vector3f() const {
-			sf::Vector3f i;
-			i.x = x;
-        	i.y = y;
-        	return i;
-		}
-        
-		#endif         
-        
-	};
-
-	struct Vec3d
-	{
-		double x,y,z;
-		Vec3d() = default;
-		Vec3d(double x,double y,double z) : x(x), y(y), z(z) {}
-		Vec3d(float x,float y,float z) : x(x), y(y), z(z) {}
-		Vec3d(int x,int y,int z) : x(x), y(y), z(z) {}
-		Vec3d(Vec3f& i) : x(i.x), y(i.y), z(i.z) {}
-        Vec3d(Vec3i& i) : x(i.x), y(i.y), z(i.z) {}
-        
-
-
-		operator ws::Vec3f() const {
-			ws::Vec3f i;
-			i.x = x;
-        	i.y = y;
-        	i.z = z;
-        	return i;
-		}
- 
- 
-		operator ws::Vec3i() const {
-			ws::Vec3i i;
-			i.x = x;
-        	i.y = y;
-        	i.z = z;
-        	return i;
-		} 
- 
- 
- 
-        
-		#ifdef SFML_SYSTEM_HPP
-        
-		Vec3d(sf::Vector3<double>& i) : x(i.x), y(i.y), z(i.z) {}
-        
-		operator sf::Vector3<double>() const {
-			sf::Vector3<double> i;
-			i.x = x;
-        	i.y = y;
-        	return i;
-		}
-        
-		#endif 
-		
-	};	
-	
-	struct IntRect
-	{
-		int left,top,width,height;
-		IntRect() = default;
-		IntRect(int left,int top,int width,int height) : left(left),top(top),width(width),height(height) {}
-		IntRect(RECT &r) : left(r.left) , top(r.top),width(r.right - r.left),height(r.bottom - r.top) {}
-		
-		
-		//IntRect to RECT
-		operator RECT() const {
-            RECT r;
-            r.left = left;
-            r.top = top;
-            r.right = left + width;
-            r.bottom = top + height;
-            return r;
-        }				
-        
-        #ifdef SFML_SYSTEM_HPP
-        
-		IntRect(sf::IntRect &r) : left(r.left) , top(r.top),width(r.width),height(r.height) {} 
-        
-        operator sf::IntRect() const {
-        	sf::IntRect r;
-        	r.left = left;
-        	r.top = top;
-        	r.width = width;
-        	r.height = height;
-        	return r;
-		}
-        
-		#endif
 	};
 	
-	struct FloatRect
-	{
-		float left,top,width,height;
-		FloatRect() = default;
-		FloatRect(float left,float top,float width,float height) : left(left),top(top),width(width),height(height) {}
-		FloatRect(int left,int top,int width,int height) : left(left),top(top),width(width),height(height) {}
-		FloatRect(ws::IntRect &r) : left(r.left), top(r.top),width(r.width),height(r.height) {} 
-		
-		
-		
-		operator ws::IntRect() const
-		{
-			ws::IntRect r;
-			r.left = static_cast<int>(left);
-			r.top = static_cast<int>(top);
-			r.width = static_cast<int>(width);
-			r.height = static_cast<int>(height);
-			return r;
-		}
-		
-
-		operator RECT() const {
-            RECT r;
-            r.left = static_cast<unsigned int>(left);
-            r.top = static_cast<unsigned int>(top);
-            r.right = static_cast<unsigned int>(left + width);
-            r.bottom = static_cast<unsigned int>(top + height);
-            return r;
-        }
-
-		
-        #ifdef SFML_SYSTEM_HPP
-        
-		FloatRect(sf::FloatRect &r) : left(r.left) , top(r.top),width(r.width),height(r.height) {} 
-        
-        operator sf::FloatRect() const {
-        	sf::FloatRect r;
-        	r.left = left;
-        	r.top = top;
-        	r.width = width;
-        	r.height = height;
-        	return r;
-		}
-        
-		#endif
+	// ==================== VEC2D ====================
+	
+	struct Vec2d {
+	    double x, y;
+	    
+	    Vec2d() = default;
+	    
+	    // Constructor for any two arithmetic types
+	    template<typename T, typename U,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U>>>
+	    Vec2d(T x_val, U y_val) 
+	        : x(static_cast<double>(x_val)), 
+	          y(static_cast<double>(y_val)) {}
+	    
+	    // Constructor for any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    Vec2d(const T& other) 
+	        : x(static_cast<double>(other.x)), 
+	          y(static_cast<double>(other.y)) {}
+	    
+	    // Conversion operator to any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        return result;
+	    }
+	    
+	    // Special POINT pointer conversions
+	    operator POINT*() { 
+	        return reinterpret_cast<POINT*>(this); 
+	    }
+	    
+	    operator const POINT*() const { 
+	        return reinterpret_cast<const POINT*>(this); 
+	    }
 	};
 	
-
-	struct DoubleRect
-	{
-		double left,top,width,height;
-		DoubleRect() = default;
-		DoubleRect(double left,double top,double width,double height) : left(left),top(top),width(width),height(height) {}
-		DoubleRect(float left,float top,float width,float height) : left(left),top(top),width(width),height(height) {}
-		DoubleRect(int left,int top,int width,int height) : left(left),top(top),width(width),height(height) {}
-		
-		
-		DoubleRect(ws::FloatRect &r) : left(r.left), top(r.top),width(r.width),height(r.height) {} 
-		DoubleRect(ws::IntRect &r) : left(r.left), top(r.top),width(r.width),height(r.height) {} 
-
-
-
-		operator ws::FloatRect() const
-		{
-			ws::FloatRect r;
-			r.left = static_cast<float>(left);
-			r.top = static_cast<float>(top);
-			r.width = static_cast<float>(width);
-			r.height = static_cast<float>(height);
-			return r;
-		}
-
-
-
-		operator ws::IntRect() const
-		{
-			ws::IntRect r;
-			r.left = static_cast<int>(left);
-			r.top = static_cast<int>(top);
-			r.width = static_cast<int>(width);
-			r.height = static_cast<int>(height);
-			return r;
-		}
-
-
-
-		operator RECT() const {
-            RECT r;
-            r.left = static_cast<unsigned int>(left);
-            r.top = static_cast<unsigned int>(top);
-            r.right = static_cast<unsigned int>(left + width);
-            r.bottom = static_cast<unsigned int>(top + height);
-            return r;
-        }
-
-		
-		
-        #ifdef SFML_SYSTEM_HPP
-        
-		DoubleRect(sf::Rect<double> &r) : left(r.left) , top(r.top),width(r.width),height(r.height) {} 
-        
-        operator sf::DoubleRect() const {
-        	sf::Rect<double> r;
-        	r.left = left;
-        	r.top = top;
-        	r.width = width;
-        	r.height = height;
-        	return r;
-		}
-        
-		#endif
-	};		
+	// ==================== VEC3I ====================
 	
+	struct Vec3i {
+	    int x, y, z;
+	    
+	    Vec3i() = default;
+	    
+	    // Constructor for any three arithmetic types
+	    template<typename T, typename U, typename V,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U> &&
+	                                         std::is_arithmetic_v<V>>>
+	    Vec3i(T x_val, U y_val, V z_val) 
+	        : x(static_cast<int>(x_val)), 
+	          y(static_cast<int>(y_val)), 
+	          z(static_cast<int>(z_val)) {}
+	    
+	    // Constructor for any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    Vec3i(const T& other) 
+	        : x(static_cast<int>(other.x)), 
+	          y(static_cast<int>(other.y)), 
+	          z(static_cast<int>(other.z)) {}
+	    
+	    // Conversion operator to any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        result.z = static_cast<decltype(T::z)>(z);
+	        return result;
+	    }
+	};
+	
+	// ==================== VEC3F ====================
+	
+	struct Vec3f {
+	    float x, y, z;
+	    
+	    Vec3f() = default;
+	    
+	    // Constructor for any three arithmetic types
+	    template<typename T, typename U, typename V,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U> &&
+	                                         std::is_arithmetic_v<V>>>
+	    Vec3f(T x_val, U y_val, V z_val) 
+	        : x(static_cast<float>(x_val)), 
+	          y(static_cast<float>(y_val)), 
+	          z(static_cast<float>(z_val)) {}
+	    
+	    // Constructor for any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    Vec3f(const T& other) 
+	        : x(static_cast<float>(other.x)), 
+	          y(static_cast<float>(other.y)), 
+	          z(static_cast<float>(other.z)) {}
+	    
+	    // Conversion operator to any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        result.z = static_cast<decltype(T::z)>(z);
+	        return result;
+	    }
+	};
+	
+	// ==================== VEC3D ====================
+	
+	struct Vec3d {
+	    double x, y, z;
+	    
+	    Vec3d() = default;
+	    
+	    // Constructor for any three arithmetic types
+	    template<typename T, typename U, typename V,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U> &&
+	                                         std::is_arithmetic_v<V>>>
+	    Vec3d(T x_val, U y_val, V z_val) 
+	        : x(static_cast<double>(x_val)), 
+	          y(static_cast<double>(y_val)), 
+	          z(static_cast<double>(z_val)) {}
+	    
+	    // Constructor for any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    Vec3d(const T& other) 
+	        : x(static_cast<double>(other.x)), 
+	          y(static_cast<double>(other.y)), 
+	          z(static_cast<double>(other.z)) {}
+	    
+	    // Conversion operator to any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        result.z = static_cast<decltype(T::z)>(z);
+	        return result;
+	    }
+	};
+	
+	// ==================== INTRECT ====================
+	
+	struct IntRect {
+	    int left, top, width, height;
+	    
+	    IntRect() = default;
+	    
+	    // Constructor for any four arithmetic types
+	    template<typename T1, typename T2, typename T3, typename T4,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
+	                                         std::is_arithmetic_v<T2> &&
+	                                         std::is_arithmetic_v<T3> &&
+	                                         std::is_arithmetic_v<T4>>>
+	    IntRect(T1 l, T2 t, T3 w, T4 h) 
+	        : left(static_cast<int>(l)), 
+	          top(static_cast<int>(t)),
+	          width(static_cast<int>(w)), 
+	          height(static_cast<int>(h)) {}
+	    
+	    // Constructor for any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    IntRect(const T& other) {
+	        if constexpr (has_width_height_style<T>::value) {
+	            // Width/height style (e.g., sf::IntRect, your own rect types)
+	            left = static_cast<int>(other.left);
+	            top = static_cast<int>(other.top);
+	            width = static_cast<int>(other.width);
+	            height = static_cast<int>(other.height);
+	        } else {
+	            // Right/bottom style (e.g., RECT)
+	            left = static_cast<int>(other.left);
+	            top = static_cast<int>(other.top);
+	            width = static_cast<int>(other.right - other.left);
+	            height = static_cast<int>(other.bottom - other.top);
+	        }
+	    }
+	    
+	    // Conversion operator to any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    operator T() const {
+	        T result;
+	        
+	        if constexpr (has_width_height_style<T>::value) {
+	            // Convert to width/height style
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.width = static_cast<decltype(T::width)>(width);
+	            result.height = static_cast<decltype(T::height)>(height);
+	        } else {
+	            // Convert to right/bottom style
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.right = static_cast<decltype(T::right)>(left + width);
+	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
+	        }
+	        
+	        return result;
+	    }
+	};
+	
+	// ==================== FLOATRECT ====================
+	
+	struct FloatRect {
+	    float left, top, width, height;
+	    
+	    FloatRect() = default;
+	    
+	    // Constructor for any four arithmetic types
+	    template<typename T1, typename T2, typename T3, typename T4,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
+	                                         std::is_arithmetic_v<T2> &&
+	                                         std::is_arithmetic_v<T3> &&
+	                                         std::is_arithmetic_v<T4>>>
+	    FloatRect(T1 l, T2 t, T3 w, T4 h) 
+	        : left(static_cast<float>(l)), 
+	          top(static_cast<float>(t)),
+	          width(static_cast<float>(w)), 
+	          height(static_cast<float>(h)) {}
+	    
+	    // Constructor for any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    FloatRect(const T& other) {
+	        if constexpr (has_width_height_style<T>::value) {
+	            left = static_cast<float>(other.left);
+	            top = static_cast<float>(other.top);
+	            width = static_cast<float>(other.width);
+	            height = static_cast<float>(other.height);
+	        } else {
+	            left = static_cast<float>(other.left);
+	            top = static_cast<float>(other.top);
+	            width = static_cast<float>(other.right - other.left);
+	            height = static_cast<float>(other.bottom - other.top);
+	        }
+	    }
+	    
+	    // Conversion operator to any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    operator T() const {
+	        T result;
+	        
+	        if constexpr (has_width_height_style<T>::value) {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.width = static_cast<decltype(T::width)>(width);
+	            result.height = static_cast<decltype(T::height)>(height);
+	        } else {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.right = static_cast<decltype(T::right)>(left + width);
+	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
+	        }
+	        
+	        return result;
+	    }
+	};
+	
+	// ==================== DOUBLERECT ====================
+	
+	struct DoubleRect {
+	    double left, top, width, height;
+	    
+	    DoubleRect() = default;
+	    
+	    // Constructor for any four arithmetic types
+	    template<typename T1, typename T2, typename T3, typename T4,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
+	                                         std::is_arithmetic_v<T2> &&
+	                                         std::is_arithmetic_v<T3> &&
+	                                         std::is_arithmetic_v<T4>>>
+	    DoubleRect(T1 l, T2 t, T3 w, T4 h) 
+	        : left(static_cast<double>(l)), 
+	          top(static_cast<double>(t)),
+	          width(static_cast<double>(w)), 
+	          height(static_cast<double>(h)) {}
+	    
+	    // Constructor for any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    DoubleRect(const T& other) {
+	        if constexpr (has_width_height_style<T>::value) {
+	            left = static_cast<double>(other.left);
+	            top = static_cast<double>(other.top);
+	            width = static_cast<double>(other.width);
+	            height = static_cast<double>(other.height);
+	        } else {
+	            left = static_cast<double>(other.left);
+	            top = static_cast<double>(other.top);
+	            width = static_cast<double>(other.right - other.left);
+	            height = static_cast<double>(other.bottom - other.top);
+	        }
+	    }
+	    
+	    // Conversion operator to any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    operator T() const {
+	        T result;
+	        
+	        if constexpr (has_width_height_style<T>::value) {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.width = static_cast<decltype(T::width)>(width);
+	            result.height = static_cast<decltype(T::height)>(height);
+	        } else {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.right = static_cast<decltype(T::right)>(left + width);
+	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
+	        }
+	        
+	        return result;
+	    }
+	};
 		
 }
 
@@ -2080,152 +2145,152 @@ namespace ws //GRAPHICS ENTITIES
 	};
 	
 	
-//	
-//	
-//
-//
-//
-//
-//
-//
-//
-//
-//	
-//	class Radial : public Drawable
-//	{
-//		public:
-//		Poly poly;
-//		
-//		Radial()
-//		{
-//			poly.fillColor = RGB(0,0,255);
-//			poly.borderColor = RGB(0,0,200);
-//			poly.borderWidth = 2;
-//			poly.closed = true;
-//			poly.filled = true;
-//			make();
-//		}
-//		
-//		void make(int points = 500)
-//		{
-//			poly.clear();
-//			
-//			double inc = (2*3.14)/points; 
-//			
-//			for(double a=0;a<(2*3.14);a+=inc)
-//			{
-//				int resx = static_cast<int>(std::cos(a) * getRadius());
-//				int resy = static_cast<int>(std::sin(a) * getRadius());
-//				poly.addVertex(center.x + resx,center.y + resy);
-//			}
-//			m_points = points;
-//			
-//			updateDrawableProperties();
-//		}
-//		
-//		
-//		
-//		void setPosition(int posx,int posy)
-//		{
-//			center = {posx,posy};
-//			make(m_points);
-//		}
-//		
-//		void setPosition(ws::Vec2i pos)
-//		{
-//			center = pos;
-//			make(m_points);
-//		}
-//		
-//		
-//		void move(ws::Vec2i delta)
-//		{
-//			setPosition(center.x + delta.x,center.y + delta.y);
-//			make(m_points);
-//		}
-//		
-//		void move(int deltaX,int deltaY)
-//		{
-//			setPosition(center.x + deltaX,center.y + deltaY);
-//			make(m_points);
-//		}
-//		
-//		
-//		void setPointCount(int count)
-//		{
-//			m_points = count;
-//			make(m_points);
-//		}
-//		
-//		void setRadius(int size)
-//		{
-//			radius = size;
-//			make(m_points);
-//		}
-//		
-//		void setFillColor(COLORREF color)
-//		{
-//			poly.fillColor = color; 
-//			make(m_points);
-//		}
-//		
-//		void setBorderColor(COLORREF color)
-//		{
-//			poly.borderColor = color;
-//			make(m_points);
-//		}
-//		
-//		void setBorderWidth(int size)
-//		{
-//			poly.borderWidth = size;
-//			make(m_points);
-//		}
-//		
-//		
-//		int getRadius()
-//		{
-//			return radius;
-//		}
-//		
-//		POINT getPosition()
-//		{
-//			return center;
-//		}
-//		
-//		int getPointCount()
-//		{
-//			return m_points;
-//		}
-//		
-//		
-//	    virtual void draw(HDC hdc, View &view) override
-//	    {
-//	        poly.draw(hdc, view);
-//	    }
-//	    
-//	    virtual bool contains(ws::Vec2i pos) override
-//	    {
-//	        return poly.contains(pos);
-//	    }	
-//		
-//		
-//		private:
-//		ws::Vec2i center;
-//		int m_points = 500;
-//		int radius = 10;
-//		
-//		
-//		void updateDrawableProperties()
-//	    {
-//	        // Set Drawable's position and size based on the poly's bounding rect
-//	        ws::IntRect bounds = poly.getBoundingRect();
-//	        x = bounds.left;
-//	        y = bounds.top;
-//	        width = bounds.width;
-//	        height = bounds.height;
-//	    }
-//		
-//	};
+	
+	
+
+
+
+
+
+
+
+
+	
+	class Radial : public Drawable
+	{
+		public:
+		Poly poly;
+		
+		Radial()
+		{
+			poly.fillColor = Gdiplus::Color(255,100,200,100);
+			poly.borderColor = Gdiplus::Color(255,50,255,50);
+			poly.borderWidth = 2;
+			poly.closed = true;
+			poly.filled = true;
+			make();
+		}
+		
+		void make(int points = 500)
+		{
+			poly.clear();
+			
+			double inc = (2*3.14)/points; 
+			
+			for(double a=0;a<(2*3.14);a+=inc)
+			{
+				int resx = static_cast<int>(std::cos(a) * getRadius());
+				int resy = static_cast<int>(std::sin(a) * getRadius());
+				poly.addVertex(center.x + resx,center.y + resy);
+			}
+			m_points = points;
+			
+			updateDrawableProperties();
+		}
+		
+		
+		
+		void setPosition(int posx,int posy)
+		{
+			center = {posx,posy};
+			make(m_points);
+		}
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			center = pos;
+			make(m_points);
+		}
+		
+		
+		void move(ws::Vec2i delta)
+		{
+			setPosition(center.x + delta.x,center.y + delta.y);
+			make(m_points);
+		}
+		
+		void move(int deltaX,int deltaY)
+		{
+			setPosition(center.x + deltaX,center.y + deltaY);
+			make(m_points);
+		}
+		
+		
+		void setPointCount(int count)
+		{
+			m_points = count;
+			make(m_points);
+		}
+		
+		void setRadius(int size)
+		{
+			radius = size;
+			make(m_points);
+		}
+		
+		void setFillColor(Gdiplus::Color color)
+		{
+			poly.fillColor = color; 
+			make(m_points);
+		}
+		
+		void setBorderColor(Gdiplus::Color color)
+		{
+			poly.borderColor = color;
+			make(m_points);
+		}
+		
+		void setBorderWidth(int size)
+		{
+			poly.borderWidth = size;
+			make(m_points);
+		}
+		
+		
+		int getRadius()
+		{
+			return radius;
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			return center;
+		}
+		
+		int getPointCount()
+		{
+			return m_points;
+		}
+		
+		
+	    virtual void draw(Gdiplus::Graphics* canvas, View &view) override
+	    {
+	    	poly.draw(canvas,view);
+	    }
+	    
+	    virtual bool contains(ws::Vec2i pos) override
+	    {
+	        return poly.contains(pos);
+	    }	
+		
+		
+		private:
+		ws::Vec2i center;
+		int m_points = 500;
+		int radius = 10;
+		
+		
+		void updateDrawableProperties()
+	    {
+	        // Set Drawable's position and size based on the poly's bounding rect
+	        ws::IntRect bounds = poly.getBoundingRect();
+	        x = bounds.left;
+	        y = bounds.top;
+	        width = bounds.width;
+	        height = bounds.height;
+	    }
+		
+	};
 
 	
 }
@@ -2462,6 +2527,32 @@ namespace ws //SYSTEM ENTITIES
 	        return bitmap;
 	    }
 	
+	
+	
+	
+	
+	
+		bool OpenClipboardCheck()
+		{
+			if(!hwnd)
+	        {
+	        	if (!OpenClipboard(NULL)) {
+		            return false;
+		        }
+			}
+			else
+			{
+				if (!OpenClipboard(hwnd)) {
+		            return false;
+		        }
+			}
+			return true;
+		}
+	
+	
+	
+	
+	
 	public:
 	    HWND hwnd = nullptr;
 	    
@@ -2471,7 +2562,7 @@ namespace ws //SYSTEM ENTITIES
 	    {
 	        const std::wstring text = ws::WIDE(str);
 	        
-	        if (!OpenClipboard(hwnd)) {
+	        if (!OpenClipboardCheck()) {
 	            return false;
 	        }
 	        
@@ -2501,10 +2592,10 @@ namespace ws //SYSTEM ENTITIES
 	    
 	    std::string pasteText() 
 	    {
-	        if (!OpenClipboard(hwnd)) {
+	        if (!OpenClipboardCheck()) {
 	            return "";
 	        }
-	        
+				        
 	        std::string result;
 	        
 	        if (IsClipboardFormatAvailable(CF_UNICODETEXT)) {
@@ -2530,12 +2621,12 @@ namespace ws //SYSTEM ENTITIES
 	        Gdiplus::Bitmap* copyBitmap = copyRectOfBitmap(texture, rect);
 	        if (!copyBitmap) return false;
 	        
-	        // Try multiple formats for better compatibility
 	        
-	        if (!OpenClipboard(hwnd)) {
+	        if (!OpenClipboardCheck()) {
 	            delete copyBitmap;
-	            return false;
+				return false;
 	        }
+	        
 	        
 	        EmptyClipboard();
 	        
@@ -2574,11 +2665,14 @@ namespace ws //SYSTEM ENTITIES
 	        delete copyBitmap;
 	        
 	        if (!hGlobal) return false;
-	        
-	        if (!OpenClipboard(hwnd)) {
+
+
+	    	if (!OpenClipboardCheck()) {
 	            GlobalFree(hGlobal);
-	            return false;
+				return false;
 	        }
+
+	        
 	        
 	        EmptyClipboard();
 	        bool success = SetClipboardData(CF_DIB, hGlobal) != NULL;
@@ -2595,7 +2689,7 @@ namespace ws //SYSTEM ENTITIES
 	    {
 	        ws::Texture tex;
 	        
-	        if (!OpenClipboard(hwnd)) {
+	        if (!OpenClipboardCheck()) {
 	            return tex;
 	        }
 	        
@@ -2663,7 +2757,9 @@ namespace ws //SYSTEM ENTITIES
 	    
 	    bool hasText() 
 	    {
-	        if (!OpenClipboard(hwnd)) return false;
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
 	        bool hasText = IsClipboardFormatAvailable(CF_UNICODETEXT);
 	        CloseClipboard();
 	        return hasText;
@@ -2671,7 +2767,9 @@ namespace ws //SYSTEM ENTITIES
 	    
 	    bool hasImage() 
 	    {
-	        if (!OpenClipboard(hwnd)) return false;
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
 	        bool hasImage = IsClipboardFormatAvailable(CF_BITMAP);
 	        CloseClipboard();
 	        return hasImage;
@@ -2679,7 +2777,9 @@ namespace ws //SYSTEM ENTITIES
 	    
 	    bool clear() 
 	    {
-	        if (!OpenClipboard(hwnd)) return false;
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
 	        bool success = EmptyClipboard();
 	        CloseClipboard();
 	        return success;
@@ -3070,10 +3170,29 @@ namespace ws //SYSTEM ENTITIES
 	                HDC hdc = BeginPaint(hwnd, &ps);
 
 					if (backBuffer.bitmap) {
-				        if (hdc) {
-				            Gdiplus::Graphics graphics(hdc);
-				            graphics.DrawImage(backBuffer.bitmap, 0, 0, width, height);
-				        }
+				        
+						if (canvas) {
+					        delete canvas;
+					        canvas = nullptr;
+					    }
+					    
+						if(hdc)
+						{
+							HBITMAP hBitmap;
+							backBuffer.bitmap->GetHBITMAP(Gdiplus::Color(0, 0, 0), &hBitmap);
+							HDC hdcMem = CreateCompatibleDC(hdc);
+							HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hBitmap);
+							
+							StretchBlt(hdc,0,0,width,height,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
+							SelectObject(hdcMem, hbmOld);
+							DeleteDC(hdcMem);
+							DeleteObject(hBitmap); 
+						}
+						
+//						if (hdc) {
+//				            Gdiplus::Graphics graphics(hdc);
+//				            graphics.DrawImage(backBuffer.bitmap, 0, 0, width, height);
+//				        }
 				    }
 
 	              
