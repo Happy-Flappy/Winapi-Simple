@@ -8,70 +8,62 @@ int main()
 	
 	ws::Texture texture;
 	texture.load("object.bmp");
-	texture.setTransparentMask(RGB(0,0,255));
-	ws::Sprite sprite;
-	sprite.setTexture(texture);
-	sprite.setTextureRect({465,623,62,64});
-	sprite.x = 100;
-	sprite.y = 100;
+	ws::Sprite spr;
+	spr.setTexture(texture);
+	spr.setScale({0.5f,0.5f});
+	
+	ws::Button button;
+	button.init(window);
+	button.setPosition(400,0);
+	button.setText("Button");
 	
 	
-		ws::Vec2f scale = {1,1};
-		POINT origin = {0,0};	
+	
+	ws::Rectangle shape;
+	shape.x = 400;
+	shape.y = 400;
+	shape.width = 300;
+	shape.height = 300;
+	
+	
+	
+	ws::Line line;
+	line.start = {700,30};
+	line.end = {20,500};
+	line.width = 5;
+	line.color = Gdiplus::Color(255,255,255,0);
+	
+	
+	
+	ws::Poly poly;
+	poly.addVertex(0,0);
+	poly.addVertex(100,30);
+	poly.addVertex(70,100);
+	poly.addVertex(40,50);
+	poly.filled = true;
+	poly.closed = true;
+	poly.borderWidth = 3;
+	poly.fillColor = Gdiplus::Color(155,255,0,0);
+	poly.borderColor = Gdiplus::Color(255,255,0,255);
+	
 	
 	while(window.isOpen())
 	{
-		
-
-		
 		MSG m;
 		while(window.pollEvent(m))
 		{
-			if(m.message == WM_KEYDOWN)
+			if(m.message == WM_LBUTTONDOWN)
 			{
-				if(m.wParam == VK_LEFT)
-				{
-					scale.x = -1;
-				}
-				if(m.wParam == VK_RIGHT)
-				{
-					scale.x = 1;
-				}
-				if(m.wParam == VK_UP)
-				{
-					scale.y = -1;
-				}
-				if(m.wParam == VK_DOWN)
-				{
-					scale.y = 1;
-				}
-				
-				if(m.wParam == 'A')
-				{
-					origin.x = 0;
-				}
-				if(m.wParam == 'D')
-				{
-					origin.x = sprite.getTextureRect().right;
-				}
-				if(m.wParam == 'W')
-				{
-					origin.y = 0;
-				}
-				if(m.wParam == 'S')
-				{
-					origin.y = sprite.getTextureRect().bottom;
-				}
-				
-				
+				window.clipboard.copyTexture(window.backBuffer);
+
 			}
 		}
-		
-		sprite.setOrigin(origin);
-		sprite.setScale(scale);
-		
+		button.update(&m);
 		window.clear();
-		window.draw(sprite);
+		window.draw(spr);
+		window.draw(shape);
+		window.draw(line);
+		window.draw(poly);
 		window.display();
 	}
 	return 0;

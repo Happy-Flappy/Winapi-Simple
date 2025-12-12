@@ -33,7 +33,16 @@
 #include <filesystem>
 #include <cwchar>
 
+// Define missing Windows types BEFORE including GDI+
+#ifndef SHORT
+typedef short SHORT;
+#endif
 
+#ifndef PROPID
+typedef unsigned long PROPID;
+#endif
+
+#include <gdiplus.h>
 
 
 
@@ -143,6 +152,17 @@ namespace ws //DATA TYPES
             return p;
         }		
         
+        
+        //Vec2i to POINT* - safe only because POINT and ws::Vec2i are exactly same layout.
+	    operator POINT*() {
+	        return reinterpret_cast<POINT*>(this);
+	    }
+	    //Vec2i to const POINT*
+	    operator const POINT*() const {
+	        return reinterpret_cast<const POINT*>(this);
+	    }
+        
+        
         #ifdef SFML_SYSTEM_HPP
         
 		Vec2i(sf::Vector2i& i) : x(i.x), y(i.y) {}
@@ -167,6 +187,33 @@ namespace ws //DATA TYPES
         Vec2f(Vec2i& f) : x(f.x), y(f.y) {}
 
 
+		operator ws::Vec2i() const
+		{
+			ws::Vec2i i;
+			i.x = static_cast<int>(x);
+			i.y = static_cast<int>(y);
+			return i;
+		}
+
+
+        operator POINT() const {
+            POINT p;
+            p.x = static_cast<unsigned int>(x);
+            p.y = static_cast<unsigned int>(y);
+            return p;
+        }		
+
+        //Vec2i to POINT* - safe only because POINT and ws::Vec2i are exactly same layout.
+	    operator POINT*() {
+	        return reinterpret_cast<POINT*>(this);
+	    }
+	    //Vec2i to const POINT*
+	    operator const POINT*() const {
+	        return reinterpret_cast<const POINT*>(this);
+	    }
+
+
+
         #ifdef SFML_SYSTEM_HPP
         Vec2f(sf::Vector2f& f) : x(f.x), y(f.y) {}
         
@@ -189,6 +236,44 @@ namespace ws //DATA TYPES
         Vec2d(int x, int y) : x(x), y(y) {}
         Vec2d(Vec2f& f) : x(f.x), y(f.y) {}
         Vec2d(Vec2i& f) : x(f.x), y(f.y) {}
+
+
+		operator ws::Vec2f() const
+		{
+			ws::Vec2f i;
+			i.x = static_cast<float>(x);
+			i.y = static_cast<float>(y);
+			return i;
+		}
+
+
+
+		operator ws::Vec2i() const
+		{
+			ws::Vec2i i;
+			i.x = static_cast<int>(x);
+			i.y = static_cast<int>(y);
+			return i;
+		}
+
+
+        operator POINT() const {
+            POINT p;
+            p.x = static_cast<unsigned int>(x);
+            p.y = static_cast<unsigned int>(y);
+            return p;
+        }		
+
+
+        //Vec2i to POINT* - safe only because POINT and ws::Vec2i are exactly same layout.
+	    operator POINT*() {
+	        return reinterpret_cast<POINT*>(this);
+	    }
+	    //Vec2i to const POINT*
+	    operator const POINT*() const {
+	        return reinterpret_cast<const POINT*>(this);
+	    }
+
         
         
         #ifdef SFML_SYSTEM_HPP
@@ -211,6 +296,7 @@ namespace ws //DATA TYPES
 		int x,y,z;
         Vec3i() = default;
         Vec3i(int x, int y,int z) : x(x), y(y), z(z) {}		
+
 
         #ifdef SFML_SYSTEM_HPP
         
@@ -235,6 +321,17 @@ namespace ws //DATA TYPES
         Vec3f(float x, float y,float z) : x(x), y(y), z(z) {}
 		Vec3f(int x, int y,int z) : x(x), y(y), z(z) {}
 		Vec3f(Vec3i& i) : x(i.x), y(i.y), z(i.z) {}
+
+
+
+		operator ws::Vec3i() const {
+			ws::Vec3i i;
+			i.x = x;
+        	i.y = y;
+        	i.z = z;
+        	return i;
+		}
+
         
 
         #ifdef SFML_SYSTEM_HPP
@@ -262,6 +359,27 @@ namespace ws //DATA TYPES
 		Vec3d(Vec3f& i) : x(i.x), y(i.y), z(i.z) {}
         Vec3d(Vec3i& i) : x(i.x), y(i.y), z(i.z) {}
         
+
+
+		operator ws::Vec3f() const {
+			ws::Vec3f i;
+			i.x = x;
+        	i.y = y;
+        	i.z = z;
+        	return i;
+		}
+ 
+ 
+		operator ws::Vec3i() const {
+			ws::Vec3i i;
+			i.x = x;
+        	i.y = y;
+        	i.z = z;
+        	return i;
+		} 
+ 
+ 
+ 
         
 		#ifdef SFML_SYSTEM_HPP
         
@@ -321,6 +439,28 @@ namespace ws //DATA TYPES
 		FloatRect(ws::IntRect &r) : left(r.left), top(r.top),width(r.width),height(r.height) {} 
 		
 		
+		
+		operator ws::IntRect() const
+		{
+			ws::IntRect r;
+			r.left = static_cast<int>(left);
+			r.top = static_cast<int>(top);
+			r.width = static_cast<int>(width);
+			r.height = static_cast<int>(height);
+			return r;
+		}
+		
+
+		operator RECT() const {
+            RECT r;
+            r.left = static_cast<unsigned int>(left);
+            r.top = static_cast<unsigned int>(top);
+            r.right = static_cast<unsigned int>(left + width);
+            r.bottom = static_cast<unsigned int>(top + height);
+            return r;
+        }
+
+		
         #ifdef SFML_SYSTEM_HPP
         
 		FloatRect(sf::FloatRect &r) : left(r.left) , top(r.top),width(r.width),height(r.height) {} 
@@ -349,6 +489,42 @@ namespace ws //DATA TYPES
 		
 		DoubleRect(ws::FloatRect &r) : left(r.left), top(r.top),width(r.width),height(r.height) {} 
 		DoubleRect(ws::IntRect &r) : left(r.left), top(r.top),width(r.width),height(r.height) {} 
+
+
+
+		operator ws::FloatRect() const
+		{
+			ws::FloatRect r;
+			r.left = static_cast<float>(left);
+			r.top = static_cast<float>(top);
+			r.width = static_cast<float>(width);
+			r.height = static_cast<float>(height);
+			return r;
+		}
+
+
+
+		operator ws::IntRect() const
+		{
+			ws::IntRect r;
+			r.left = static_cast<int>(left);
+			r.top = static_cast<int>(top);
+			r.width = static_cast<int>(width);
+			r.height = static_cast<int>(height);
+			return r;
+		}
+
+
+
+		operator RECT() const {
+            RECT r;
+            r.left = static_cast<unsigned int>(left);
+            r.top = static_cast<unsigned int>(top);
+            r.right = static_cast<unsigned int>(left + width);
+            r.bottom = static_cast<unsigned int>(top + height);
+            return r;
+        }
+
 		
 		
         #ifdef SFML_SYSTEM_HPP
@@ -850,84 +1026,99 @@ namespace ws //GRAPHICS ENTITIES
 			
 		}
 		
-		void setRect(RECT viewRect)
+		void setRect(ws::IntRect viewRect)
 		{
 			world = viewRect;
 		}
 		
-		void setSize(POINT size)
+		void setSize(ws::Vec2i size)
 		{
-			world.right = size.x;
-			world.bottom = size.y;
+			world.width = size.x;
+			world.height = size.y;
 		}
 		
-		void setPos(POINT pos)
+		void setPos(ws::Vec2i pos)
 		{
 			world.left = pos.x;
 			world.top = pos.y;
 		}
 		
 		
-		void setPortRect(RECT portRect)
+		void setPortRect(ws::IntRect portRect)
 		{
 			port = portRect;
 		}
 		
-		void setPortSize(POINT size)
+		
+		void setPortSize(ws::Vec2i size)
 		{
-			port.right = size.x;
-			port.bottom = size.y;
+			port.width = size.x;
+			port.height = size.y;
 		}
 		
-		void setPortPos(POINT pos)
+		
+		void setPortSize(int x,int y)
+		{
+			port.width = x;
+			port.height = y;
+		}
+		
+		
+		void setPortPos(ws::Vec2i pos)
 		{
 			port.left = pos.x;
 			port.top = pos.y;
 		}
 		
+		void setPortPos(int x,int y)
+		{
+			port.left = x;
+			port.top = y;
+		}
 		
 		
 		
-		RECT getRect()
+		
+		ws::IntRect getRect()
 		{
 			return world;
 		}
 		
-		POINT getSize()
+		ws::Vec2i getSize()
 		{
-			POINT p;
-			p.x = world.right;
-			p.y = world.bottom;
+			ws::Vec2i p;
+			p.x = world.width;
+			p.y = world.height;
 			
 			return p;
 		}
 		
-		POINT getPos()
+		ws::Vec2i getPos()
 		{
-			POINT p;
+			ws::Vec2i p;
 			p.x = world.left;
 			p.y = world.top;
 			
 			return p;
 		}
 		
-		RECT getPortRect()
+		ws::IntRect getPortRect()
 		{
 			return port;
 		}
 		
-		POINT getPortSize()
+		ws::Vec2i getPortSize()
 		{
-			POINT p;
-			p.x = port.right;
-			p.y = port.bottom;
+			ws::Vec2i p;
+			p.x = port.width;
+			p.y = port.height;
 			
 			return p;
 		}
 		
-		POINT getPortPos()
+		ws::Vec2i getPortPos()
 		{
-			POINT p;
+			ws::Vec2i p;
 			p.x = port.left;
 			p.y = port.top;
 			
@@ -942,8 +1133,8 @@ namespace ws //GRAPHICS ENTITIES
 	    	if(factor != 0)
 	    	{
 			
-		    	long int x = world.right / factor;
-		    	long int y = world.bottom / factor;
+		    	int x = world.width / factor;
+		    	int y = world.height / factor;
 				setPortSize({x,y});	// If factor is 2, that means that the visible world area is half as much because it is zooming in and will  be stretching into the viewport.
 	    		world.left += x;
 	    		world.top += y;
@@ -951,13 +1142,13 @@ namespace ws //GRAPHICS ENTITIES
 		}
 
 
-		void move(POINT delta)
+		void move(ws::Vec2i delta)
 		{
 			world.left += delta.x;
 			world.top += delta.y;
 		}
 		
-		void movePort(POINT delta)
+		void movePort(ws::Vec2i delta)
 		{
 			port.left += delta.x;
 			port.top += delta.y;
@@ -966,13 +1157,13 @@ namespace ws //GRAPHICS ENTITIES
 		
 		
 		
-	    POINT toWorld(POINT pos) 
+	    ws::Vec2i toWorld(ws::Vec2i pos) 
 	    {
-		    POINT worldSize = getSize();
-		    POINT viewSize = getPortSize();
-		    POINT viewPos = getPos();
+		    ws::Vec2i worldSize = getSize();
+		    ws::Vec2i viewSize = getPortSize();
+		    ws::Vec2i viewPos = getPos();
 		    
-		    POINT worldPoint;
+		    ws::Vec2i worldPoint;
 		    
 		    float scaleX = static_cast<float>(worldSize.x) / viewSize.x;
 		    float scaleY = static_cast<float>(worldSize.y) / viewSize.y;
@@ -983,13 +1174,13 @@ namespace ws //GRAPHICS ENTITIES
 		    return worldPoint;
 	    }
 	    
-	    POINT toWindow(POINT pos) 
+	    ws::Vec2i toWindow(ws::Vec2i pos) 
 	    {
-		    POINT worldSize = getSize();
-		    POINT viewSize = getPortSize();
-		    POINT viewPos = getPos();
+		    ws::Vec2i worldSize = getSize();
+		    ws::Vec2i viewSize = getPortSize();
+		    ws::Vec2i viewPos = getPos();
 		    
-		    POINT windowPoint;
+		    ws::Vec2i windowPoint;
 		    
 		    float scaleX = static_cast<float>(viewSize.x) / worldSize.x;
 		    float scaleY = static_cast<float>(viewSize.y) / worldSize.y;
@@ -1009,8 +1200,8 @@ namespace ws //GRAPHICS ENTITIES
 		
 		
 		private:
-		RECT world;
-		RECT port;
+		ws::IntRect world;
+		ws::IntRect port;
 		
 			
 	};
@@ -1023,12 +1214,14 @@ namespace ws //GRAPHICS ENTITIES
 	{
 		public:
 		
-		HBITMAP bitmap;
+		Gdiplus::Bitmap* bitmap;
 		int width = 0;
 		int height = 0;
 		
 		
-		Texture() = default;
+		
+		Texture() : bitmap(nullptr) {}
+		
 		
 		Texture(std::string path)
 		{
@@ -1038,10 +1231,10 @@ namespace ws //GRAPHICS ENTITIES
 		
 	    ~Texture()
 	    {
-	        if (bitmap != NULL)
+	        if (bitmap != nullptr)
 	        {
-	            DeleteObject(bitmap);
-	            bitmap = NULL;
+	            delete bitmap;
+	            bitmap = nullptr;
 	        }
 	    }		
 		
@@ -1065,14 +1258,14 @@ namespace ws //GRAPHICS ENTITIES
 	        {
 	            if (bitmap != NULL)
 	            {
-	                DeleteObject(bitmap);
+	                delete bitmap;
 	            }
 	            
 	            bitmap = other.bitmap;
 	            width = other.width;
 	            height = other.height;
 	            
-	            other.bitmap = NULL;
+	            other.bitmap = nullptr;
 	            other.width = 0;
 	            other.height = 0;
 	        }
@@ -1080,6 +1273,30 @@ namespace ws //GRAPHICS ENTITIES
 	    }		
 		
 		
+	
+	
+		bool create(int w,int h,Gdiplus::Color color = {0,0,0,0})
+		{
+			
+			bitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
+			
+			Gdiplus::Graphics* gr;
+			gr = new Gdiplus::Graphics(bitmap);
+			gr->Clear(color);
+			
+			
+			if(gr)
+			{
+				delete gr;
+				gr = nullptr;
+			}
+			if(!bitmap)
+				return false;
+				
+			width = w;
+			height = h;
+			return true;
+		}
 	
 	
 	
@@ -1090,8 +1307,8 @@ namespace ws //GRAPHICS ENTITIES
 
 	        if (bitmap != NULL)
 	        {
-	            DeleteObject(bitmap);
-	            bitmap = NULL;
+	            delete bitmap;
+	            bitmap = nullptr;
 	            width = 0;
 	            height = 0;
 	        }
@@ -1101,375 +1318,57 @@ namespace ws //GRAPHICS ENTITIES
 				return false;
 
 
-			bitmap = (HBITMAP)LoadImageW(
-			NULL,
-			WIDE(path).c_str(),
-			IMAGE_BITMAP,
-			0,
-			0,
-			LR_LOADFROMFILE
-			);
+			std::wstring wpath = WIDE(path);
+			bitmap = Gdiplus::Bitmap::FromFile(wpath.c_str());
 			
 			
 			
-			if(bitmap == NULL)
+			if(bitmap == nullptr || bitmap->GetLastStatus() != Gdiplus::Ok)
 			{
 				std::cerr << "Failed to load image at " << std::quoted(path) << ".\n";
+				if (bitmap != nullptr)
+				{
+					delete bitmap;
+					bitmap = nullptr;
+				}
 				return false;
 			}
 			
-            BITMAP bm;
-            GetObject(bitmap, sizeof(BITMAP), &bm);
-            width = bm.bmWidth;
-            height = bm.bmHeight;		
+			width = bitmap->GetWidth();
+			height = bitmap->GetHeight();		
 			
 			return true;
 		}
 		
 	    bool isValid() const
 	    {
-	        return bitmap != NULL;
+	        return bitmap != nullptr;
 	    }		
 	    
 	    
 	    
-	    COLORREF transparencyColor = CLR_INVALID; // Add this member variable
-	
-	    void setTransparentMask(COLORREF color) {
-	        transparencyColor = color;
-	    }	    
 	    
 	    
 	    
 	    
-	    COLORREF getPixel(int Xindex,int Yindex)
+	    
+	    
+	    void setPixel(int xIndex,int yIndex,Gdiplus::Color &color)
 	    {
-			
-			
-			HDC hdc = CreateCompatibleDC(NULL);
-			if(!hdc)
-				return RGB(0,0,0);
-			
-			
-			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
-			
-			
-			COLORREF result = GetPixel(hdc,Xindex,Yindex);
-			
-			
-	        SelectObject(hdc, oldbitmap);
-	        DeleteDC(hdc);	    	
-	        
-	        return result;
+			bitmap->SetPixel(xIndex, yIndex, color);
 		}
-		
-		
-		
-		
-		bool setPixel(COLORREF color,int Xindex,int Yindex)
-		{
-		
-			HDC hdc = CreateCompatibleDC(NULL);
-			if(!hdc)
-				return false;
-			
-			
-			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
-			
-			color = RGB(GetBValue(color),GetGValue(color),GetRValue(color));//convert to BGR for HBITMAP. COLORREF is RGB. HBITMAP is BGR
-			
-			SetPixel(hdc,Xindex,Yindex,color);
-			
-			
-	        SelectObject(hdc, oldbitmap);
-	        DeleteDC(hdc);	    	
-	        
-	        return true;			
+	    
+	    Gdiplus::Color getPixel(int xIndex,int yIndex)
+	    {
+	    	Gdiplus::Color color;
+			bitmap->GetPixel(xIndex, yIndex, &color);
+			return color;
 		}
-			
+	    
+	    	
 	};
 	
 	
-	
-	
-	class PixelArray
-	{
-			
-		private:
-		
-		COLORREF* pixels = nullptr;
-		
-		int getPixelIndex(int x,int y)	
-		{
-			return (y * width + x);	
-		}
-		
-		public:	
-		int width = 0;
-		int height = 0;
-		
-		
-		PixelArray()
-		{
-			
-		}
-		
-		~PixelArray()
-		{
-			clear();
-		}
-		
-		
-		
-	    // Copy constructor
-	    PixelArray(const PixelArray& other)
-	    {
-	        if (other.pixels && other.width > 0 && other.height > 0)
-	        {
-	            create(other.width, other.height);
-	            for (int x = 0; x < width; x++)
-	            {
-	                for (int y = 0; y < height; y++)
-	                {
-	                    pixels[getPixelIndex(x,y)] = other.pixels[getPixelIndex(x,y)];
-	                }
-	            }
-	        }
-	    }
-	    
-	    // Assignment operator
-	    PixelArray& operator=(const PixelArray& other)
-	    {
-	        if (this != &other)
-	        {
-	            clear();
-	            if (other.pixels && other.width > 0 && other.height > 0)
-	            {
-	                create(other.width, other.height);
-	                for (int x = 0; x < width; x++)
-	                {
-	                    for (int y = 0; y < height; y++)
-	                    {
-	                         pixels[getPixelIndex(x,y)] = other.pixels[getPixelIndex(x,y)];
-	                    }
-	                }
-	            }
-	        }
-	        return *this;
-	    }
-	    
-	    // Move constructor
-	    PixelArray(PixelArray&& other) noexcept
-	        : pixels(other.pixels), width(other.width), height(other.height)
-	    {
-	        other.pixels = nullptr;
-	        other.width = 0;
-	        other.height = 0;
-	    }
-	    
-	    // Move assignment operator
-	    PixelArray& operator=(PixelArray&& other) noexcept
-	    {
-	        if (this != &other)
-	        {
-	            clear();
-	            pixels = other.pixels;
-	            width = other.width;
-	            height = other.height;
-	            
-	            other.pixels = nullptr;
-	            other.width = 0;
-	            other.height = 0;
-	        }
-	        return *this;
-	    }		
-		
-		
-		
-		
-		
-		
-		
-		void clear()
-		{
-			if(pixels)
-			{
-				delete[] pixels;
-				pixels = nullptr;
-			}
-			width = 0;
-			height = 0;
-		}
-		
-		
-		
-		
-		bool create(int w,int h)
-		{
-			
-			clear();
-			
-			if(w <= 0 || h <= 0)
-				return false;
-			
-			width = w;
-			height = h;
-			
-			
-			pixels = new COLORREF[width * height];
-			
-	
-			for(int a=0;a<width * height;a++)
-			{
-				pixels[a] = RGB(0,0,0);
-			}
-			
-			return true;
-		}
-		
-		
-		
-		
-		
-		bool convertToPixel(Texture &texture)
-		{
-			//convert HBITMAP to COLORREFS
-			//INIT PIXELS AS 2D ARRAY USING WIDTH AND HEIGHT FROM HBITMAP.
-			
-			if(!texture.isValid())
-				return false;
-			
-			width = texture.width;
-			height = texture.height;
-			
-			
-			create(width,height);
-			
-			for(int x=0;x<width;x++)
-			{
-				for(int y=0;y<height;y++)
-				{
-					pixels[getPixelIndex(x,y)] = texture.getPixel(x,y);
-				}
-			}	
-			
-	        return true;
-						
-		}
-		
-		
-		bool sendToTexture(Texture &texture)
-		{
-			
-	        if (!pixels || width <= 0 || height <= 0)
-	            return false;
-	        
-	        
-	        
-	        
-	        
-	        // Create device context
-	        HDC hdc = CreateCompatibleDC(NULL);
-	        if (!hdc)
-	            return false;
-	        
-	        
-	        // Create bitmap
-	        BITMAPINFO bmi = {};
-	        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	        bmi.bmiHeader.biWidth = width;
-	        bmi.bmiHeader.biHeight = -height;  // Negative for top-down
-	        bmi.bmiHeader.biPlanes = 1;
-	        bmi.bmiHeader.biBitCount = 32;
-	        bmi.bmiHeader.biCompression = BI_RGB;
-	        
-			
-			
-			void* pBits = nullptr;
-	        HBITMAP hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, NULL, 0);
-	        if (!hBitmap)
-	        {
-	            DeleteDC(hdc);
-	            return false;
-	        }
-	        
-	        // Copy pixels to the bitmap (bitmap expects row-major order: [y][x])
-	        COLORREF* pPixels = (COLORREF*)pBits;
-
-			//Convert RGB data to BGR for HBITMAP
-			for (int i = 0; i < width * height; i++)
-		    {
-		        COLORREF srcPixel = pixels[i];
-		        BYTE r = GetRValue(srcPixel);
-		        BYTE g = GetGValue(srcPixel); 
-		        BYTE b = GetBValue(srcPixel);
-		        
-		        // Convert RGB to BGR for bitmap
-		        pPixels[i] = RGB(b, g, r);
-		    }
-
-			
-		    if (texture.bitmap)
-		    {
-		        DeleteObject(texture.bitmap);
-		    }	        
-	        
-	        // Set up the texture
-	        texture.bitmap = hBitmap;
-	        texture.width = width;
-	        texture.height = height;
-	        
-	        // Clean up
-	        DeleteDC(hdc);
-	        
-	        return true;
-		}
-		
-		
-		
-		
-		
-		void setPixel(COLORREF color,int x,int y)
-		{
-			if(x >=0 && x < width && y >=0 && y < height)
-				pixels[getPixelIndex(x,y)] = color;
-			
-		}
-		
-		COLORREF getPixel(int x,int y)
-		{
-			if(x >=0 && x < width && y >=0 && y < height)
-				return pixels[getPixelIndex(x,y)];
-			return RGB(0,0,0);
-		}
-		
-		
-		
-		bool setMask(COLORREF startColor,COLORREF endColor)
-		{
-			
-			if(width <=0 || height <=0)
-				return false;
-				
-			for(int x=0;x<width;x++)
-			{
-				for(int y=0;y<height;y++)
-				{
-					COLORREF c = getPixel(x,y);
-					if(c == startColor)
-					{
-						setPixel(endColor,x,y);
-					}
-					
-				}
-			}
-			
-			return true;
-		}		
-		
-		
-		
-	};
 	
 	
 	
@@ -1482,31 +1381,38 @@ namespace ws //GRAPHICS ENTITIES
 		
 		int x = 0,y = 0,z = 0;
 		int width = 1,height = 1;
-		Vec2f scale = {1,1};		
-		POINT origin = {0,0};
+		ws::Vec2f scale = {1,1};		
+		ws::Vec2i origin = {0,0};
 		
-		void setScale(Vec2f s)	
+		void setScale(ws::Vec2f s)	
 		{
 			scale.x = s.x;
 			scale.y = s.y;
 		}
 		
 		
-		void setOrigin(POINT pos)
+		void setScale(float sx,float sy)	
+		{
+			scale.x = sx;
+			scale.y = sy;
+		}
+		
+		
+		
+		void setOrigin(ws::Vec2i pos)
 		{
 			origin.x = pos.x;
 			origin.y = pos.y;
 		}
 		
-		
-		//depreciated
-		POINT getScaledOrigin(){
-			return {0,0};
+		void setOrigin(int posx,int posy)
+		{
+			origin.x = posx;
+			origin.y = posy;
 		}
 		
 		
-		//
-	
+		
 	
 	    // Get the visual width after scaling (always positive)
 	    int getScaledWidth() const {
@@ -1611,8 +1517,8 @@ namespace ws //GRAPHICS ENTITIES
 	    };
 	
 		
-		virtual void draw(HDC hdc,View &view) = 0;
-		virtual bool contains(POINT pos) = 0;
+		virtual void draw(Gdiplus::Graphics* graphics,View &view) = 0;
+		virtual bool contains(ws::Vec2i pos) = 0;
 		
 		
 		virtual ~Drawable() = default;
@@ -1654,7 +1560,7 @@ namespace ws //GRAPHICS ENTITIES
 		
 		
 		
-	    virtual bool contains(POINT pos) override
+	    virtual bool contains(ws::Vec2i pos) override
 	    {
 	        int left, top, right, bottom;
 	        getBounds(left, top, right, bottom);
@@ -1663,86 +1569,79 @@ namespace ws //GRAPHICS ENTITIES
 	                pos.y >= top && pos.y < bottom);
 	    }
 	    
-	    virtual void draw(HDC hdc, View &view) override
+	    virtual void draw(Gdiplus::Graphics* graphics, View &view) override
 	    {
-	        if (!textureRef || !textureRef->isValid()) {
+	        if (!textureRef || !textureRef->isValid()) 
 	            return;
-	        }
 	        
 	        // Use the common transformation calculation
-	        TransformResult tr = TransformResult::calculate(*this, view, 
-	                                                        texLeft, texTop, 
-	                                                        texWidth, texHeight);
+	        TransformResult tr = TransformResult::calculate(*this, view, texLeft, texTop, texWidth, texHeight);
 	        
 	        if (!tr.visible) {
 	            return;
 	        }
 	        
 	        
-		        
-	        // Create source memory DC
-	        HDC hMemDC = CreateCompatibleDC(hdc);
-	        HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, textureRef->bitmap);
 	        
-	        // Create intermediate buffer
-	        HDC hIntermediateDC = CreateCompatibleDC(hdc);
-	        HBITMAP hIntermediateBmp = CreateCompatibleBitmap(hdc, tr.visualWidth, tr.visualHeight);
-	        HBITMAP hOldIntermediateBmp = (HBITMAP)SelectObject(hIntermediateDC, hIntermediateBmp);
+	        Gdiplus::Rect destRect(tr.drawX, tr.drawY, tr.visualWidth, tr.visualHeight);
 	        
-	        // Clear intermediate buffer
-	        RECT intermediateRect = {0, 0, tr.visualWidth, tr.visualHeight};
-	        FillRect(hIntermediateDC, &intermediateRect, (HBRUSH)GetStockObject(BLACK_BRUSH));
+			if (tr.srcWidth >= 0 && tr.srcHeight >= 0)
+			{
+				// No flipping
+				Gdiplus::Rect srcRect(tr.srcX, tr.srcY, abs(tr.srcWidth), abs(tr.srcHeight));
+				graphics->DrawImage(textureRef->bitmap, destRect, 
+								   srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+								   Gdiplus::UnitPixel);
+			}
+			else
+			{
+				// Handle flipping with image attributes
+				Gdiplus::ImageAttributes attributes;
+				
+				if (tr.srcWidth < 0)
+				{
+					// Horizontal flip
+					attributes.SetWrapMode(Gdiplus::WrapModeTileFlipX);
+				}
+				if (tr.srcHeight < 0)
+				{
+					// Vertical flip
+					attributes.SetWrapMode(Gdiplus::WrapModeTileFlipY);
+				}
+				
+				Gdiplus::Rect srcRect(abs(tr.srcX), abs(tr.srcY), 
+				abs(tr.srcWidth), abs(tr.srcHeight));
+				graphics->DrawImage(textureRef->bitmap, destRect,
+				srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+				Gdiplus::UnitPixel, &attributes);
+			}	        
 	        
-	        // Step 1: Stretch with flipping to intermediate buffer
-	        SetStretchBltMode(hIntermediateDC, HALFTONE);
-	        SetBrushOrgEx(hIntermediateDC, 0, 0, NULL);
 	        
-	        StretchBlt(hIntermediateDC,
-	                   0, 0, tr.visualWidth, tr.visualHeight,
-	                   hMemDC,
-	                   tr.srcX, tr.srcY,
-	                   tr.srcWidth, tr.srcHeight,
-	                   SRCCOPY);
-	        
-	        // Step 2: Apply transparency from intermediate to screen
-	        TransparentBlt(hdc,
-	                       tr.drawX, tr.drawY,
-	                       tr.visualWidth, tr.visualHeight,
-	                       hIntermediateDC,
-	                       0, 0,
-	                       tr.visualWidth, tr.visualHeight,
-	                       textureRef->transparencyColor);
-	        
-	        // Cleanup
-	        SelectObject(hIntermediateDC, hOldIntermediateBmp);
-	        DeleteObject(hIntermediateBmp);
-	        DeleteDC(hIntermediateDC);
-	        
-	        SelectObject(hMemDC, hOldBitmap);
-	        DeleteDC(hMemDC);
 	    }
 		
 		
 		
 		
-	    void setTexture(ws::Texture& texture) {
+	    void setTexture(ws::Texture& texture,bool resize = true) {
 	        textureRef = &texture;
+	        if(resize)
+	        	setTextureRect({0,0,texture.width,texture.height});
 	    }
 	    
-	    void setTextureRect(RECT rect) {
+	    void setTextureRect(ws::IntRect rect) {
 	        // Assuming rect.left, rect.top are coordinates
 	        // rect.right is width, rect.bottom is height
 	        texLeft = rect.left;
 	        texTop = rect.top;
-	        texWidth = rect.right;
-	        texHeight = rect.bottom;
+	        texWidth = rect.width;
+	        texHeight = rect.height;
 	        
 	        // Set Drawable dimensions to match texture rectangle
 	        width = texWidth;
 	        height = texHeight;
 	    }
 	    
-	    RECT getTextureRect() const {
+	    ws::IntRect getTextureRect() const {
 	        return {texLeft, texTop, texWidth, texHeight};
 	    }
 		
@@ -1779,13 +1678,13 @@ namespace ws //GRAPHICS ENTITIES
 	
 	
 	
-	class Shape : public Drawable
+	class Rectangle : public Drawable
 	{
 		public:
 		
-		COLORREF color = RGB(125,255,255);
+		Gdiplus::Color color = {255,100,200,100};
 		
-		Shape()
+		Rectangle()
 		{
 			width = 10;
 			height = 10;
@@ -1794,42 +1693,36 @@ namespace ws //GRAPHICS ENTITIES
 		
 
 
-		virtual bool contains(POINT pos)  override
+		virtual bool contains(ws::Vec2i pos)  override
 		{
-			
-	    	POINT o = getScaledOrigin();
-			return (pos.x >= x - o.x && pos.y >= y - o.y && pos.x < x + getScaledWidth() - o.x && pos.y < y + getScaledHeight() - o.y); 
+			int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+	        return (pos.x >= left && pos.x < right &&
+	                pos.y >= top && pos.y < bottom);
 		}
 
 
-
-	    virtual void draw(HDC hdc,View &view)  override
+		
+	    virtual void draw(Gdiplus::Graphics* canvas,View &view)  override
 	    {
-		    POINT o = getScaledOrigin();
-		    POINT viewPos = view.getPos();
-		    
-		    int drawX = (x - o.x) - viewPos.x;
-		    int drawY = (y - o.y) - viewPos.y;
-		    
-		    // Culling check
-		    RECT spriteRect = {drawX, drawY, drawX + getScaledWidth(), drawY + getScaledHeight()};
-		    RECT viewportRect = {0, 0, view.getPortSize().x, view.getPortSize().y};
-		    RECT intersection;
+	    	
 
-		    if (!IntersectRect(&intersection, &spriteRect, &viewportRect)) {
-   		    	return; // No intersection with viewport means the entire sprite is outside of view
-		    }
+	        // Use the common transformation calculation
+	        TransformResult tr = TransformResult::calculate(*this, view, x, y, width, height);
+	        
+	        if (!tr.visible) {
+	            return;
+	        }			
+
+	    	
+			
+			Gdiplus::SolidBrush brush(color);
+			Gdiplus::Rect rect(tr.drawX, tr.drawY, tr.visualWidth, tr.visualHeight);
+			canvas->FillRectangle(&brush,rect);
 		    
-		    HBRUSH brush = CreateSolidBrush(color);
-		    RECT rect = {
-		        drawX, 
-		        drawY, 
-		        drawX + getScaledWidth(), 
-		        drawY + getScaledHeight()
-		    };
-		    FillRect(hdc, &rect, brush);
-		    DeleteObject(brush);
 	    }
+
 
 
 
@@ -1851,50 +1744,39 @@ namespace ws //GRAPHICS ENTITIES
 	
 		public:
 		
-		POINT start;
-		POINT end;
-		COLORREF color = RGB(0,0,255);
-		int width = 2;
+		ws::Vec2i start;
+		ws::Vec2i end;
+		Gdiplus::Color color = {255,0,0,255};
+		
 	    
 	    
 	    
-	    
-	    Line(POINT start = {0,0},POINT end = {0,0},int width = 2,COLORREF color = RGB(0,0,255))
+	    Line(ws::Vec2i start = {0,0},ws::Vec2i end = {0,0},int thewidth = 2,Gdiplus::Color color = {255,0,0,255})
 	    {
 	    	this->start = start;
 	    	this->end = end;
-	    	this->width = width;
+	    	width = thewidth;
 	    	this->color = color;
 		}
 	    
 	    
-		virtual void draw(HDC hdc, ws::View &view) override {
-	        // Create and select a blue pen
-	        HPEN hPen = CreatePen(PS_SOLID, width, color);
-	        HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
+		virtual void draw(Gdiplus::Graphics* canvas, ws::View &view) override 
+		{
+	        TransformResult tr = TransformResult::calculate(*this, view, start.x, start.y, end.x, end.y);
 	        
-	        // Apply view transformation
-	        POINT viewPos = view.getPos();
-	        int drawX1 = start.x - viewPos.x;
-	        int drawY1 = start.y - viewPos.y;
-	        int drawX2 = end.x - viewPos.x;
-	        int drawY2 = end.y - viewPos.y;
-	        
-	        // Draw a line
-	        MoveToEx(hdc, drawX1, drawY1, NULL);
-	        LineTo(hdc, drawX2, drawY2);
-	        
-	        // Restore the old pen and delete the created pen
-	        SelectObject(hdc, hOldPen);
-	        DeleteObject(hPen);
-	        
-	        
+	        if (!tr.visible) {
+	            return;
+	        }
+	
+			Gdiplus::Pen pen(color);
+			canvas->DrawLine(&pen,start.x,start.y,end.x,end.y);
+	
 	
 	    }
 	    
 	    
 	    private:
-	    virtual bool contains(POINT pos) override
+	    virtual bool contains(ws::Vec2i pos) override
 	    { 
 	    	return false;
 		}
@@ -1902,7 +1784,7 @@ namespace ws //GRAPHICS ENTITIES
 		
 		public:
 			
-		bool onSegment(POINT p, POINT q, POINT r)
+		bool onSegment(ws::Vec2i p, ws::Vec2i q, ws::Vec2i r)
 	    {
 	        if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
 	            q.y <= std::max(p.y, r.y) && q.y >= std::min(p.y, r.y))
@@ -1911,7 +1793,7 @@ namespace ws //GRAPHICS ENTITIES
 	    }
 		
 		// Returns: 0 = collinear, 1 = clockwise, 2 = counterclockwise
-	    int orientation(POINT p, POINT q, POINT r)
+	    int orientation(ws::Vec2i p, ws::Vec2i q, ws::Vec2i r)
 	    {
 	        long long val = (long long)(q.y - p.y) * (r.x - q.x) - 
 	                       (long long)(q.x - p.x) * (r.y - q.y);
@@ -1922,10 +1804,10 @@ namespace ws //GRAPHICS ENTITIES
 		
 	    bool intersects(Line &otherLine)
 	    {
-	        POINT p1 = this->start;
-	        POINT p2 = this->end;
-	        POINT p3 = otherLine.start;
-	        POINT p4 = otherLine.end;
+	        ws::Vec2i p1 = this->start;
+	        ws::Vec2i p2 = this->end;
+	        ws::Vec2i p3 = otherLine.start;
+	        ws::Vec2i p4 = otherLine.end;
 	        
 	        // Calculate orientation values
 	        int o1 = orientation(p1, p2, p3);
@@ -1958,9 +1840,9 @@ namespace ws //GRAPHICS ENTITIES
 	
 	
 	
-	    std::vector<POINT> vertices;
-	    COLORREF fillColor = RGB(255, 0, 0);    
-	    COLORREF borderColor = RGB(0, 0, 0);    
+	    std::vector<ws::Vec2i> vertices;
+	    Gdiplus::Color fillColor = {255,255,0,0};    
+	    Gdiplus::Color borderColor = {255,255,0,100};    
 	    int borderWidth = 2;
 	    bool filled = true;
 	    bool closed = true;
@@ -1969,7 +1851,7 @@ namespace ws //GRAPHICS ENTITIES
 	    Poly() = default;
 	
 	    
-	    Poly(std::vector<POINT>& vertices, COLORREF fillColor = RGB(255, 0, 0), COLORREF borderColor = RGB(0, 0, 0), int borderWidth = 2, bool filled = true)
+	    Poly(std::vector<ws::Vec2i>& vertices, Gdiplus::Color fillColor = {255,255,0,0}, Gdiplus::Color borderColor = {255,255,0,255}, int borderWidth = 2, bool filled = true)
 	    {
 	        this->vertices = vertices;
 	        this->fillColor = fillColor;
@@ -1979,7 +1861,7 @@ namespace ws //GRAPHICS ENTITIES
 	    }
 	
 	
-	    void addVertex(POINT vertex) 
+	    void addVertex(ws::Vec2i vertex) 
 		{
 	        vertices.push_back(vertex);
 	    }
@@ -2010,7 +1892,7 @@ namespace ws //GRAPHICS ENTITIES
 	    }
 	
 	    // Calculate centroid of the polygon
-	    POINT getCentroid() 
+	    ws::Vec2i getCentroid() 
 		{
 	        if (vertices.empty()) return {0, 0};
 	        
@@ -2020,14 +1902,14 @@ namespace ws //GRAPHICS ENTITIES
 	            sumY += vertex.y;
 	        }
 	        
-	        return {static_cast<LONG>(sumX / vertices.size()), 
-	                static_cast<LONG>(sumY / vertices.size())};
+	        return {static_cast<int>(sumX / vertices.size()), 
+	                static_cast<int>(sumY / vertices.size())};
 	    }
 	
 	
 	
 	    // Check if a point is inside the polygon using ray casting algorithm
-	    virtual bool contains(POINT point) override 
+	    virtual bool contains(ws::Vec2i point) override 
 		{
 	        if (vertices.size() < 3) return false;
 	        
@@ -2036,8 +1918,8 @@ namespace ws //GRAPHICS ENTITIES
 	        
 	        for (size_t a = 0; a < n; a++) 
 			{
-	            POINT p1 = vertices[a];
-	            POINT p2 = vertices[(a + 1) % n];
+	            ws::Vec2i p1 = vertices[a];
+	            ws::Vec2i p2 = vertices[(a + 1) % n];
 	            
 	            // Check if point is on vertex
 	            if (point.x == p1.x && point.y == p1.y) return true;
@@ -2068,8 +1950,8 @@ namespace ws //GRAPHICS ENTITIES
 	        
 	        // Check if any edge intersects with the line
 	        for (size_t i = 0; i < vertices.size(); i++) {
-	            POINT p1 = vertices[i];
-	            POINT p2 = vertices[(i + 1) % vertices.size()];
+	            ws::Vec2i p1 = vertices[i];
+	            ws::Vec2i p2 = vertices[(i + 1) % vertices.size()];
 	            
 	            Line edge(p1, p2);
 	            if (edge.intersects(line)) {
@@ -2109,13 +1991,13 @@ namespace ws //GRAPHICS ENTITIES
 	        
 	        // Check if any edges intersect
 	        for (size_t i = 0; i < vertices.size(); i++) {
-	            POINT p1 = vertices[i];
-	            POINT p2 = vertices[(i + 1) % vertices.size()];
+	            ws::Vec2i p1 = vertices[i];
+	            ws::Vec2i p2 = vertices[(i + 1) % vertices.size()];
 	            Line edge1(p1, p2);
 	            
 	            for (size_t j = 0; j < other.vertices.size(); j++) {
-	                POINT p3 = other.vertices[j];
-	                POINT p4 = other.vertices[(j + 1) % other.vertices.size()];
+	                ws::Vec2i p3 = other.vertices[j];
+	                ws::Vec2i p4 = other.vertices[(j + 1) % other.vertices.size()];
 	                Line edge2(p3, p4);
 	                
 	                if (edge1.intersects(edge2)) {
@@ -2129,17 +2011,22 @@ namespace ws //GRAPHICS ENTITIES
 	
 	    
 	
-		RECT getBoundingRect() 
+		ws::IntRect getBoundingRect() 
 		{
 	        if (vertices.empty()) return {0, 0, 0, 0};
 	        
-	        RECT rect = {vertices[0].x, vertices[0].y, vertices[0].x, vertices[0].y};
+	        RECT rect1 = {vertices[0].x, vertices[0].y, vertices[0].x, vertices[0].y};
+	        ws::IntRect rect = rect1;
+	        rect.width = rect.width - rect.left;
+	        rect.height = rect.height - rect.top;
+	        
+	        
 	        
 	        for (const auto& vertex : vertices) {
 	            rect.left = std::min(rect.left, vertex.x);
 	            rect.top = std::min(rect.top, vertex.y);
-	            rect.right = std::max(rect.right, vertex.x);
-	            rect.bottom = std::max(rect.bottom, vertex.y);
+	            rect.width = std::max(rect.width, vertex.x);
+	            rect.height = std::max(rect.height, vertex.y);
 	        }
 	        
 	        return rect;
@@ -2150,205 +2037,198 @@ namespace ws //GRAPHICS ENTITIES
 	    
 	
 	
-		virtual void draw(HDC hdc, ws::View &view) override 
+		virtual void draw(Gdiplus::Graphics* canvas, ws::View &view) override 
 		{
 	
 	        if (vertices.size() < 2) return;
 	        
-	        POINT viewPos = view.getPos();
-	        std::vector<POINT> transformedPoints;
+	        ws::Vec2i viewPos = view.getPos();
+		    std::vector<Gdiplus::PointF> transformedPoints;
+		    
+		    // Apply view transformation to all points
+		    for (const auto& vertex : vertices) {
+		        transformedPoints.push_back(Gdiplus::PointF(
+		            static_cast<Gdiplus::REAL>(vertex.x - viewPos.x),
+		            static_cast<Gdiplus::REAL>(vertex.y - viewPos.y)
+		        ));
+		    }
 	        
-	        // Apply view transformation to all points
-	        for (const auto& vertex : vertices) {
-	            transformedPoints.push_back({
-	                vertex.x - viewPos.x,
-	                vertex.y - viewPos.y
-	            });
-	        }
 	        
-	        // If filled, create and select brush
-	        HBRUSH hBrush = NULL;
-	        HBRUSH hOldBrush = NULL;
+		    Gdiplus::Pen borderPen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+		    Gdiplus::SolidBrush fillBrush(fillColor);
 	        
-	        if (filled && vertices.size() >= 3) {
-	            hBrush = CreateSolidBrush(fillColor);
-	            hOldBrush = (HBRUSH)SelectObject(hdc, hBrush);
-	        }
 	        
-	        // Create and select pen for border
-	        HPEN hPen = CreatePen(PS_SOLID, borderWidth, borderColor);
-	        HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
-	        
-	        // Draw the polygon
-	        if (closed && vertices.size() >= 3) {
-	            Polygon(hdc, transformedPoints.data(), static_cast<int>(transformedPoints.size()));
-	        } else {
-	            // Draw as polyline if not closed
-	            Polyline(hdc, transformedPoints.data(), static_cast<int>(transformedPoints.size()));
-	        }
-	        
-	        // Clean up
-	        SelectObject(hdc, hOldPen);
-	        DeleteObject(hPen);
-	        
-	        if (filled && vertices.size() >= 3) {
-	            SelectObject(hdc, hOldBrush);
-	            DeleteObject(hBrush);
-	        }
+	  
+		    // Draw filled polygon
+		    if (filled && closed && vertices.size() >= 3) {
+		        canvas->FillPolygon(&fillBrush, transformedPoints.data(), 
+		                          static_cast<INT>(transformedPoints.size()));
+		    }
+		    
+		    // Draw border/outline
+		    if (closed && vertices.size() >= 3) {
+		        canvas->DrawPolygon(&borderPen, transformedPoints.data(), 
+		                          static_cast<INT>(transformedPoints.size()));
+		    } 
+		    else if (vertices.size() >= 2) {
+		        // Draw as polyline if not closed
+		        canvas->DrawLines(&borderPen, transformedPoints.data(), 
+		                        static_cast<INT>(transformedPoints.size()));
+		    }
+	  
 	    }
 	};
 	
 	
-	
-	
-
-
-
-
-
-
-
-
-	
-	class Radial : public Drawable
-	{
-		public:
-		Poly poly;
-		
-		Radial()
-		{
-			poly.fillColor = RGB(0,0,255);
-			poly.borderColor = RGB(0,0,200);
-			poly.borderWidth = 2;
-			poly.closed = true;
-			poly.filled = true;
-			make();
-		}
-		
-		void make(int points = 500)
-		{
-			poly.clear();
-			
-			double inc = (2*3.14)/points; 
-			
-			for(double a=0;a<(2*3.14);a+=inc)
-			{
-				int resx = static_cast<int>(std::cos(a) * getRadius());
-				int resy = static_cast<int>(std::sin(a) * getRadius());
-				poly.addVertex(center.x + resx,center.y + resy);
-			}
-			m_points = points;
-			
-			updateDrawableProperties();
-		}
-		
-		
-		
-		void setPosition(int posx,int posy)
-		{
-			center = {posx,posy};
-			make(m_points);
-		}
-		
-		void setPosition(POINT pos)
-		{
-			center = pos;
-			make(m_points);
-		}
-		
-		
-		void move(POINT delta)
-		{
-			setPosition(center.x + delta.x,center.y + delta.y);
-			make(m_points);
-		}
-		
-		void move(int deltaX,int deltaY)
-		{
-			setPosition(center.x + deltaX,center.y + deltaY);
-			make(m_points);
-		}
-		
-		
-		void setPointCount(int count)
-		{
-			m_points = count;
-			make(m_points);
-		}
-		
-		void setRadius(int size)
-		{
-			radius = size;
-			make(m_points);
-		}
-		
-		void setFillColor(COLORREF color)
-		{
-			poly.fillColor = color; 
-			make(m_points);
-		}
-		
-		void setBorderColor(COLORREF color)
-		{
-			poly.borderColor = color;
-			make(m_points);
-		}
-		
-		void setBorderWidth(int size)
-		{
-			poly.borderWidth = size;
-			make(m_points);
-		}
-		
-		
-		int getRadius()
-		{
-			return radius;
-		}
-		
-		POINT getPosition()
-		{
-			return center;
-		}
-		
-		int getPointCount()
-		{
-			return m_points;
-		}
-		
-		
-	    virtual void draw(HDC hdc, View &view) override
-	    {
-	        poly.draw(hdc, view);
-	    }
-	    
-	    virtual bool contains(POINT pos) override
-	    {
-	        return poly.contains(pos);
-	    }	
-		
-		
-		private:
-		POINT center;
-		int m_points = 500;
-		int radius = 10;
-		
-		
-		void updateDrawableProperties()
-	    {
-	        // Set Drawable's position and size based on the poly's bounding rect
-	        RECT bounds = poly.getBoundingRect();
-	        x = bounds.left;
-	        y = bounds.top;
-	        width = bounds.right - bounds.left;
-	        height = bounds.bottom - bounds.top;
-	    }
-		
-	};
+//	
+//	
+//
+//
+//
+//
+//
+//
+//
+//
+//	
+//	class Radial : public Drawable
+//	{
+//		public:
+//		Poly poly;
+//		
+//		Radial()
+//		{
+//			poly.fillColor = RGB(0,0,255);
+//			poly.borderColor = RGB(0,0,200);
+//			poly.borderWidth = 2;
+//			poly.closed = true;
+//			poly.filled = true;
+//			make();
+//		}
+//		
+//		void make(int points = 500)
+//		{
+//			poly.clear();
+//			
+//			double inc = (2*3.14)/points; 
+//			
+//			for(double a=0;a<(2*3.14);a+=inc)
+//			{
+//				int resx = static_cast<int>(std::cos(a) * getRadius());
+//				int resy = static_cast<int>(std::sin(a) * getRadius());
+//				poly.addVertex(center.x + resx,center.y + resy);
+//			}
+//			m_points = points;
+//			
+//			updateDrawableProperties();
+//		}
+//		
+//		
+//		
+//		void setPosition(int posx,int posy)
+//		{
+//			center = {posx,posy};
+//			make(m_points);
+//		}
+//		
+//		void setPosition(ws::Vec2i pos)
+//		{
+//			center = pos;
+//			make(m_points);
+//		}
+//		
+//		
+//		void move(ws::Vec2i delta)
+//		{
+//			setPosition(center.x + delta.x,center.y + delta.y);
+//			make(m_points);
+//		}
+//		
+//		void move(int deltaX,int deltaY)
+//		{
+//			setPosition(center.x + deltaX,center.y + deltaY);
+//			make(m_points);
+//		}
+//		
+//		
+//		void setPointCount(int count)
+//		{
+//			m_points = count;
+//			make(m_points);
+//		}
+//		
+//		void setRadius(int size)
+//		{
+//			radius = size;
+//			make(m_points);
+//		}
+//		
+//		void setFillColor(COLORREF color)
+//		{
+//			poly.fillColor = color; 
+//			make(m_points);
+//		}
+//		
+//		void setBorderColor(COLORREF color)
+//		{
+//			poly.borderColor = color;
+//			make(m_points);
+//		}
+//		
+//		void setBorderWidth(int size)
+//		{
+//			poly.borderWidth = size;
+//			make(m_points);
+//		}
+//		
+//		
+//		int getRadius()
+//		{
+//			return radius;
+//		}
+//		
+//		POINT getPosition()
+//		{
+//			return center;
+//		}
+//		
+//		int getPointCount()
+//		{
+//			return m_points;
+//		}
+//		
+//		
+//	    virtual void draw(HDC hdc, View &view) override
+//	    {
+//	        poly.draw(hdc, view);
+//	    }
+//	    
+//	    virtual bool contains(ws::Vec2i pos) override
+//	    {
+//	        return poly.contains(pos);
+//	    }	
+//		
+//		
+//		private:
+//		ws::Vec2i center;
+//		int m_points = 500;
+//		int radius = 10;
+//		
+//		
+//		void updateDrawableProperties()
+//	    {
+//	        // Set Drawable's position and size based on the poly's bounding rect
+//	        ws::IntRect bounds = poly.getBoundingRect();
+//	        x = bounds.left;
+//	        y = bounds.top;
+//	        width = bounds.width;
+//	        height = bounds.height;
+//	    }
+//		
+//	};
 
 	
 }
-
 
 
 
@@ -2417,6 +2297,425 @@ namespace ws //SYSTEM ENTITIES
 	
 	
 	
+	
+	class Clipboard
+	{
+	private:
+	    // Helper function to copy a rectangular region from a GDI+ Bitmap
+	    Gdiplus::Bitmap* copyRectOfBitmap(ws::Texture &texture, ws::IntRect rect)
+	    {
+	        if (!texture.isValid()) return nullptr;
+	        
+	        // Get bitmap dimensions
+	        int srcWidth = texture.bitmap->GetWidth();
+	        int srcHeight = texture.bitmap->GetHeight();
+	        
+	        // Determine copy area
+	        int copyWidth, copyHeight, copyLeft, copyTop;
+	        
+	        if (rect.width == 0 && rect.height == 0 && rect.left == 0 && rect.top == 0) {
+	            // Copy entire bitmap
+	            copyLeft = 0;
+	            copyTop = 0;
+	            copyWidth = srcWidth;
+	            copyHeight = srcHeight;
+	        } else {
+	            // Copy specified rectangle
+	            copyLeft = rect.left;
+	            copyTop = rect.top;
+	            copyWidth = rect.width;
+	            copyHeight = rect.height;
+	            
+	            // Clamp to bitmap bounds
+	            if (copyLeft < 0) copyLeft = 0;
+	            if (copyTop < 0) copyTop = 0;
+	            if (copyLeft + copyWidth > srcWidth) copyWidth = srcWidth - copyLeft;
+	            if (copyTop + copyHeight > srcHeight) copyHeight = srcHeight - copyTop;
+	            
+	            // Check if rectangle is valid
+	            if (copyWidth <= 0 || copyHeight <= 0) return nullptr;
+	        }
+	        
+	        // Create a new bitmap for the copied region
+	        Gdiplus::Bitmap* copyBitmap = new Gdiplus::Bitmap(copyWidth, copyHeight, 
+	                                                         PixelFormat32bppARGB);
+	        
+	        // Create graphics context for the new bitmap
+	        Gdiplus::Graphics graphics(copyBitmap);
+	        
+	        // Draw the specified region from source to destination
+	        graphics.DrawImage(texture.bitmap, 
+	                          0, 0, copyLeft, copyTop, copyWidth, copyHeight, 
+	                          Gdiplus::UnitPixel);
+	        
+	        return copyBitmap;
+	    }
+	    
+	    // Convert GDI+ Bitmap to HBITMAP for clipboard (CF_BITMAP format)
+	    HBITMAP gdipBitmapToHBITMAP(Gdiplus::Bitmap* gdipBitmap)
+	    {
+	        if (!gdipBitmap) return nullptr;
+	        
+	        HBITMAP hBitmap = nullptr;
+	        Gdiplus::Color color(0, 0, 0, 0); // Transparent background
+	        Gdiplus::Status status = gdipBitmap->GetHBITMAP(color, &hBitmap);
+	        
+	        if (status != Gdiplus::Ok) {
+	            return nullptr;
+	        }
+	        
+	        return hBitmap;
+	    }
+	    
+	    // Convert GDI+ Bitmap to DIB for clipboard (CF_DIB format)
+	    HGLOBAL gdipBitmapToDIB(Gdiplus::Bitmap* gdipBitmap)
+	    {
+	        if (!gdipBitmap) return nullptr;
+	        
+	        UINT width = gdipBitmap->GetWidth();
+	        UINT height = gdipBitmap->GetHeight();
+	        
+	        // Lock the bitmap bits
+	        Gdiplus::BitmapData bitmapData;
+	        Gdiplus::Rect rect(0, 0, width, height);
+	        
+	        if (gdipBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, 
+	                                PixelFormat32bppARGB, &bitmapData) != Gdiplus::Ok) {
+	            return nullptr;
+	        }
+	        
+	        // Prepare BITMAPINFOHEADER
+	        BITMAPINFOHEADER bi = {0};
+	        bi.biSize = sizeof(BITMAPINFOHEADER);
+	        bi.biWidth = width;
+	        bi.biHeight = height;  // Positive for top-down DIB
+	        bi.biPlanes = 1;
+	        bi.biBitCount = 32;
+	        bi.biCompression = BI_RGB;
+	        bi.biSizeImage = width * height * 4;
+	        
+	        // Calculate total size needed
+	        DWORD dwSize = sizeof(BITMAPINFOHEADER) + bi.biSizeImage;
+	        
+	        // Allocate global memory
+	        HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, dwSize);
+	        if (!hGlobal) {
+	            gdipBitmap->UnlockBits(&bitmapData);
+	            return nullptr;
+	        }
+	        
+	        // Lock the global memory
+	        LPBYTE lpData = (LPBYTE)GlobalLock(hGlobal);
+	        if (!lpData) {
+	            GlobalFree(hGlobal);
+	            gdipBitmap->UnlockBits(&bitmapData);
+	            return nullptr;
+	        }
+	        
+	        // Copy BITMAPINFOHEADER
+	        memcpy(lpData, &bi, sizeof(BITMAPINFOHEADER));
+	        
+	        // Copy pixel data (convert from bottom-up to top-down if needed)
+	        LPBYTE pDest = lpData + sizeof(BITMAPINFOHEADER);
+	        LPBYTE pSrc = (LPBYTE)bitmapData.Scan0;
+	        
+	        // Copy scanline by scanline (bitmapData is bottom-up, DIB we want top-down)
+	        for (UINT y = 0; y < height; y++) {
+	            // Copy entire scanline
+	            memcpy(pDest + (y * width * 4), 
+	                   pSrc + ((height - 1 - y) * bitmapData.Stride), 
+	                   width * 4);
+	        }
+	        
+	        // Cleanup
+	        gdipBitmap->UnlockBits(&bitmapData);
+	        GlobalUnlock(hGlobal);
+	        
+	        return hGlobal;
+	    }
+	    
+	    // Convert HBITMAP to GDI+ Bitmap
+	    Gdiplus::Bitmap* hbitmapToGdipBitmap(HBITMAP hBitmap)
+	    {
+	        if (!hBitmap) return nullptr;
+	        
+	        // Create GDI+ bitmap from HBITMAP
+	        Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromHBITMAP(hBitmap, NULL);
+	        
+	        // If FromHBITMAP fails, try creating a new bitmap and copying
+	        if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
+	            if (bitmap) delete bitmap;
+	            
+	            // Get bitmap info
+	            BITMAP bm;
+	            GetObject(hBitmap, sizeof(BITMAP), &bm);
+	            
+	            // Create a new GDI+ bitmap
+	            bitmap = new Gdiplus::Bitmap(bm.bmWidth, bm.bmHeight, PixelFormat32bppARGB);
+	            
+	            // Create graphics and draw the HBITMAP
+	            Gdiplus::Graphics graphics(bitmap);
+	            Gdiplus::Bitmap tempBitmap(hBitmap, NULL);
+	            graphics.DrawImage(&tempBitmap, 0, 0, bm.bmWidth, bm.bmHeight);
+	        }
+	        
+	        return bitmap;
+	    }
+	
+	public:
+	    HWND hwnd = nullptr;
+	    
+	    Clipboard(HWND windowHandle = nullptr) : hwnd(windowHandle) {}
+	    
+	    bool copyText(const std::string& str) 
+	    {
+	        const std::wstring text = ws::WIDE(str);
+	        
+	        if (!OpenClipboard(hwnd)) {
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        size_t length = (text.length() + 1) * sizeof(wchar_t);
+	        HGLOBAL hGlobal = GlobalAlloc(GHND | GMEM_SHARE, length);
+	        if (!hGlobal) {
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        LPWSTR pGlobal = (LPWSTR)GlobalLock(hGlobal);
+	        if (!pGlobal) {
+	            GlobalFree(hGlobal);
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        wcsncpy_s(pGlobal, length / sizeof(wchar_t), text.c_str(), text.length());
+	        GlobalUnlock(hGlobal);
+	        
+	        SetClipboardData(CF_UNICODETEXT, hGlobal);
+	        CloseClipboard();
+	        return true;
+	    }
+	    
+	    std::string pasteText() 
+	    {
+	        if (!OpenClipboard(hwnd)) {
+	            return "";
+	        }
+	        
+	        std::string result;
+	        
+	        if (IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+	            HANDLE hData = GetClipboardData(CF_UNICODETEXT);
+	            if (hData) {
+	                LPCWSTR pGlobal = (LPCWSTR)GlobalLock(hData);
+	                if (pGlobal) {
+	                    result = ws::SHORT(pGlobal);
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+	        
+	        CloseClipboard();
+	        return result;
+	    }
+	    
+	    bool copyTexture(ws::Texture &texture, ws::IntRect rect = {0,0,0,0}) 
+	    {
+	        if (!texture.isValid()) return false;
+	        
+	        // Create a copy of the specified region
+	        Gdiplus::Bitmap* copyBitmap = copyRectOfBitmap(texture, rect);
+	        if (!copyBitmap) return false;
+	        
+	        // Try multiple formats for better compatibility
+	        
+	        if (!OpenClipboard(hwnd)) {
+	            delete copyBitmap;
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        bool success = false;
+	        
+	        // Try DIB format first (most compatible)
+	        HGLOBAL hDib = gdipBitmapToDIB(copyBitmap);
+	        if (hDib && SetClipboardData(CF_DIB, hDib)) {
+	            success = true;
+	        } else if (hDib) {
+	            GlobalFree(hDib);
+	        }
+	        
+	        // Also try BITMAP format
+	        HBITMAP hBitmap = gdipBitmapToHBITMAP(copyBitmap);
+	        if (hBitmap && SetClipboardData(CF_BITMAP, hBitmap)) {
+	            success = true;
+	        } else if (hBitmap) {
+	            DeleteObject(hBitmap);
+	        }
+	        
+	        delete copyBitmap;
+	        CloseClipboard();
+	        
+	        return success;
+	    }
+	    
+	    bool copyTextureAsDIB(ws::Texture &texture, ws::IntRect rect = {0,0,0,0})
+	    {
+	        if (!texture.isValid()) return false;
+	        
+	        Gdiplus::Bitmap* copyBitmap = copyRectOfBitmap(texture, rect);
+	        if (!copyBitmap) return false;
+	        
+	        HGLOBAL hGlobal = gdipBitmapToDIB(copyBitmap);
+	        delete copyBitmap;
+	        
+	        if (!hGlobal) return false;
+	        
+	        if (!OpenClipboard(hwnd)) {
+	            GlobalFree(hGlobal);
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        bool success = SetClipboardData(CF_DIB, hGlobal) != NULL;
+	        CloseClipboard();
+	        
+	        if (!success) {
+	            GlobalFree(hGlobal);
+	        }
+	        
+	        return success;
+	    }
+	    
+	    ws::Texture pasteTexture(ws::IntRect rect = {0,0,0,0}) 
+	    {
+	        ws::Texture tex;
+	        
+	        if (!OpenClipboard(hwnd)) {
+	            return tex;
+	        }
+	        
+	        // Try to get DIB first (better quality)
+	        if (IsClipboardFormatAvailable(CF_DIB)) {
+	            HANDLE hData = GetClipboardData(CF_DIB);
+	            if (hData) {
+	                LPVOID pData = GlobalLock(hData);
+	                if (pData) {
+	                    BITMAPINFOHEADER* bih = (BITMAPINFOHEADER*)pData;
+	                    
+	                    // Calculate pixel data offset
+	                    LPBYTE pPixels = (LPBYTE)pData + bih->biSize;
+	                    
+	                    // Create GDI+ bitmap from DIB
+	                    Gdiplus::Bitmap* bitmap = new Gdiplus::Bitmap(
+	                        bih->biWidth, 
+	                        abs(bih->biHeight), 
+	                        bih->biWidth * 4, 
+	                        PixelFormat32bppARGB, 
+	                        pPixels);
+	                    
+	                    if (bitmap && bitmap->GetLastStatus() == Gdiplus::Ok) {
+	                        tex.bitmap = bitmap;
+	                        tex.width = bitmap->GetWidth();
+	                        tex.height = bitmap->GetHeight();
+	                    } else {
+	                        delete bitmap;
+	                    }
+	                    
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+	        // Fall back to BITMAP format
+	        else if (IsClipboardFormatAvailable(CF_BITMAP)) {
+	            HBITMAP hClipboardBitmap = (HBITMAP)GetClipboardData(CF_BITMAP);
+	            if (hClipboardBitmap) {
+	                Gdiplus::Bitmap* clipboardBitmap = hbitmapToGdipBitmap(hClipboardBitmap);
+	                if (clipboardBitmap && clipboardBitmap->GetLastStatus() == Gdiplus::Ok) {
+	                    tex.bitmap = clipboardBitmap;
+	                    tex.width = clipboardBitmap->GetWidth();
+	                    tex.height = clipboardBitmap->GetHeight();
+	                } else {
+	                    delete clipboardBitmap;
+	                }
+	            }
+	        }
+	        
+	        CloseClipboard();
+	        
+	        // Apply rectangle cropping if needed and we have a valid texture
+	        if (tex.isValid() && rect.width > 0 && rect.height > 0) {
+	            Gdiplus::Bitmap* croppedBitmap = copyRectOfBitmap(tex, rect);
+	            if (croppedBitmap) {
+	                delete tex.bitmap;
+	                tex.bitmap = croppedBitmap;
+	                tex.width = croppedBitmap->GetWidth();
+	                tex.height = croppedBitmap->GetHeight();
+	            }
+	        }
+	        
+	        return tex;
+	    }
+	    
+	    bool hasText() 
+	    {
+	        if (!OpenClipboard(hwnd)) return false;
+	        bool hasText = IsClipboardFormatAvailable(CF_UNICODETEXT);
+	        CloseClipboard();
+	        return hasText;
+	    }
+	    
+	    bool hasImage() 
+	    {
+	        if (!OpenClipboard(hwnd)) return false;
+	        bool hasImage = IsClipboardFormatAvailable(CF_BITMAP);
+	        CloseClipboard();
+	        return hasImage;
+	    }
+	    
+	    bool clear() 
+	    {
+	        if (!OpenClipboard(hwnd)) return false;
+	        bool success = EmptyClipboard();
+	        CloseClipboard();
+	        return success;
+	    }
+	    
+	    void setWindowHandle(HWND windowHandle) 
+	    {
+	        hwnd = windowHandle;
+	    }
+	};
+	
+	
+	
+	
+	
+	class GDIPLUS
+	{
+		public:
+			
+		Gdiplus::GdiplusStartupInput gdiplusstartup;
+		ULONG_PTR gdiplustoken;
+		
+		GDIPLUS()
+		{
+			Gdiplus::GdiplusStartup(&gdiplustoken,&gdiplusstartup,nullptr);
+		}
+		
+		~GDIPLUS()
+		{
+			Gdiplus::GdiplusShutdown(gdiplustoken);
+		}
+		
+	}gdi;
+	
+	
+		
 	class Window
 	{
 		public:
@@ -2437,12 +2736,11 @@ namespace ws //SYSTEM ENTITIES
 		
 		View view;
 		
-		
-        HBITMAP stretchBufferBitmap;
-        HDC stretchBufferDC;		
+		ws::Texture backBuffer;
+	    Gdiplus::Graphics* canvas;
 
-	    HDC backBufferDC;
-	    HBITMAP backBufferBitmap;
+		
+		Clipboard clipboard;
 
 		
 		INITCOMMONCONTROLSEX icex;
@@ -2487,7 +2785,7 @@ namespace ws //SYSTEM ENTITIES
 			
 			
 			hwnd = CreateWindowEx(
-			0,
+			WS_EX_COMPOSITED,
 			CLASS_NAME,
 			TO_LPCSTR(title),
 			style,
@@ -2509,51 +2807,40 @@ namespace ws //SYSTEM ENTITIES
 			
 			
 			
-			
-			
-			
+			clipboard.setWindowHandle(hwnd);
 			
 				
-	        HDC hdc = GetDC(hwnd);
-	        backBufferDC = CreateCompatibleDC(hdc);
-	        backBufferBitmap = CreateCompatibleBitmap(hdc, view.getSize().x, view.getSize().y);
-	        SelectObject(backBufferDC, backBufferBitmap);
-	        
-			stretchBufferDC = CreateCompatibleDC(hdc);
-            stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height);
-            SelectObject(stretchBufferDC, stretchBufferBitmap);
-			
-			ReleaseDC(hwnd, hdc);			
 			
 			
-			clear();
+			backBuffer.create(view.getSize().x,view.getSize().y); 
+			canvas = new Gdiplus::Graphics(backBuffer.bitmap);
 			
-			
-			
-			
-			
-			
-            windowInstances[hwnd] = this;			
-
 
             ShowWindow(hwnd, SW_SHOW);
             UpdateWindow(hwnd);
 
+			
+			windowInstances[hwnd] = this;			
 
 			
 		}
 		
 		
-		
+		Window(const Window&) = delete;
+		Window& operator=(const Window&) = delete;
+		Window(Window&&) = delete;
+		Window& operator=(Window&&) = delete;
+
         ~Window()
         {
-            windowInstances.erase(hwnd);
-            DeleteObject(backBufferBitmap);
-        	DeleteDC(backBufferDC);
-            DeleteObject(stretchBufferBitmap);
-        	DeleteDC(stretchBufferDC);
-        	DeleteObject(LegacyAlpha.hbmp);
-		    DeleteDC(LegacyAlpha.hdcMem);
+		    if (canvas) {
+		        delete canvas;
+		        canvas = nullptr;
+		    }
+		    if (backBuffer.bitmap) {
+		        delete backBuffer.bitmap;
+		        backBuffer.bitmap = nullptr;
+		    }
         }
 		
 		
@@ -2567,71 +2854,9 @@ namespace ws //SYSTEM ENTITIES
 		
 		
     	
-    	private:
-		BYTE alpha = 255;
-	    COLORREF transparencyColor = RGB(-1,0,0); 
 		public:	
 			
-	    void setChromaKey(COLORREF color = RGB(-1,-1,-1),BYTE alphaValue = 255,std::string type = "modern") 
-		{
-			
-	        transparencyColor = color;
-	        alpha = alphaValue;
-	        if(type == "legacy")
-	        	legacyTransparency = true;
-	        else
-	        	legacyTransparency = false;
-	        
-	        
-	    	COLORREF c = transparencyColor;
-	    	
-	    	if(!(GetRValue(c) < 0 || GetRValue(c) > 255 || GetGValue(c) < 0 || GetGValue(c) > 255 || GetBValue(c) < 0 || GetBValue(c) > 255)    ||    alpha < 255)
-	    	{
-	    		//is valid color or semi-transparent
-				
-				LONG_PTR style = GetWindowLongPtr(hwnd,GWL_STYLE);
-	    		style |= WS_EX_LAYERED;
-	    		SetWindowLongPtrA(hwnd,GWL_EXSTYLE,style);
-	    		
-	    		bool legacy = legacyTransparency;
-	    		
-	    		if(!legacy)
-	    		{
-					SetLayeredWindowAttributes(hwnd,c,alpha,LWA_COLORKEY | LWA_ALPHA);
-	    		}
-	    		else
-	    		{
-				
-	    			//setup for ARGB 32bit transparency - legacy
-		    		HDC hdc = GetDC(hwnd);
-					SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
-					LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
-			        
-					BITMAPINFO bmi = {0};
-			        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-			        bmi.bmiHeader.biWidth = width;
-			        bmi.bmiHeader.biHeight = -height;
-			        bmi.bmiHeader.biPlanes = 1;
-			        bmi.bmiHeader.biBitCount = 32;
-			        bmi.bmiHeader.biCompression = BI_RGB;
-			        
-			        LegacyAlpha.hbmp = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &LegacyAlpha.pvBits, NULL, 0);
-			        SelectObject(LegacyAlpha.hdcMem, LegacyAlpha.hbmp);
 
-				}
-
-
-	    		isTransparent = true;
-
-	    		
-			}
-			else
-				isTransparent = false;
-				
-				
-			view.setPortSize({width,height});
-	        
-	    }	
 		
 		
 		
@@ -2743,21 +2968,22 @@ namespace ws //SYSTEM ENTITIES
 		
 		
 		
-	    void clear(COLORREF color = RGB(0,0,0)) {
-
-
-			//Update back buffer to contain the visible world area. 
-
-
-	    	
-	        HBRUSH brush = CreateSolidBrush(color);
-	        RECT rect = {0, 0, view.getSize().x, view.getSize().y};
-	        FillRect(backBufferDC, &rect, brush);
-	        DeleteObject(brush);
-	        
-
+	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
+		{
+		    // Clean up old resources
+		    if (canvas) {
+		        delete canvas;
+		        canvas = nullptr;
+		    }
+		    //Do the cleanup here or suffer memory overload
+		    if (backBuffer.bitmap) {
+		        delete backBuffer.bitmap;
+		        backBuffer.bitmap = nullptr;
+		    }
+		    backBuffer.create(view.getSize().x,view.getSize().y);
+		    canvas = new Gdiplus::Graphics(backBuffer.bitmap);
+			canvas->Clear(color);
 	    }
-		
 		
 		
 		
@@ -2772,9 +2998,9 @@ namespace ws //SYSTEM ENTITIES
 		
 		void draw(Drawable &draw)
 		{
-			
-		    SetLayout(backBufferDC, LAYOUT_BITMAPORIENTATIONPRESERVED);
-		    draw.draw(backBufferDC,view);
+			if(!canvas) return;
+
+			draw.draw(canvas,view);
 		}
 		
 		
@@ -2785,75 +3011,20 @@ namespace ws //SYSTEM ENTITIES
 		
 	    void display() 
 		{
-			
-			
-			
-			
-		    HDC hdc = GetDC(hwnd);
-		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-		    
-		    // Just copy the entire back buffer to stretch buffer
-		    StretchBlt(stretchBufferDC, 
-		    0, 
-			0, 
-			width, 
-			height,
-		    backBufferDC, 
-		    0, 
-			0, 
-			view.getSize().x, 
-			view.getSize().y,  
-		    SRCCOPY);
-			
-
-
-			
-		    if(isTransparent && legacyTransparency)
-	    	{
-		        
-		        
-		        if (!LegacyAlpha.hdcMem || !LegacyAlpha.hbmp) {
-		            setChromaKey(transparencyColor, alpha,"legacy"); // Recreate buffers just in case someone tries to use the isTransparent variable directly instead of using the setTransparency function.
-		        }		        
-		        
-		        
-		        // Copy from stretch buffer to ARGB buffer
-		        SetLayout(LegacyAlpha.hdcMem, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
-		        BitBlt(LegacyAlpha.hdcMem, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
-	
-
-		        
-		        BLENDFUNCTION blend = {AC_SRC_OVER, 0, alpha, 0};
-		        POINT ptDst = {0, 0};
-		        SIZE size = {width, height};
-		        POINT ptSrc = {0, 0};
-		        
-		        UpdateLayeredWindow(hwnd, hdc, &ptDst, &size, LegacyAlpha.hdcMem, &ptSrc, transparencyColor, &blend, ULW_ALPHA | ULW_COLORKEY);
-		        
-		        
-		    }
-		    else 
-		    {
-		        BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);	        
-//				InvalidateRect(hwnd, NULL, FALSE);
-//		        UpdateWindow(hwnd);
-		    }
-
-			ReleaseDC(hwnd, hdc);
-
+			InvalidateRect(hwnd, NULL, FALSE);
+        	UpdateWindow(hwnd);
 	    }		
 		
 		
 		
-		
+	
 		
 		
 		
 		
 		
 		private:
-			
-			
+						
 			
 		
 		
@@ -2897,13 +3068,19 @@ namespace ws //SYSTEM ENTITIES
 	            	
 	                PAINTSTRUCT ps;
 	                HDC hdc = BeginPaint(hwnd, &ps);
-	             
-	             	SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-	                // Draw the back buffer to the screen
-	                BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
+
+					if (backBuffer.bitmap) {
+				        if (hdc) {
+				            Gdiplus::Graphics graphics(hdc);
+				            graphics.DrawImage(backBuffer.bitmap, 0, 0, width, height);
+				        }
+				    }
+
+	              
 	                
 	                EndPaint(hwnd, &ps);
 	                return 0;
+
 	            }
 	                
 	            case WM_SIZE: {
@@ -2912,51 +3089,13 @@ namespace ws //SYSTEM ENTITIES
 				    
 					width = LOWORD(lParam);
 	                height = HIWORD(lParam);
+
+	
+	        		view.setPortSize({width, height});
+
 	                
-	                
-	                
-	                
-	                //viewport size should be updated here to keep proportion even after window has changed size.
-	                //for now we will wait to do that. For now we will just set the viewport as the window size.
-					
-					view.setPortSize({width,height});
-					
-					
-					
-	                
-			        HDC hdc = GetDC(hwnd);
-			        			        
-			        
-			        DeleteObject(stretchBufferBitmap);
-			        stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height); 	//this will also likely need to change to accomodate the viewport size.
-			        SelectObject(stretchBufferDC, stretchBufferBitmap);
-			        
-			        
-				    // RECREATE TRANSPARENCY BUFFERS WHEN SIZE CHANGES
-				    if (isTransparent) {
-				        if (LegacyAlpha.hbmp) DeleteObject(LegacyAlpha.hbmp);
-				        if (LegacyAlpha.hdcMem) DeleteDC(LegacyAlpha.hdcMem);
-				        
-				        LegacyAlpha.hdcMem = CreateCompatibleDC(hdc);
-				        BITMAPINFO bmi = {0};
-				        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-				        bmi.bmiHeader.biWidth = width;
-				        bmi.bmiHeader.biHeight = -height;
-				        bmi.bmiHeader.biPlanes = 1;
-				        bmi.bmiHeader.biBitCount = 32;
-				        bmi.bmiHeader.biCompression = BI_RGB;
-				        
-				        LegacyAlpha.hbmp = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &LegacyAlpha.pvBits, NULL, 0);
-				        SelectObject(LegacyAlpha.hdcMem, LegacyAlpha.hbmp);
-				    }			        
-			        
-			        
-			        
-			        ReleaseDC(hwnd, hdc);
-						                
-	                clear();
 	                return 0;
-	            	break;
+	            	
 				}
 				
 				
@@ -2987,14 +3126,6 @@ namespace ws //SYSTEM ENTITIES
         
 				
 		
-		
-		struct LEGACY_ALPHA
-		{
-		
-			void* pvBits = NULL;
-			HBITMAP hbmp = NULL;
-			HDC hdcMem = NULL;
-		}LegacyAlpha;
 		
 		bool isFullscreen = false;
 		bool legacyTransparency = false;
@@ -3029,14 +3160,13 @@ namespace ws //SYSTEM ENTITIES
 
 
 
-
 namespace ws //GLOBAL INPUT
 {
     
 	namespace Global
 	{
 	
-		POINT getMousePos(Window &window)
+		ws::Vec2i getMousePos(Window &window)
 		{
 			
 		    POINT p;
@@ -3046,11 +3176,12 @@ namespace ws //GLOBAL INPUT
 		    }
 		    
 		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
-		    p = window.view.toWorld(p);
-		    return p;
+		    ws::Vec2i p2 = p;
+			p2 = window.view.toWorld(p2);
+		    return p2;
 		}
 		
-		POINT getMousePos()
+		ws::Vec2i getMousePos()
 		{
 				
 			POINT p;
@@ -3271,7 +3402,7 @@ namespace ws //CHILD WINDOW API
 			int windowWidth = parentRef->width;
 			int windowHeight = parentRef->height;
 
-		    POINT originalSize = parentRef->view.getSize();
+		    ws::Vec2i originalSize = parentRef->view.getSize();
 		    
 		    
 		    
