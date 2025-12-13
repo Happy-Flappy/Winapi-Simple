@@ -76,6 +76,7 @@ Clipboard can copy different types such as bitmap to and from windows.
 
 To be added:
 
+Video class
 Improved View class that takes advantage of GDI+ transformations.
 Texture stretching into polygonal shapes. - in progress
 Mesh3D - in progress
