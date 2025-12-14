@@ -102,7 +102,7 @@ int main()
 				button.update(&m);
 				if(button.isPressed(m))
 				{
-					window.clipboard.copyTexture(window.backBuffer);
+					clipboard.copyTexture(window.backBuffer);
 				}
 	
 			}
