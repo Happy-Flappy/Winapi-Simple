@@ -2534,18 +2534,9 @@ namespace ws //SYSTEM ENTITIES
 	
 		bool OpenClipboardCheck()
 		{
-			if(!hwnd)
-	        {
-	        	if (!OpenClipboard(NULL)) {
-		            return false;
-		        }
-			}
-			else
-			{
-				if (!OpenClipboard(hwnd)) {
-		            return false;
-		        }
-			}
+	        if (!OpenClipboard(NULL)) {
+	            return false;
+	        }
 			return true;
 		}
 	
@@ -2554,9 +2545,8 @@ namespace ws //SYSTEM ENTITIES
 	
 	
 	public:
-	    HWND hwnd = nullptr;
-	    
-	    Clipboard(HWND windowHandle = nullptr) : hwnd(windowHandle) {}
+	    Clipboard()
+		{}
 	    
 	    bool copyText(const std::string& str) 
 	    {
@@ -2654,36 +2644,6 @@ namespace ws //SYSTEM ENTITIES
 	        return success;
 	    }
 	    
-	    bool copyTextureAsDIB(ws::Texture &texture, ws::IntRect rect = {0,0,0,0})
-	    {
-	        if (!texture.isValid()) return false;
-	        
-	        Gdiplus::Bitmap* copyBitmap = copyRectOfBitmap(texture, rect);
-	        if (!copyBitmap) return false;
-	        
-	        HGLOBAL hGlobal = gdipBitmapToDIB(copyBitmap);
-	        delete copyBitmap;
-	        
-	        if (!hGlobal) return false;
-
-
-	    	if (!OpenClipboardCheck()) {
-	            GlobalFree(hGlobal);
-				return false;
-	        }
-
-	        
-	        
-	        EmptyClipboard();
-	        bool success = SetClipboardData(CF_DIB, hGlobal) != NULL;
-	        CloseClipboard();
-	        
-	        if (!success) {
-	            GlobalFree(hGlobal);
-	        }
-	        
-	        return success;
-	    }
 	    
 	    ws::Texture pasteTexture(ws::IntRect rect = {0,0,0,0}) 
 	    {
@@ -2765,7 +2725,7 @@ namespace ws //SYSTEM ENTITIES
 	        return hasText;
 	    }
 	    
-	    bool hasImage() 
+	    bool hasTexture() 
 	    {
 	        if (!OpenClipboardCheck()) {
 	            return false;
@@ -2785,11 +2745,7 @@ namespace ws //SYSTEM ENTITIES
 	        return success;
 	    }
 	    
-	    void setWindowHandle(HWND windowHandle) 
-	    {
-	        hwnd = windowHandle;
-	    }
-	};
+	}clipboard;
 	
 	
 	
@@ -2829,7 +2785,8 @@ namespace ws //SYSTEM ENTITIES
 		bool isRunning = true;
 		std::queue<MSG> msgQ;
 		
-
+		INITCOMMONCONTROLSEX icex;
+		
 				
 		public:		
 		
@@ -2840,15 +2797,16 @@ namespace ws //SYSTEM ENTITIES
 	    Gdiplus::Graphics* canvas;
 
 		
-		Clipboard clipboard;
 
 		
-		INITCOMMONCONTROLSEX icex;
 		
-		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW)
+		
+		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
 			
 			style |= WS_CLIPCHILDREN;
+			
+			exStyle |= WS_EX_COMPOSITED;
 			
 			//This is for initialization of winapi child objects sucg as buttons and textboxes.
 			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -2885,7 +2843,7 @@ namespace ws //SYSTEM ENTITIES
 			
 			
 			hwnd = CreateWindowEx(
-			WS_EX_COMPOSITED,
+			0,
 			CLASS_NAME,
 			TO_LPCSTR(title),
 			style,
@@ -2907,7 +2865,6 @@ namespace ws //SYSTEM ENTITIES
 			
 			
 			
-			clipboard.setWindowHandle(hwnd);
 			
 				
 			
@@ -2947,7 +2904,7 @@ namespace ws //SYSTEM ENTITIES
 		
 		
 		
-		void setView(View &v)
+		void setView(ws::View &v)
 		{
 			view = v;
 		}
