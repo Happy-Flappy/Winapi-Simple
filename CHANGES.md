@@ -12,7 +12,7 @@
 
 * Split shape and sprite functionality into ws::Sprite and ws::Shape.
 
-* Both classes inherit from ws::Drawable and can both be drawn using window.draw(ws::Drawable \\\&draw).
+* Both classes inherit from ws::Drawable and can both be drawn using window.draw(ws::Drawable &draw).
 
 
 
@@ -36,7 +36,7 @@
 
 * Added Global Input System
 
-* ws::Global::getMousePos(ws::Window \\\&window)
+* ws::Global::getMousePos(ws::Window &window)
 
 * ws::Global::getMousePos()
 
@@ -58,7 +58,7 @@
 
 * Added setLayerAfter() for Z positioning of window.
 
-* Added ws::Line class and bool ws::Line::intersects(ws::Line \\\&otherLine).
+* Added ws::Line class and bool ws::Line::intersects(ws::Line &otherLine).
 
 * Added ws::Timer class.
 
@@ -125,8 +125,7 @@
 * Re-added  Button,Slider,Textbox,Label classes.
 
 * Added complete conversion constructors for
-
-* ws::Vec2i,ws::Vec2f,ws::Vec2d,ws::Vec3i,ws::Vec3f,ws::Vec3d,ws::IntRect,ws::FloatRect,and ws:DoubleRect.
+  ws::Vec2i,ws::Vec2f,ws::Vec2d,ws::Vec3i,ws::Vec3f,ws::Vec3d,ws::IntRect,ws::FloatRect,and ws:DoubleRect.
 
 * Added flip transformations to drawable scale property. Negative scale on an axis means flipped image on that axis.
 
