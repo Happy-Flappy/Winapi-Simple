@@ -1082,65 +1082,16 @@ namespace ws //GRAPHICS ENTITIES
 {
 
 
+
 	class View
 	{
 		public:
-			
+		
+		
 		View()
 		{
 			
 		}
-		
-		void setRect(ws::IntRect viewRect)
-		{
-			world = viewRect;
-		}
-		
-		void setSize(ws::Vec2i size)
-		{
-			world.width = size.x;
-			world.height = size.y;
-		}
-		
-		void setPos(ws::Vec2i pos)
-		{
-			world.left = pos.x;
-			world.top = pos.y;
-		}
-		
-		
-		void setPortRect(ws::IntRect portRect)
-		{
-			port = portRect;
-		}
-		
-		
-		void setPortSize(ws::Vec2i size)
-		{
-			port.width = size.x;
-			port.height = size.y;
-		}
-		
-		
-		void setPortSize(int x,int y)
-		{
-			port.width = x;
-			port.height = y;
-		}
-		
-		
-		void setPortPos(ws::Vec2i pos)
-		{
-			port.left = pos.x;
-			port.top = pos.y;
-		}
-		
-		void setPortPos(int x,int y)
-		{
-			port.left = x;
-			port.top = y;
-		}
-		
 		
 		
 		
@@ -1149,22 +1100,9 @@ namespace ws //GRAPHICS ENTITIES
 			return world;
 		}
 		
-		ws::Vec2i getSize()
+		void setRect(ws::IntRect rect)
 		{
-			ws::Vec2i p;
-			p.x = world.width;
-			p.y = world.height;
-			
-			return p;
-		}
-		
-		ws::Vec2i getPos()
-		{
-			ws::Vec2i p;
-			p.x = world.left;
-			p.y = world.top;
-			
-			return p;
+			world = rect;
 		}
 		
 		ws::IntRect getPortRect()
@@ -1172,104 +1110,333 @@ namespace ws //GRAPHICS ENTITIES
 			return port;
 		}
 		
+		void setPortRect(ws::IntRect rect)
+		{
+			port = rect;
+		}
+		
+		
+		void setSize(ws::Vec2i size)
+		{
+			world.width = size.x;
+			world.height = size.y;
+		}
+		
+		ws::Vec2i getSize()
+		{
+			return ws::Vec2i(world.width,world.height);
+		}
+		
+		void setPortSize(ws::Vec2i size)
+		{
+			port.width = size.x;
+			port.height = size.y;
+		}
+		
 		ws::Vec2i getPortSize()
 		{
-			ws::Vec2i p;
-			p.x = port.width;
-			p.y = port.height;
-			
-			return p;
+			return ws::Vec2i(port.width,port.height);
 		}
 		
-		ws::Vec2i getPortPos()
+		
+		
+		ws::Vec2i getCenter()
 		{
-			ws::Vec2i p;
-			p.x = port.left;
-			p.y = port.top;
-			
-			return p;
-		}
-		
-		
-		
-		
-	    void zoom(float factor)
-	    {
-	    	if(factor != 0)
-	    	{
-			
-		    	int x = world.width / factor;
-		    	int y = world.height / factor;
-				setPortSize({x,y});	// If factor is 2, that means that the visible world area is half as much because it is zooming in and will  be stretching into the viewport.
-	    		world.left += x;
-	    		world.top += y;
-			}
+			return ws::Vec2i(world.left + (world.width/2),world.top + (world.height/2));
 		}
 
+		void setCenter(int cx,int cy)
+		{
+			world.left = cx - (world.width/2);
+			world.top = cy - (world.height/2);
+		}
 
-		void move(ws::Vec2i delta)
+		
+		ws::Vec2i getPortCenter()
 		{
-			world.left += delta.x;
-			world.top += delta.y;
+			return ws::Vec2i(port.left + (port.width/2),port.top + (port.height/2));
+		}
+
+		void setPortCenter(int cx,int cy)
+		{
+			port.left = cx - (port.width/2);
+			port.top = cy - (port.height/2);
 		}
 		
-		void movePort(ws::Vec2i delta)
+		
+		ws::Vec2i getPosition()
 		{
-			port.left += delta.x;
-			port.top += delta.y;
+			return ws::Vec2i(world.left,world.top);
+		}
+		
+		void setPosition(int cx,int cy)
+		{
+			world.left = cx;
+			world.top = cy;
+		}
+		
+		
+		ws::Vec2i getPortPosition()
+		{
+			return ws::Vec2i(port.left,port.top);
+		}
+		
+		void setPortPosition(int cx,int cy)
+		{
+			port.left = cx;
+			port.top = cy;
+		}
+		
+		
+		float getRotation() 
+		{
+		    return rotation;
+		}
+		
+		
+		void setRotation(float angle) 
+		{
+		    rotation = angle;
 		}
 		
 		
 		
+		void getTransform(Gdiplus::Matrix &m)
+		{
+			m = *matrix;
+		}
 		
-	    ws::Vec2i toWorld(ws::Vec2i pos) 
-	    {
-		    ws::Vec2i worldSize = getSize();
-		    ws::Vec2i viewSize = getPortSize();
-		    ws::Vec2i viewPos = getPos();
-		    
-		    ws::Vec2i worldPoint;
-		    
-		    float scaleX = static_cast<float>(worldSize.x) / viewSize.x;
-		    float scaleY = static_cast<float>(worldSize.y) / viewSize.y;
-		    
-		    worldPoint.x = static_cast<int>(pos.x * scaleX) + viewPos.x;
-		    worldPoint.y = static_cast<int>(pos.y * scaleY) + viewPos.y;
-		    
-		    return worldPoint;
-	    }
-	    
-	    ws::Vec2i toWindow(ws::Vec2i pos) 
-	    {
-		    ws::Vec2i worldSize = getSize();
-		    ws::Vec2i viewSize = getPortSize();
-		    ws::Vec2i viewPos = getPos();
-		    
-		    ws::Vec2i windowPoint;
-		    
-		    float scaleX = static_cast<float>(viewSize.x) / worldSize.x;
-		    float scaleY = static_cast<float>(viewSize.y) / worldSize.y;
-		    
-		    windowPoint.x = static_cast<int>((pos.x - viewPos.x) * scaleX);
-		    windowPoint.y = static_cast<int>((pos.y - viewPos.y) * scaleY);
-		    
-		    return windowPoint;
-	    }
-				
+		void setTransform(Gdiplus::Matrix &m)
+		{
+			matrix = m;
+		}
 		
 		
-		
-		
-		
-		
-		
-		
+		void apply(Gdiplus::Graphics &graphics)
+		{
+			
+			
+			
+			matrix.Reset();
+			
+			float centerX = getCenter().x;
+			float centerY = getCenter().y;
+			//Translate to the center position. This moves the world center to the origin.
+			matrix.Translate(-centerX,-centerY);
+			
+			//apply a rotation around the origin which is now the center.
+			if(rotation != 0)
+				matrix.Rotate(rotation);
+			
+			//scale from port size to world size.
+			matrix.Scale((float)port.width / world.width, (float)port.height / world.height);
+
+			//Translate to port center. Moves origin to port center.
+			matrix.Translate(port.left + (port.width/2), port.top + (port.height/2));
+			
+			graphics.SetTransform(&matrix);
+		}
+			
+			
 		private:
-		ws::IntRect world;
-		ws::IntRect port;
-		
 			
+		float rotation = 0;
+		ws::IntRect port; //Port is always in screen coordinates.
+		ws::IntRect world; //World is the world coordinate section of the world that is sent to the view.
+		Gdiplus::Matrix matrix;
+		
+		 	
 	};
+
+
+//	class View
+//	{
+//		public:
+//			
+//		View()
+//		{
+//			
+//		}
+//		
+//		void setRect(ws::IntRect viewRect)
+//		{
+//			world = viewRect;
+//		}
+//		
+//		void setSize(ws::Vec2i size)
+//		{
+//			world.width = size.x;
+//			world.height = size.y;
+//		}
+//		
+//		void setPos(ws::Vec2i pos)
+//		{
+//			world.left = pos.x;
+//			world.top = pos.y;
+//		}
+//		
+//		
+//		void setPortRect(ws::IntRect portRect)
+//		{
+//			port = portRect;
+//		}
+//		
+//		
+//		void setPortSize(ws::Vec2i size)
+//		{
+//			port.width = size.x;
+//			port.height = size.y;
+//		}
+//		
+//		
+//		void setPortSize(int x,int y)
+//		{
+//			port.width = x;
+//			port.height = y;
+//		}
+//		
+//		
+//		void setPortPos(ws::Vec2i pos)
+//		{
+//			port.left = pos.x;
+//			port.top = pos.y;
+//		}
+//		
+//		void setPortPos(int x,int y)
+//		{
+//			port.left = x;
+//			port.top = y;
+//		}
+//		
+//		
+//		
+//		
+//		ws::IntRect getRect()
+//		{
+//			return world;
+//		}
+//		
+//		ws::Vec2i getSize()
+//		{
+//			ws::Vec2i p;
+//			p.x = world.width;
+//			p.y = world.height;
+//			
+//			return p;
+//		}
+//		
+//		ws::Vec2i getPos()
+//		{
+//			ws::Vec2i p;
+//			p.x = world.left;
+//			p.y = world.top;
+//			
+//			return p;
+//		}
+//		
+//		ws::IntRect getPortRect()
+//		{
+//			return port;
+//		}
+//		
+//		ws::Vec2i getPortSize()
+//		{
+//			ws::Vec2i p;
+//			p.x = port.width;
+//			p.y = port.height;
+//			
+//			return p;
+//		}
+//		
+//		ws::Vec2i getPortPos()
+//		{
+//			ws::Vec2i p;
+//			p.x = port.left;
+//			p.y = port.top;
+//			
+//			return p;
+//		}
+//		
+//		
+//		
+//		
+//	    void zoom(float factor)
+//	    {
+//	    	if(factor != 0)
+//	    	{
+//			
+//		    	int x = world.width / factor;
+//		    	int y = world.height / factor;
+//				setPortSize({x,y});	// If factor is 2, that means that the visible world area is half as much because it is zooming in and will  be stretching into the viewport.
+//	    		world.left += x;
+//	    		world.top += y;
+//			}
+//		}
+//
+//
+//		void move(ws::Vec2i delta)
+//		{
+//			world.left += delta.x;
+//			world.top += delta.y;
+//		}
+//		
+//		void movePort(ws::Vec2i delta)
+//		{
+//			port.left += delta.x;
+//			port.top += delta.y;
+//		}
+//		
+//		
+//		
+//		
+//	    ws::Vec2i toWorld(ws::Vec2i pos) 
+//	    {
+//		    ws::Vec2i worldSize = getSize();
+//		    ws::Vec2i viewSize = getPortSize();
+//		    ws::Vec2i viewPos = getPos();
+//		    
+//		    ws::Vec2i worldPoint;
+//		    
+//		    float scaleX = static_cast<float>(worldSize.x) / viewSize.x;
+//		    float scaleY = static_cast<float>(worldSize.y) / viewSize.y;
+//		    
+//		    worldPoint.x = static_cast<int>(pos.x * scaleX) + viewPos.x;
+//		    worldPoint.y = static_cast<int>(pos.y * scaleY) + viewPos.y;
+//		    
+//		    return worldPoint;
+//	    }
+//	    
+//	    ws::Vec2i toWindow(ws::Vec2i pos) 
+//	    {
+//		    ws::Vec2i worldSize = getSize();
+//		    ws::Vec2i viewSize = getPortSize();
+//		    ws::Vec2i viewPos = getPos();
+//		    
+//		    ws::Vec2i windowPoint;
+//		    
+//		    float scaleX = static_cast<float>(viewSize.x) / worldSize.x;
+//		    float scaleY = static_cast<float>(viewSize.y) / worldSize.y;
+//		    
+//		    windowPoint.x = static_cast<int>((pos.x - viewPos.x) * scaleX);
+//		    windowPoint.y = static_cast<int>((pos.y - viewPos.y) * scaleY);
+//		    
+//		    return windowPoint;
+//	    }
+//				
+//		
+//		
+//		
+//		
+//		
+//		
+//		
+//		
+//		private:
+//		ws::IntRect world;
+//		ws::IntRect port;
+//		
+//			
+//	};
 
 
 
@@ -1418,7 +1585,7 @@ namespace ws //GRAPHICS ENTITIES
 	    
 	    
 	    
-	    void setPixel(int xIndex,int yIndex,Gdiplus::Color &color)
+	    void setPixel(int xIndex,int yIndex,Gdiplus::Color color)
 	    {
 			bitmap->SetPixel(xIndex, yIndex, color);
 		}
@@ -1515,74 +1682,9 @@ namespace ws //GRAPHICS ENTITIES
 	        bottom = y + scaledBottom;
 	    }
 
-	    // Consolidated transformation function
-	    struct TransformResult {
-	        int drawX, drawY;          // Screen coordinates to draw at
-	        int visualWidth, visualHeight; // Visual dimensions on screen
-	        int srcX, srcY;            // Source texture coordinates (for Sprite)
-	        int srcWidth, srcHeight;   // Source dimensions (for Sprite, may be negative)
-	        bool visible;              // Whether the object is visible in view
-	        
-	        // Common transformation that applies to all Drawables
-	        static TransformResult calculate(const Drawable& drawable, View& view, 
-	                                         int texLeft = 0, int texTop = 0,
-	                                         int texWidth = 0, int texHeight = 0) {
-	            TransformResult result;
-	            
-	            // Get view position for culling
-	            POINT viewPos = view.getPos();
-	            
-	            // Get the visual bounds
-	            int left, top, right, bottom;
-	            drawable.getBounds(left, top, right, bottom);
-	            
-	            result.visualWidth = right - left;
-	            result.visualHeight = bottom - top;
-	            
-	            // Calculate draw position (top-left of visual bounds)
-	            result.drawX = left - viewPos.x;
-	            result.drawY = top - viewPos.y;
-	            
-	            // Culling check
-	            result.visible = !(result.drawX + result.visualWidth < 0 || 
-	                               result.drawY + result.visualHeight < 0 ||
-	                               result.drawX >= view.getPortSize().x || 
-	                               result.drawY >= view.getPortSize().y);
-	            
-	            if (!result.visible) {
-	                return result;
-	            }
-	            
-	            // Texture source calculations (only for sprites)
-	            if (texWidth > 0 && texHeight > 0) {
-	                // Determine source rectangle based on flipping
-	                if (drawable.scale.x >= 0) {
-	                    // No horizontal flip
-	                    result.srcX = texLeft;
-	                    result.srcWidth = texWidth;
-	                } else {
-	                    // Horizontal flip: start from right edge, use negative width
-	                    result.srcX = texLeft + texWidth - 1;
-	                    result.srcWidth = -texWidth;
-	                }
-	                
-	                if (drawable.scale.y >= 0) {
-	                    // No vertical flip
-	                    result.srcY = texTop;
-	                    result.srcHeight = texHeight;
-	                } else {
-	                    // Vertical flip: start from bottom edge, use negative height
-	                    result.srcY = texTop + texHeight - 1;
-	                    result.srcHeight = -texHeight;
-	                }
-	            }
-	            
-	            return result;
-	        }
-	    };
-	
+
 		
-		virtual void draw(Gdiplus::Graphics* graphics,View &view) = 0;
+		virtual void draw(Gdiplus::Graphics* graphics) = 0;
 		virtual bool contains(ws::Vec2i pos) = 0;
 		
 		
@@ -1634,53 +1736,46 @@ namespace ws //GRAPHICS ENTITIES
 	                pos.y >= top && pos.y < bottom);
 	    }
 	    
-	    virtual void draw(Gdiplus::Graphics* graphics, View &view) override
+	    virtual void draw(Gdiplus::Graphics* graphics) override
 	    {
 	        if (!textureRef || !textureRef->isValid()) 
 	            return;
+			        
+			        
+			        
+	        int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
 	        
-	        // Use the common transformation calculation
-	        TransformResult tr = TransformResult::calculate(*this, view, texLeft, texTop, texWidth, texHeight);
+	        Gdiplus::Rect destRect(left, top, right - left, bottom - top);
 	        
-	        if (!tr.visible) {
-	            return;
+	        
+	        
+	        if (scale.x >= 0 && scale.y >= 0)
+	        {
+	            // No flipping
+	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+	            graphics->DrawImage(textureRef->bitmap, destRect, 
+	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+	                               Gdiplus::UnitPixel);
 	        }
-	        
-	        
-	        
-	        Gdiplus::Rect destRect(tr.drawX, tr.drawY, tr.visualWidth, tr.visualHeight);
-	        
-			if (tr.srcWidth >= 0 && tr.srcHeight >= 0)
-			{
-				// No flipping
-				Gdiplus::Rect srcRect(tr.srcX, tr.srcY, abs(tr.srcWidth), abs(tr.srcHeight));
-				graphics->DrawImage(textureRef->bitmap, destRect, 
-								   srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-								   Gdiplus::UnitPixel);
-			}
-			else
-			{
-				// Handle flipping with image attributes
-				Gdiplus::ImageAttributes attributes;
-				
-				if (tr.srcWidth < 0)
-				{
-					// Horizontal flip
-					attributes.SetWrapMode(Gdiplus::WrapModeTileFlipX);
-				}
-				if (tr.srcHeight < 0)
-				{
-					// Vertical flip
-					attributes.SetWrapMode(Gdiplus::WrapModeTileFlipY);
-				}
-				
-				Gdiplus::Rect srcRect(abs(tr.srcX), abs(tr.srcY), 
-				abs(tr.srcWidth), abs(tr.srcHeight));
-				graphics->DrawImage(textureRef->bitmap, destRect,
-				srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-				Gdiplus::UnitPixel, &attributes);
-			}	        
-	        
+	        else
+	        {
+	            // Handle flipping with image attributes
+	            Gdiplus::ImageAttributes attributes;
+	            
+	            if (scale.x < 0) {
+	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipX);
+	            }
+	            if (scale.y < 0) {
+	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipY);
+	            }
+	            
+	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+	            graphics->DrawImage(textureRef->bitmap, destRect,
+	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+	                               Gdiplus::UnitPixel, &attributes);
+	        }
+		    
 	        
 	    }
 		
@@ -1769,21 +1864,16 @@ namespace ws //GRAPHICS ENTITIES
 
 
 		
-	    virtual void draw(Gdiplus::Graphics* canvas,View &view)  override
+	    virtual void draw(Gdiplus::Graphics* canvas)  override
 	    {
-	    	
-
-	        // Use the common transformation calculation
-	        TransformResult tr = TransformResult::calculate(*this, view, x, y, width, height);
-	        
-	        if (!tr.visible) {
-	            return;
-	        }			
-
-	    	
+	     
+		 	Gdiplus::SolidBrush brush(color);
 			
-			Gdiplus::SolidBrush brush(color);
-			Gdiplus::Rect rect(tr.drawX, tr.drawY, tr.visualWidth, tr.visualHeight);
+			int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+			Gdiplus::Rect rect(left,top,right,bottom);
+			
 			canvas->FillRectangle(&brush,rect);
 		    
 	    }
@@ -1825,18 +1915,10 @@ namespace ws //GRAPHICS ENTITIES
 		}
 	    
 	    
-		virtual void draw(Gdiplus::Graphics* canvas, ws::View &view) override 
+		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
-	        TransformResult tr = TransformResult::calculate(*this, view, start.x, start.y, end.x, end.y);
-	        
-	        if (!tr.visible) {
-	            return;
-	        }
-	
-			Gdiplus::Pen pen(color);
+	    	Gdiplus::Pen pen(color);
 			canvas->DrawLine(&pen,start.x,start.y,end.x,end.y);
-	
-	
 	    }
 	    
 	    
@@ -2102,19 +2184,18 @@ namespace ws //GRAPHICS ENTITIES
 	    
 	
 	
-		virtual void draw(Gdiplus::Graphics* canvas, ws::View &view) override 
+		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
 	
 	        if (vertices.size() < 2) return;
 	        
-	        ws::Vec2i viewPos = view.getPos();
-		    std::vector<Gdiplus::PointF> transformedPoints;
-		    
-		    // Apply view transformation to all points
+	        std::vector<Gdiplus::PointF> transformedPoints;
+	        
+		    // Convert to Gdiplus::REAL
 		    for (const auto& vertex : vertices) {
 		        transformedPoints.push_back(Gdiplus::PointF(
-		            static_cast<Gdiplus::REAL>(vertex.x - viewPos.x),
-		            static_cast<Gdiplus::REAL>(vertex.y - viewPos.y)
+		            static_cast<Gdiplus::REAL>(vertex.x),
+		            static_cast<Gdiplus::REAL>(vertex.y)
 		        ));
 		    }
 	        
@@ -2263,9 +2344,9 @@ namespace ws //GRAPHICS ENTITIES
 		}
 		
 		
-	    virtual void draw(Gdiplus::Graphics* canvas, View &view) override
+	    virtual void draw(Gdiplus::Graphics* canvas) override
 	    {
-	    	poly.draw(canvas,view);
+	    	poly.draw(canvas);
 	    }
 	    
 	    virtual bool contains(ws::Vec2i pos) override
@@ -2791,7 +2872,7 @@ namespace ws //SYSTEM ENTITIES
 		public:		
 		
 		
-		View view;
+		ws::View view;
 		
 		ws::Texture backBuffer;
 	    Gdiplus::Graphics* canvas;
@@ -3057,7 +3138,18 @@ namespace ws //SYSTEM ENTITIES
 		{
 			if(!canvas) return;
 
-			draw.draw(canvas,view);
+			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
+        	canvas->GetTransform(&originalMatrix);
+			
+			//Apply the transformation
+			view.apply(*canvas);
+			
+			//draw the object in world coords.
+			draw.draw(canvas);
+			
+			//Restore the original transformation so that the transform can be applied again next time. 
+			//This is because changes occur and need to be transformed too.
+			canvas->SetTransform(&originalMatrix);
 		}
 		
 		
@@ -3133,6 +3225,7 @@ namespace ws //SYSTEM ENTITIES
 					        canvas = nullptr;
 					    }
 					    
+					    //faster to use bitbltting
 						if(hdc)
 						{
 							HBITMAP hBitmap;
@@ -3146,6 +3239,7 @@ namespace ws //SYSTEM ENTITIES
 							DeleteObject(hBitmap); 
 						}
 						
+						//much slower when using graphics.drawimage 
 //						if (hdc) {
 //				            Gdiplus::Graphics graphics(hdc);
 //				            graphics.DrawImage(backBuffer.bitmap, 0, 0, width, height);
@@ -3167,7 +3261,6 @@ namespace ws //SYSTEM ENTITIES
 	                height = HIWORD(lParam);
 
 	
-	        		view.setPortSize({width, height});
 
 	                
 	                return 0;
