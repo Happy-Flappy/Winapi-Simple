@@ -129,12 +129,6 @@
 
 * Added flip transformations to drawable scale property. Negative scale on an axis means flipped image on that axis.
 
-
-
-
-
-
-
 * Replaced Most of GDI graphics with GDI+  
 
 * Added Clipboard class for each window.
@@ -142,6 +136,20 @@
 * Clipboard can copy different types such as bitmap to and from windows.
 
 
+
+# V1.5 - BETA 
+
+* Made View class much more functional by using GDI+ Transformations.
+
+* Added set and get functions for Rotate, Zoom, Origin, Center, and Size to View class.
+
+* Added copy constructor and operator to View class. 
+
+* Added many new functions to ws::Window and removed redundant settings variables that normally can be accessed through the windows HWND. These settings are get and set through functions that directly interact with winapi code.
+
+* Added many ws::window constructors and copy constructors and create function.
+
+* Added ws::Window::close(). 
 
 
 
@@ -157,13 +165,11 @@
 
 * Video class
 
-* Improved View class that takes advantage of GDI+ transformations.
-
 * Texture stretching into polygonal shapes.
 
-* Mesh3D - in progress
+* Mesh3D
 
-* Transformation functions(rotate,scale,color functions,etc.)
+* Transformation functions at a drawables level (rotate,scale,color functions,etc.)
 
 * More child classes and features for them.(right click menu)
 

@@ -11,11 +11,16 @@ int main()
 	ws::Window window;
 	
 	
-	ws::Window newwindow;
+	ws::Texture backTex;
+	ws::Sprite sprite;
+	backTex.load("back2.jpg");
+	sprite.setTexture(backTex);
+	sprite.setOrigin(0,sprite.getTextureRect().height);
+	sprite.setScale(1,-1);
 	
-	newwindow.create(960,540,"");
 	
-	window = newwindow;
+	window.create(backTex.width,backTex.height,"");
+	window.setFullscreen(true);
 	
 	while(window.isOpen())
 	{
@@ -28,15 +33,6 @@ int main()
 				{
 					window.close();
 				}
-				if(m.wParam == 'V')
-				{
-					window.setVisible(false);
-				}
-				if(m.wParam == 'S')
-				{
-					window.setVisible(true);
-				}
-				
 				
 				
 			}
@@ -44,18 +40,9 @@ int main()
 		}
 		
 		
-		if(window.hasFocus())
-		{
-			std::cerr << "Has focus...\n";
-		}
-		else
-		{
-			window.setFocus();
-			std::cerr << "Forced back into focus.\n";
-		}
-		
 		
 		window.clear();
+		window.draw(sprite);
 		window.display();
 	}
 	

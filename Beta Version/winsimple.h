@@ -1682,8 +1682,7 @@ namespace ws //GRAPHICS ENTITIES
 		
 
 
-
-
+		//move
 	    Texture(Texture&& other) noexcept
 	        : bitmap(other.bitmap), width(other.width), height(other.height)
 	    {
@@ -1692,8 +1691,47 @@ namespace ws //GRAPHICS ENTITIES
 	        other.height = 0;
 	    }
 
+		//copy
+	    Texture(const Texture& other) : bitmap(nullptr), width(0), height(0)
+	    {
+	        if (other.bitmap && other.width > 0 && other.height > 0) {
+	            bitmap = other.bitmap->Clone(0, 0, other.width, other.height, PixelFormat32bppARGB);
+	            width = other.width;
+	            height = other.height;
+	        }
+	    }
 
-		
+
+		//Copy assignment
+	    Texture& operator=(const Texture& other)
+	    {
+	        if (this != &other)
+	        {
+	            // Clean up existing bitmap
+	            if (bitmap != nullptr)
+	            {
+	                delete bitmap;
+	                bitmap = nullptr;
+	            }
+	            
+	            // Copy from other if it has valid bitmap
+	            if (other.bitmap && other.width > 0 && other.height > 0)
+	            {
+	                bitmap = other.bitmap->Clone(0, 0, other.width, other.height, PixelFormat32bppARGB);
+	                width = other.width;
+	                height = other.height;
+	            }
+	            else
+	            {
+	                bitmap = nullptr;
+	                width = 0;
+	                height = 0;
+	            }
+	        }
+	        return *this;
+	    }
+
+
 	    Texture& operator=(Texture&& other) noexcept
 	    {
 	        if (this != &other)
@@ -1714,8 +1752,7 @@ namespace ws //GRAPHICS ENTITIES
 	        return *this;
 	    }		
 		
-		
-	
+
 	
 		bool create(int w,int h,Gdiplus::Color color = {0,0,0,0})
 		{
@@ -3067,14 +3104,12 @@ namespace ws //SYSTEM ENTITIES
 	{
 		public:
 		
-		HWND hwnd;
-	    int x,y,width, height;		
-		bool isTransparent = false;
+		HWND hwnd;	
 
 		private:
 			
 		bool isRunning = false;
-		bool visible = false;
+		
 		std::queue<MSG> msgQ;
 		
 		INITCOMMONCONTROLSEX icex;
@@ -3102,14 +3137,125 @@ namespace ws //SYSTEM ENTITIES
 			create(width,height,title,style,exStyle);
 		}
 		
+		
+		
+		Window(HWND otherHwnd)
+		{
+			createFromHwnd(otherHwnd);	
+		}
+		
+		
+		
+		bool createFromHwnd(HWND otherHwnd)
+		{
+			if(!otherHwnd)
+			{
+				std::cerr << "Failed to create window from HWND!\n";
+				return false;
+			}
+			
+			
+			WINDOWINFO winInfo;
+            winInfo.cbSize = sizeof(WINDOWINFO);
+            
+            if (!GetWindowInfo(otherHwnd, &winInfo))
+            {
+            	std::cerr << "Failed to create window from HWND!\n";
+				return false;
+			}
+			
+			
+			
+			char title[256];
+            GetWindowTextA(otherHwnd, title, sizeof(title));
+			
+			
+			int width = winInfo.rcClient.right - winInfo.rcClient.left;
+			int height = winInfo.rcClient.bottom - winInfo.rcClient.top;
+			create(width,height,std::string(title),winInfo.dwStyle,winInfo.dwExStyle);
+			if(winInfo.dwWindowStatus == WS_ACTIVECAPTION)
+				setVisible(true);
+			else
+				setVisible(false);	
+			
+			return true;
+		}
+		
+		
+		
+		Window(Window &other)
+		{
+			isRunning = other.isRunning;
+	        msgQ = other.msgQ;
+	        
+	        view = other.view;
+	        
+	        isFullscreen = other.isFullscreen;
+	        windowedRect = other.windowedRect;
+	        
+			
+
+	        
+	        // Copy icex
+	        icex = other.icex;
+	        
+	        
+		    if (other.hwnd) 
+		    {
+		        // Get the other window's properties
+		        RECT rect;
+		        GetWindowRect(other.hwnd, &rect);
+		        
+		        char title[256];
+		        GetWindowTextA(other.hwnd, title, sizeof(title));
+		        
+		        DWORD style = GetWindowLong(other.hwnd, GWL_STYLE);
+		        DWORD exStyle = GetWindowLong(other.hwnd, GWL_EXSTYLE);
+		        
+		        // Create a new window
+		        create(
+		            other.getSize().x,
+		            other.getSize().y,
+		            std::string(title),
+		            style,
+		            exStyle
+		        );
+		        
+		        // Copy the view
+		        view = other.view;
+		        
+		        backBuffer = other.backBuffer;
+		        
+		        setVisible(other.getVisible());
+		        if(other.hasFocus())
+					setFocus();
+		        
+		        
+		        if(other.getFullscreen())
+		        	setFullscreen(true);
+		        
+//		        // Copy backbuffer
+//		        if (other.backBuffer.isValid() && backBuffer.isValid()) {
+//		            delete backBuffer.bitmap;
+//		            backBuffer.bitmap = other.backBuffer.bitmap->Clone(
+//		                0, 0, other.backBuffer.width, other.backBuffer.height, 
+//		                PixelFormat32bppARGB
+//		            );
+//		            backBuffer.width = other.backBuffer.width;
+//		            backBuffer.height = other.backBuffer.height;
+//		        }
+		    }
+		}
+		
 
 
 
 		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
+			//Note to self: the style must be set this way because hwnd has not been initialized yet!
 			style |= WS_CLIPCHILDREN;
-			
 			exStyle |= WS_EX_COMPOSITED;
+			
 			
 			//This is for initialization of winapi child objects sucg as buttons and textboxes.
 			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -3118,10 +3264,7 @@ namespace ws //SYSTEM ENTITIES
 			///////////////////////////////
 			
 			
-			
-			view.setRect({0,0,width,height});//Sets world rect
-			view.setPortRect({0,0,width,height});//Sets viewport rect
-			
+			view.init({0,0,width,height});
 			
 			
 			isRunning = true;
@@ -3181,7 +3324,9 @@ namespace ws //SYSTEM ENTITIES
 
 
 			isRunning = true;
-			visible = true;
+			
+			setVisible(true);
+			setFocus();
 						
 		}
 
@@ -3214,17 +3359,44 @@ namespace ws //SYSTEM ENTITIES
 		
 		
 		
+		
+		std::string getTitle()
+		{
+			if(!hwnd)
+				return "";
+				
+			char title[256];
+            GetWindowTextA(hwnd, title, sizeof(title));
+			return std::string(title);			
+		}
+		
+		
+		void setTitle(std::string title)
+		{
+			if(!hwnd)
+				return;
+			SetWindowTextA(hwnd,ws::TO_LPCSTR(title));
+		}
+		
+		
 		void setView(ws::View &v)
 		{
 			view = v;
 		}
 		
 		
+		ws::View getView()
+		{
+			return view;
+		}
+		
 		
 		void setVisible(bool val)
 		{
-			visible = val;
-			if(!visible)
+			if(!hwnd)
+				return;
+				
+			if(!val)
 				ShowWindow(hwnd, SW_HIDE);
 			else
 				ShowWindow(hwnd, SW_SHOW);
@@ -3232,7 +3404,9 @@ namespace ws //SYSTEM ENTITIES
 		
 		bool getVisible()
 		{
-			return visible;
+			if(!hwnd)
+				return false;
+			return IsWindowVisible(hwnd);
 		}
 		
 		
@@ -3254,47 +3428,212 @@ namespace ws //SYSTEM ENTITIES
 		{
 			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
 		}
-		    	    
+		
+		
+		void addStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getStyle();
+			s |= style;
+			
+				
+			SetWindowLongA(hwnd,GWL_STYLE,s);		
+		}
+		
+		void removeStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getStyle();
+			s &= ~style;
+			
+				
+			SetWindowLongA(hwnd,GWL_STYLE,s);			
+		}
+		
+		void setAllStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			SetWindowLongA(hwnd,GWL_STYLE,0);
+			
+			SetWindowLongA(hwnd,GWL_STYLE,style);			
+		}
+
+
+		void addExStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getExStyle();
+			s |= style;
+			
+				
+			SetWindowLongA(hwnd,GWL_EXSTYLE,s);		
+		}
+		
+		void removeExStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getExStyle();
+			s &= ~style;
+			
+				
+			SetWindowLongA(hwnd,GWL_EXSTYLE,s);			
+		}
+		
+		void setAllExStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			SetWindowLongA(hwnd,GWL_EXSTYLE,0);
+			
+			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
+		}
+
+		
+		
+		DWORD getExStyle()
+		{	
+			return GetWindowLong(hwnd, GWL_EXSTYLE);
+		}
+		
+	    
+	    DWORD getStyle()
+	    {
+	    	return GetWindowLong(hwnd, GWL_STYLE);
+            
+		}
+	    
+	    
+	    bool hasStyle(DWORD checkStyle)
+	    {
+	    	return (getStyle() & checkStyle);
+		}
+		
+		bool hasExStyle(DWORD checkStyle)
+	    {
+	    	return (getExStyle() & checkStyle);
+		}
+		
+		
+		
+		void setSize(ws::Vec2i size)
+		{
+			setSize(size.x,size.y);
+		}
+	    
+	    void setSize(int screenWidth,int screenHeight)
+	    {
+	    	if(screenWidth <= 0 || screenHeight <= 0)
+			{
+				setVisible(false);
+				std::cerr << "Warning! You tried to set a window to an invalid size. This has been converted into a safe setVisible(false) command. Try using the setVisible function as a better practice.\n";
+				return;
+			}
+	    	SetWindowPos(hwnd, 
+			0, 
+			0, 
+			0, 
+			screenWidth, 
+			screenHeight,
+			SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+            
+		}
+		
+		
+		ws::Vec2i getSize()
+		{
+  
+            RECT rect;
+            GetWindowRect(hwnd, &rect);  
+            
+//            RECT clientRect;
+//            GetClientRect(hwnd, &clientRect);
+//            
+//            int clientWidth = clientRect.right - clientRect.left;
+//            int clientHeight = clientRect.bottom - clientRect.top;
+
+            int width = rect.right - rect.left;
+            int height = rect.bottom - rect.top;
+
+
+			return ws::Vec2i(width,height);			
+		}
+		
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			setPosition(pos.x,pos.y);
+		}
+		
+		void setPosition(int posx,int posy)
+		{
+	    	SetWindowPos(hwnd, 
+			0, 
+			posx, 
+			posy, 
+			0, 
+			0,
+			SWP_FRAMECHANGED | SWP_SHOWWINDOW);			
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			if(!hwnd)
+				return ws::Vec2i(0,0);
+				
+            RECT rect;
+            GetWindowRect(hwnd, &rect);
+						
+            // Remove window decorations for size calculation
+            RECT clientRect;
+            GetClientRect(hwnd, &clientRect);
+            
+			return ws::Vec2i(clientRect.left,clientRect.top);			
+		}
 		
 	    
 
 
-	    void setFullscreen(bool fullscreen) {
+	    void setFullscreen(bool fullscreen) 
+		{
 	        if (fullscreen == isFullscreen) return;
 	        
-	        if (fullscreen) {
-	            windowedStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-	            GetWindowRect(hwnd, &windowedRect);
+	        if (fullscreen) 
+			{
+	            windowedStyle = getExStyle();
+	            
+				GetWindowRect(hwnd, &windowedRect);
 	            
 	            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 	            
-	            SetWindowLong(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-	            SetWindowPos(hwnd, 
-				HWND_TOP, 
-				0, 
-				0, 
-				screenWidth, 
-				screenHeight,
-				SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+	            
+	            removeStyle(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+	            addStyle(WS_POPUP | WS_VISIBLE);
+	            setSize(screenWidth,screenHeight);
 	            
 	            isFullscreen = true;
 	        } else {
-	            SetWindowLong(hwnd, GWL_STYLE, windowedStyle);
-	            SetWindowPos(hwnd, HWND_TOP, 
-	            windowedRect.left, 
-				windowedRect.top,
-	            windowedRect.right - windowedRect.left,
-	            windowedRect.bottom - windowedRect.top,
-	            SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+	            setAllStyle(windowedStyle);
+	            
+	            setPosition(windowedRect.left,windowedRect.top);
+	            setSize(windowedRect.right - windowedRect.left,
+	            windowedRect.bottom - windowedRect.top);
 	            
 	            isFullscreen = false;
 	        }
 	    }
 	    
-	    void toggleFullscreen() {
-	        setFullscreen(!isFullscreen);
-	    }
 	    
 	    bool getFullscreen() const {
 	        return isFullscreen;
@@ -3360,6 +3699,9 @@ namespace ws //SYSTEM ENTITIES
 		
 	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
 		{
+			if(!hwnd)
+				return;
+				
 			
 		    // Clean up old resources
 		    if (canvas) {
@@ -3389,7 +3731,7 @@ namespace ws //SYSTEM ENTITIES
 		
 		void draw(Drawable &draw)
 		{
-			if(!canvas) return;
+			if(!canvas || !hwnd) return;
 
 
 
@@ -3417,7 +3759,9 @@ namespace ws //SYSTEM ENTITIES
 		
 	    void display() 
 		{
-		    InvalidateRect(hwnd, NULL, FALSE);
+			if(!hwnd)
+		    	return;
+			InvalidateRect(hwnd, NULL, FALSE);
 		    UpdateWindow(hwnd);
 	    }		
 		
@@ -3492,9 +3836,8 @@ namespace ws //SYSTEM ENTITIES
 
 				            SetStretchBltMode(hdc, HALFTONE); //For better quality stretching
 				            SetBrushOrgEx(hdc, 0, 0, NULL);
-
 							
-							StretchBlt(hdc,0,0,width,height,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
+							StretchBlt(hdc,0,0,view.getPortSize().x,view.getPortSize().y,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
 							SelectObject(hdcMem, hbmOld);
 							DeleteDC(hdcMem);
 							DeleteObject(hBitmap); 
@@ -3514,26 +3857,9 @@ namespace ws //SYSTEM ENTITIES
 
 	            }
 	                
-	            case WM_SIZE: {
-				
-				   
-				    
-					width = LOWORD(lParam);
-	                height = HIWORD(lParam);
 
-	
-
-	                
-	                return 0;
-	            	
-				}
 				
 				
-				case WM_MOVE:
-				{
-					x = GET_X_LPARAM(lParam);
-					y = GET_Y_LPARAM(lParam);
-				}
 				
 				
 	        }
@@ -3556,12 +3882,9 @@ namespace ws //SYSTEM ENTITIES
         
 				
 		
-		
 		bool isFullscreen = false;
-		bool legacyTransparency = false;
 		RECT windowedRect; // Stores window position/size when not fullscreen
     	DWORD windowedStyle; // Stores window style when not fullscreen
-		
 		
 		
 		
@@ -3828,9 +4151,9 @@ namespace ws //CHILD WINDOW API
 				return;
 
 
-
-			int windowWidth = parentRef->width;
-			int windowHeight = parentRef->height;
+		    ws::Vec2i windowSize = parentRef->getSize(); 
+		    int windowWidth = windowSize.x;
+		    int windowHeight = windowSize.y;
 
 		    ws::Vec2i originalSize = parentRef->view.getSize();
 		    
