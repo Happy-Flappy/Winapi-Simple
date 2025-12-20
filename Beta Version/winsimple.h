@@ -1094,8 +1094,90 @@ namespace ws //GRAPHICS ENTITIES
 		}
 		
 		
+		//Matrix does not have normal copy constructor so the view class has to do this in a custom way so that View can be copied to another view like view = v;
+	    View(const View& other) : 
+	        world(other.world), 
+	        port(other.port), 
+	        rotation(other.rotation),
+	        portOrigin(other.portOrigin),
+	        matrix(),
+	        zoom(other.zoom)
+	    {
+	        setTransform(other.matrix);
+	    }	
+	    
+	  
+		//move constructor
 		
-		ws::IntRect getRect()
+		View(View&& other) noexcept :
+	        world(std::move(other.world)),
+	        port(std::move(other.port)),
+	        rotation(other.rotation),
+	        portOrigin(std::move(other.portOrigin)),
+	        matrix(),
+	        zoom(other.zoom)
+	    {
+	    	setTransform(other.matrix);
+	        other.rotation = 0.0f;
+	        other.zoom = 0.0f;
+	    }	  
+	  
+	  
+	    
+		View& operator=(const View& other)
+		{
+		    if (this != &other) {
+		        world = other.world;
+		        port = other.port;
+		        rotation = other.rotation;
+		        portOrigin = other.portOrigin;
+		        zoom = other.zoom;
+		        setTransform(other.matrix);
+		    }
+		    return *this;
+		}
+		
+		
+	    View& operator=(View&& other) noexcept
+	    {
+	        if (this != &other) {
+	            world = std::move(other.world);
+	            port = std::move(other.port);
+	            rotation = other.rotation;
+	            portOrigin = std::move(other.portOrigin);
+	            setTransform(other.matrix);
+	            zoom = other.zoom;
+	            
+	            other.rotation = 0.0f;
+	            other.zoom = 0.0f;
+	        }
+	        return *this;
+	    }		
+		
+		
+		~View() = default;
+		
+		
+
+		void init(int portLeft,int portTop,int portWidth,int portHeight)
+		{
+			port.left = portLeft;
+			port.top = portTop;
+			port.width = portWidth;
+			port.height = portHeight;
+			
+			world = port;
+		}
+		
+
+		void init(ws::IntRect rect)
+		{	
+			init(rect.left,rect.top,rect.width,rect.height);
+		}
+		
+		
+		
+		[[nodiscard]] ws::IntRect getRect()
 		{
 			return world;
 		}
@@ -1104,8 +1186,14 @@ namespace ws //GRAPHICS ENTITIES
 		{
 			world = rect;
 		}
+
+		void setRect(int left,int top,int width,int height)
+		{
+			setRect(ws::IntRect(left,top,width,height));
+		}
 		
-		ws::IntRect getPortRect()
+		
+		[[nodiscard]] ws::IntRect getPortRect()
 		{
 			return port;
 		}
@@ -1115,6 +1203,11 @@ namespace ws //GRAPHICS ENTITIES
 			port = rect;
 		}
 		
+		void setPortRect(int left,int top,int width,int height)
+		{
+			setPortRect(ws::IntRect(left,top,width,height));
+		}
+		
 		
 		void setSize(ws::Vec2i size)
 		{
@@ -1122,7 +1215,7 @@ namespace ws //GRAPHICS ENTITIES
 			world.height = size.y;
 		}
 		
-		ws::Vec2i getSize()
+		[[nodiscard]] ws::Vec2i getSize()
 		{
 			return ws::Vec2i(world.width,world.height);
 		}
@@ -1133,14 +1226,14 @@ namespace ws //GRAPHICS ENTITIES
 			port.height = size.y;
 		}
 		
-		ws::Vec2i getPortSize()
+		[[nodiscard]] ws::Vec2i getPortSize()
 		{
 			return ws::Vec2i(port.width,port.height);
 		}
 		
 		
 		
-		ws::Vec2i getCenter()
+		[[nodiscard]] ws::Vec2i getCenter()
 		{
 			return ws::Vec2i(world.left + (world.width/2),world.top + (world.height/2));
 		}
@@ -1151,44 +1244,54 @@ namespace ws //GRAPHICS ENTITIES
 			world.top = cy - (world.height/2);
 		}
 
+		void setCenter(ws::Vec2i pos)
+		{
+			setCenter(pos.x,pos.y);
+		}
+
+
 		
-		ws::Vec2i getPortCenter()
+		[[nodiscard]] ws::Vec2i getPortCenter()
 		{
 			return ws::Vec2i(port.left + (port.width/2),port.top + (port.height/2));
 		}
 
 		void setPortCenter(int cx,int cy)
 		{
-			port.left = cx - (port.width/2);
-			port.top = cy - (port.height/2);
+			ws::Vec2i pos = ws::Vec2i(cx - (port.width/2),cy - (port.height/2));
+			port.left = pos.x;
+			port.top = pos.y;
+			
 		}
-		
-		
-		ws::Vec2i getPosition()
+
+
+		void setPortCenter(ws::Vec2i pos)
 		{
-			return ws::Vec2i(world.left,world.top);
+			setPortCenter(pos.x,pos.y);
 		}
 		
-		void setPosition(int cx,int cy)
+		
+		
+		void setPortRotatePoint(int ox,int oy)
 		{
-			world.left = cx;
-			world.top = cy;
+			portOrigin.x = ox;
+			portOrigin.y = oy;
 		}
 		
-		
-		ws::Vec2i getPortPosition()
+		void setPortRotatePoint(ws::Vec2i pos)
 		{
-			return ws::Vec2i(port.left,port.top);
+			setPortRotatePoint(pos.x,pos.y);
 		}
 		
-		void setPortPosition(int cx,int cy)
+		
+		void setPortRotatePointCenter()
 		{
-			port.left = cx;
-			port.top = cy;
+			portOrigin = ws::Vec2i(port.left + (port.width/2), port.top + (port.height/2));
 		}
 		
 		
-		float getRotation() 
+		
+		[[nodiscard]] float getRotation() 
 		{
 		    return rotation;
 		}
@@ -1201,15 +1304,94 @@ namespace ws //GRAPHICS ENTITIES
 		
 		
 		
-		void getTransform(Gdiplus::Matrix &m)
+		void setZoom(float val)
 		{
-			m = *matrix;
+			zoom = val;
 		}
 		
-		void setTransform(Gdiplus::Matrix &m)
+		
+		[[nodiscard]] float getZoom()
 		{
-			matrix = m;
+			return zoom;
 		}
+		
+		
+		void move(float dx,float dy)
+		{
+			world.left += dx;
+			world.top += dy;
+		}
+		
+		void move(ws::Vec2f dir)
+		{
+			move(dir.x,dir.y);
+		}
+
+		void move(int dx,int dy)
+		{
+			world.left += dx;
+			world.top += dy;
+		}		
+		
+	    void getTransform(Gdiplus::Matrix &m) const
+	    {
+	        Gdiplus::REAL elements[6];
+	        matrix.GetElements(elements);
+	        m.SetElements(elements[0], elements[1], elements[2], 
+	                     elements[3], elements[4], elements[5]);
+	    }
+		
+		void setTransform(const Gdiplus::Matrix &m)
+	    {
+	        Gdiplus::REAL elements[6];
+	        m.GetElements(elements);
+	        matrix.SetElements(elements[0], elements[1], elements[2], 
+	                          elements[3], elements[4], elements[5]);
+	    }
+		
+		
+		
+		
+		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos) const
+		{
+			
+	        Gdiplus::Matrix invMatrix;
+	        getTransform(invMatrix);
+	        invMatrix.Invert();			
+			
+	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(screenPos.x),static_cast<Gdiplus::REAL>(screenPos.y));
+	        invMatrix.TransformPoints(&point, 1);
+	        
+	        return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
+		}		
+		
+		[[nodiscard]] ws::Vec2i toWorld(int x,int y) 
+		{
+			return toWorld(ws::Vec2i(x,y));
+		}
+		
+
+	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos) const
+	    {
+	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(worldPos.x), 
+	                             static_cast<Gdiplus::REAL>(worldPos.y));
+	        matrix.TransformPoints(&point, 1);
+				        
+			return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
+	    
+		}
+
+		
+		[[nodiscard]] ws::Vec2i toScreen(int x,int y) 
+		{
+			return toScreen(ws::Vec2i(x,y));
+		}		
+		
+
+
+
+
+		
 		
 		
 		void apply(Gdiplus::Graphics &graphics)
@@ -1218,23 +1400,49 @@ namespace ws //GRAPHICS ENTITIES
 			
 			
 			matrix.Reset();
-			
-			float centerX = getCenter().x;
-			float centerY = getCenter().y;
-			//Translate to the center position. This moves the world center to the origin.
-			matrix.Translate(-centerX,-centerY);
-			
-			//apply a rotation around the origin which is now the center.
-			if(rotation != 0)
-				matrix.Rotate(rotation);
-			
-			//scale from port size to world size.
-			matrix.Scale((float)port.width / world.width, (float)port.height / world.height);
 
-			//Translate to port center. Moves origin to port center.
-			matrix.Translate(port.left + (port.width/2), port.top + (port.height/2));
+	        float scaleX = static_cast<float>(port.width) / world.width;
+	        float scaleY = static_cast<float>(port.height) / world.height;
+
 			
-			graphics.SetTransform(&matrix);
+	        
+			float zoomFactor = 1.0f / std::pow(1.1f, abs(zoom)); // More gradual zoom
+			
+			if(zoom < 0) {
+			    scaleX *= zoomFactor;
+			    scaleY *= zoomFactor;
+			} else if(zoom > 0) {
+			    scaleX /= zoomFactor;
+			    scaleY /= zoomFactor;
+			}
+		    
+		    float worldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+		    float worldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
+		    
+		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+	        
+	        
+        	
+        	
+        
+	        matrix.Translate(portCenterX, portCenterY);           // Step 4
+	        
+	        if (rotation != 0) {
+	            matrix.Rotate(rotation);                          // Step 3
+	        }
+	        
+	        matrix.Scale(scaleX, scaleY);                         // Step 2
+	        matrix.Translate(-worldCenterX, -worldCenterY);       // Step 1
+
+
+		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+
+	        
+	        graphics.SetTransform(&matrix);
+	        
 		}
 			
 			
@@ -1243,7 +1451,9 @@ namespace ws //GRAPHICS ENTITIES
 		float rotation = 0;
 		ws::IntRect port; //Port is always in screen coordinates.
 		ws::IntRect world; //World is the world coordinate section of the world that is sent to the view.
+		ws::Vec2i portOrigin;//This is the point of rotation. It does NOT effect the view position.
 		Gdiplus::Matrix matrix;
+		float zoom = 0;
 		
 		 	
 	};
@@ -2863,7 +3073,8 @@ namespace ws //SYSTEM ENTITIES
 
 		private:
 			
-		bool isRunning = true;
+		bool isRunning = false;
+		bool visible = false;
 		std::queue<MSG> msgQ;
 		
 		INITCOMMONCONTROLSEX icex;
@@ -2878,13 +3089,24 @@ namespace ws //SYSTEM ENTITIES
 	    Gdiplus::Graphics* canvas;
 
 		
-
+		Window()
+		{
+			canvas = nullptr;
+        	hwnd = nullptr;
+		}
 		
 		
 		
 		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
-			
+			create(width,height,title,style,exStyle);
+		}
+		
+
+
+
+		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
+		{
 			style |= WS_CLIPCHILDREN;
 			
 			exStyle |= WS_EX_COMPOSITED;
@@ -2924,7 +3146,7 @@ namespace ws //SYSTEM ENTITIES
 			
 			
 			hwnd = CreateWindowEx(
-			0,
+			exStyle,
 			CLASS_NAME,
 			TO_LPCSTR(title),
 			style,
@@ -2944,9 +3166,6 @@ namespace ws //SYSTEM ENTITIES
 		        exit(-1);
 		    }			
 			
-			
-			
-			
 				
 			
 			
@@ -2960,14 +3179,15 @@ namespace ws //SYSTEM ENTITIES
 			
 			windowInstances[hwnd] = this;			
 
-			
+
+			isRunning = true;
+			visible = true;
+						
 		}
+
+
 		
 		
-		Window(const Window&) = delete;
-		Window& operator=(const Window&) = delete;
-		Window(Window&&) = delete;
-		Window& operator=(Window&&) = delete;
 
         ~Window()
         {
@@ -2982,6 +3202,15 @@ namespace ws //SYSTEM ENTITIES
         }
 		
 		
+		void close()
+		{
+		    if (hwnd && IsWindow(hwnd)) {
+		        DestroyWindow(hwnd);
+		    }
+		    isRunning = false;
+		    
+		    
+		}
 		
 		
 		
@@ -2991,15 +3220,33 @@ namespace ws //SYSTEM ENTITIES
 		}
 		
 		
-    	
-		public:	
-			
-
+		
+		void setVisible(bool val)
+		{
+			visible = val;
+			if(!visible)
+				ShowWindow(hwnd, SW_HIDE);
+			else
+				ShowWindow(hwnd, SW_SHOW);
+		}
+		
+		bool getVisible()
+		{
+			return visible;
+		}
 		
 		
 		
+		void setFocus()
+		{
+			SetFocus(hwnd);
+		}
 		
-		
+		bool hasFocus()
+		{
+			HWND focus = GetFocus();
+			return (focus == hwnd);
+		}
 		
 		
 		
@@ -3008,6 +3255,7 @@ namespace ws //SYSTEM ENTITIES
 			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
 		}
 		    	    
+		
 	    
 
 
@@ -3059,6 +3307,10 @@ namespace ws //SYSTEM ENTITIES
 		
 		bool isOpen()
 		{
+			
+			if(!isRunning || !hwnd)
+				return false;
+				
 	        MSG msg;
 	        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 	            if (msg.message == WM_QUIT) {
@@ -3108,6 +3360,7 @@ namespace ws //SYSTEM ENTITIES
 		
 	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
 		{
+			
 		    // Clean up old resources
 		    if (canvas) {
 		        delete canvas;
@@ -3138,6 +3391,10 @@ namespace ws //SYSTEM ENTITIES
 		{
 			if(!canvas) return;
 
+
+
+
+
 			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
         	canvas->GetTransform(&originalMatrix);
 			
@@ -3160,8 +3417,8 @@ namespace ws //SYSTEM ENTITIES
 		
 	    void display() 
 		{
-			InvalidateRect(hwnd, NULL, FALSE);
-        	UpdateWindow(hwnd);
+		    InvalidateRect(hwnd, NULL, FALSE);
+		    UpdateWindow(hwnd);
 	    }		
 		
 		
@@ -3232,6 +3489,10 @@ namespace ws //SYSTEM ENTITIES
 							backBuffer.bitmap->GetHBITMAP(Gdiplus::Color(0, 0, 0), &hBitmap);
 							HDC hdcMem = CreateCompatibleDC(hdc);
 							HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hBitmap);
+
+				            SetStretchBltMode(hdc, HALFTONE); //For better quality stretching
+				            SetBrushOrgEx(hdc, 0, 0, NULL);
+
 							
 							StretchBlt(hdc,0,0,width,height,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
 							SelectObject(hdcMem, hbmOld);

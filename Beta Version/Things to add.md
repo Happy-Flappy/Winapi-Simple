@@ -16,7 +16,7 @@
 
 
 
-void loadFromMemory(const BYTE* buffer,size_t bufferSize)
+bool loadFromMemory(const BYTE* buffer,size_t bufferSize)
 {
 	//create an Istream object from the memory buffer.
 	
@@ -26,7 +26,16 @@ void loadFromMemory(const BYTE* buffer,size_t bufferSize)
 	stream.Attach(SHCreateMemStream(static_cast<const BYTE*>(buffer), static_cast<UINT>(bufferSize)));
 	
 	
-	
+	bitmap = Gdiplus::Bitmap::FromStream(stream);
+
+	if(bitmap->GetLastStatus() != Gdiplus::Ok)
+	{
+		delete bitmap;
+		bitmap = nullptr;
+		return false;
+	}
+
+	return true;
 }
 
 ```
@@ -55,39 +64,7 @@ ws::Vec2i getSize()
 
 ## to ws::Window
 
-- Close() = a call to a destructor.
-
-
-- setVisible(bool vis)
-
-- getVisible()
-
-
-- Ability to construct window without definition.
-
-- create() function.
-
-
-
-#### If the clear color is less than opaque, set the window mode to layered and use alpha.
-
-#### Likewise, if window is not transparent at all, undo that setting. 
-
-
-#### OR
-
-
-#### Have window always be layered. 
-
-#### AND
-
-#### provide legacy transparency support via alphaBlend.
-
-
-
-
-
-
+- Some kind of transparency method that will work. Chromakey most likely.
 
 ## To all things
 
