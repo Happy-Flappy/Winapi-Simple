@@ -43,7 +43,8 @@ typedef unsigned long PROPID;
 #endif
 
 #include <gdiplus.h>
-
+#include <shlwapi.h>
+#include <objbase.h>
 
 
 
@@ -1389,59 +1390,74 @@ namespace ws //GRAPHICS ENTITIES
 		
 
 
-
+		void zoomAtPoint(float delta, ws::Vec2i screenPoint = ws::Vec2i(-100000,-100000))
+		{
+			
+			if(screenPoint == ws::Vec2i(-100000,-100000))
+			{
+				screenPoint = getCenter();
+			}
+			
+		    // Convert screen point to world coordinates
+		    ws::Vec2i worldPoint = toWorld(screenPoint);
+		    
+		    // Apply zoom
+		    zoom += delta;
+		    
+		    // Calculate new world rectangle that keeps the world point at the same screen position
+		    float zoomFactor = std::pow(1.1f, delta);
+		    
+		    // Adjust world rectangle to zoom around the point
+		    float newWidth = world.width / zoomFactor;
+		    float newHeight = world.height / zoomFactor;
+		    
+		    // Calculate the proportion of the world rectangle that the world point represents
+		    float propX = static_cast<float>(worldPoint.x - world.left) / world.width;
+		    float propY = static_cast<float>(worldPoint.y - world.top) / world.height;
+		    
+		    // Adjust world rectangle to keep the same point under the cursor
+		    world.left = worldPoint.x - (propX * newWidth);
+		    world.top = worldPoint.y - (propY * newHeight);
+		    world.width = static_cast<int>(newWidth);
+		    world.height = static_cast<int>(newHeight);
+		}
 
 		
 		
 		
 		void apply(Gdiplus::Graphics &graphics)
 		{
-			
-			
-			
-			matrix.Reset();
-
-	        float scaleX = static_cast<float>(port.width) / world.width;
-	        float scaleY = static_cast<float>(port.height) / world.height;
-
-			
-	        
-			float zoomFactor = 1.0f / std::pow(1.1f, abs(zoom)); // More gradual zoom
-			
-			if(zoom < 0) {
-			    scaleX *= zoomFactor;
-			    scaleY *= zoomFactor;
-			} else if(zoom > 0) {
-			    scaleX /= zoomFactor;
-			    scaleY /= zoomFactor;
-			}
+		    matrix.Reset();
+		
+		    // Apply zoom by adjusting scale
+		    float zoomFactor = std::pow(1.1f, zoom);
+		    float scaleX = static_cast<float>(port.width) / world.width * zoomFactor;
+		    float scaleY = static_cast<float>(port.height) / world.height * zoomFactor;
 		    
 		    float worldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
 		    float worldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
 		    
 		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
 		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-	        
-	        
-        	
-        	
-        
-	        matrix.Translate(portCenterX, portCenterY);           // Step 4
-	        
-	        if (rotation != 0) {
-	            matrix.Rotate(rotation);                          // Step 3
-	        }
-	        
-	        matrix.Scale(scaleX, scaleY);                         // Step 2
-	        matrix.Translate(-worldCenterX, -worldCenterY);       // Step 1
-
-
+		    
+		    
+		    
+		    matrix.Translate(portCenterX, portCenterY);           // Step 4
+		    
+		    if (rotation != 0) {
+		        matrix.Rotate(rotation);                          // Step 3
+		    }
+		    
+		    matrix.Scale(scaleX, scaleY);                         // Step 2
+		    matrix.Translate(-worldCenterX, -worldCenterY);       // Step 1
+		
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-
-	        
-	        graphics.SetTransform(&matrix);
+		
+		    
+		    graphics.SetTransform(&matrix);
+	    
 	        
 		}
 			
@@ -1459,206 +1475,22 @@ namespace ws //GRAPHICS ENTITIES
 	};
 
 
-//	class View
-//	{
-//		public:
-//			
-//		View()
-//		{
-//			
-//		}
-//		
-//		void setRect(ws::IntRect viewRect)
-//		{
-//			world = viewRect;
-//		}
-//		
-//		void setSize(ws::Vec2i size)
-//		{
-//			world.width = size.x;
-//			world.height = size.y;
-//		}
-//		
-//		void setPos(ws::Vec2i pos)
-//		{
-//			world.left = pos.x;
-//			world.top = pos.y;
-//		}
-//		
-//		
-//		void setPortRect(ws::IntRect portRect)
-//		{
-//			port = portRect;
-//		}
-//		
-//		
-//		void setPortSize(ws::Vec2i size)
-//		{
-//			port.width = size.x;
-//			port.height = size.y;
-//		}
-//		
-//		
-//		void setPortSize(int x,int y)
-//		{
-//			port.width = x;
-//			port.height = y;
-//		}
-//		
-//		
-//		void setPortPos(ws::Vec2i pos)
-//		{
-//			port.left = pos.x;
-//			port.top = pos.y;
-//		}
-//		
-//		void setPortPos(int x,int y)
-//		{
-//			port.left = x;
-//			port.top = y;
-//		}
-//		
-//		
-//		
-//		
-//		ws::IntRect getRect()
-//		{
-//			return world;
-//		}
-//		
-//		ws::Vec2i getSize()
-//		{
-//			ws::Vec2i p;
-//			p.x = world.width;
-//			p.y = world.height;
-//			
-//			return p;
-//		}
-//		
-//		ws::Vec2i getPos()
-//		{
-//			ws::Vec2i p;
-//			p.x = world.left;
-//			p.y = world.top;
-//			
-//			return p;
-//		}
-//		
-//		ws::IntRect getPortRect()
-//		{
-//			return port;
-//		}
-//		
-//		ws::Vec2i getPortSize()
-//		{
-//			ws::Vec2i p;
-//			p.x = port.width;
-//			p.y = port.height;
-//			
-//			return p;
-//		}
-//		
-//		ws::Vec2i getPortPos()
-//		{
-//			ws::Vec2i p;
-//			p.x = port.left;
-//			p.y = port.top;
-//			
-//			return p;
-//		}
-//		
-//		
-//		
-//		
-//	    void zoom(float factor)
-//	    {
-//	    	if(factor != 0)
-//	    	{
-//			
-//		    	int x = world.width / factor;
-//		    	int y = world.height / factor;
-//				setPortSize({x,y});	// If factor is 2, that means that the visible world area is half as much because it is zooming in and will  be stretching into the viewport.
-//	    		world.left += x;
-//	    		world.top += y;
-//			}
-//		}
-//
-//
-//		void move(ws::Vec2i delta)
-//		{
-//			world.left += delta.x;
-//			world.top += delta.y;
-//		}
-//		
-//		void movePort(ws::Vec2i delta)
-//		{
-//			port.left += delta.x;
-//			port.top += delta.y;
-//		}
-//		
-//		
-//		
-//		
-//	    ws::Vec2i toWorld(ws::Vec2i pos) 
-//	    {
-//		    ws::Vec2i worldSize = getSize();
-//		    ws::Vec2i viewSize = getPortSize();
-//		    ws::Vec2i viewPos = getPos();
-//		    
-//		    ws::Vec2i worldPoint;
-//		    
-//		    float scaleX = static_cast<float>(worldSize.x) / viewSize.x;
-//		    float scaleY = static_cast<float>(worldSize.y) / viewSize.y;
-//		    
-//		    worldPoint.x = static_cast<int>(pos.x * scaleX) + viewPos.x;
-//		    worldPoint.y = static_cast<int>(pos.y * scaleY) + viewPos.y;
-//		    
-//		    return worldPoint;
-//	    }
-//	    
-//	    ws::Vec2i toWindow(ws::Vec2i pos) 
-//	    {
-//		    ws::Vec2i worldSize = getSize();
-//		    ws::Vec2i viewSize = getPortSize();
-//		    ws::Vec2i viewPos = getPos();
-//		    
-//		    ws::Vec2i windowPoint;
-//		    
-//		    float scaleX = static_cast<float>(viewSize.x) / worldSize.x;
-//		    float scaleY = static_cast<float>(viewSize.y) / worldSize.y;
-//		    
-//		    windowPoint.x = static_cast<int>((pos.x - viewPos.x) * scaleX);
-//		    windowPoint.y = static_cast<int>((pos.y - viewPos.y) * scaleY);
-//		    
-//		    return windowPoint;
-//	    }
-//				
-//		
-//		
-//		
-//		
-//		
-//		
-//		
-//		
-//		private:
-//		ws::IntRect world;
-//		ws::IntRect port;
-//		
-//			
-//	};
-
 
 
 	
 	
 	class Texture
 	{
-		public:
-		
-		Gdiplus::Bitmap* bitmap;
+		private:
 		int width = 0;
 		int height = 0;
+
+
+		public:
+
+		
+		Gdiplus::Bitmap* bitmap;
+		
 		
 		
 		
@@ -1667,7 +1499,7 @@ namespace ws //GRAPHICS ENTITIES
 		
 		Texture(std::string path)
 		{
-			load(path);
+			loadFromFile(path);
 		}
 		
 		
@@ -1777,10 +1609,9 @@ namespace ws //GRAPHICS ENTITIES
 			return true;
 		}
 	
-	
-	
-	
-		bool load(std::string path)
+		
+		
+		bool loadFromFile(std::string path)
 		{
 
 
@@ -1818,6 +1649,52 @@ namespace ws //GRAPHICS ENTITIES
 			
 			return true;
 		}
+
+
+		bool loadFromMemory(const void* buffer,size_t bufferSize)
+		{
+		    // create a global memory object
+		    HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
+		    if (!hGlobal) {
+		        return false;
+		    }
+		    
+		    // copy the data to the global memory
+		    void* pData = GlobalLock(hGlobal);
+		    if (!pData) {
+		        GlobalFree(hGlobal);
+		        return false;
+		    }
+		    
+		    memcpy(pData, buffer, bufferSize);
+		    GlobalUnlock(hGlobal);
+		    
+		    // Create IStream from the global memory
+		    IStream* pStream = nullptr;
+		    HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pStream);
+		    if (FAILED(hr)) {
+		        GlobalFree(hGlobal);
+		        return false;
+		    }
+		    
+		    bitmap = Gdiplus::Bitmap::FromStream(pStream);
+		    pStream->Release();
+		    
+		    if (bitmap == nullptr || bitmap->GetLastStatus() != Gdiplus::Ok) {
+		        if (bitmap) {
+		            delete bitmap;
+		            bitmap = nullptr;
+		        }
+		        return false;
+		    }
+		    
+		    width = bitmap->GetWidth();
+		    height = bitmap->GetHeight();
+		    return true;
+		}
+
+
+
 		
 	    bool isValid() const
 	    {
@@ -1831,11 +1708,26 @@ namespace ws //GRAPHICS ENTITIES
 	    
 	    
 	    
+		void setPixel(int index,Gdiplus::Color color)
+		{
+			int x = index % width;
+		    int y = index / width;
+			setPixel(x,y,color);
+		}
 	    
 	    void setPixel(int xIndex,int yIndex,Gdiplus::Color color)
 	    {
 			bitmap->SetPixel(xIndex, yIndex, color);
 		}
+	    
+	    
+	    Gdiplus::Color getPixel(int index)
+		{
+			int x = index % width;
+		    int y = index / width;
+			return getPixel(x,y);
+		}
+	    
 	    
 	    Gdiplus::Color getPixel(int xIndex,int yIndex)
 	    {
@@ -1844,6 +1736,13 @@ namespace ws //GRAPHICS ENTITIES
 			return color;
 		}
 	    
+	    
+	    
+	    
+	    ws::Vec2i getSize()
+		{
+			return ws::Vec2i(width,height); 
+		}
 	    	
 	};
 	
@@ -2032,7 +1931,7 @@ namespace ws //GRAPHICS ENTITIES
 	    void setTexture(ws::Texture& texture,bool resize = true) {
 	        textureRef = &texture;
 	        if(resize)
-	        	setTextureRect({0,0,texture.width,texture.height});
+	        	setTextureRect({0,0,texture.getSize().x,texture.getSize().y});
 	    }
 	    
 	    void setTextureRect(ws::IntRect rect) {
@@ -3001,9 +2900,8 @@ namespace ws //SYSTEM ENTITIES
 	                        pPixels);
 	                    
 	                    if (bitmap && bitmap->GetLastStatus() == Gdiplus::Ok) {
+	                        tex.create(bitmap->GetWidth(),bitmap->GetHeight());
 	                        tex.bitmap = bitmap;
-	                        tex.width = bitmap->GetWidth();
-	                        tex.height = bitmap->GetHeight();
 	                    } else {
 	                        delete bitmap;
 	                    }
@@ -3018,9 +2916,9 @@ namespace ws //SYSTEM ENTITIES
 	            if (hClipboardBitmap) {
 	                Gdiplus::Bitmap* clipboardBitmap = hbitmapToGdipBitmap(hClipboardBitmap);
 	                if (clipboardBitmap && clipboardBitmap->GetLastStatus() == Gdiplus::Ok) {
-	                    tex.bitmap = clipboardBitmap;
-	                    tex.width = clipboardBitmap->GetWidth();
-	                    tex.height = clipboardBitmap->GetHeight();
+	                    
+						tex.create(clipboardBitmap->GetWidth(),clipboardBitmap->GetHeight());
+						tex.bitmap = clipboardBitmap;
 	                } else {
 	                    delete clipboardBitmap;
 	                }
@@ -3034,9 +2932,9 @@ namespace ws //SYSTEM ENTITIES
 	            Gdiplus::Bitmap* croppedBitmap = copyRectOfBitmap(tex, rect);
 	            if (croppedBitmap) {
 	                delete tex.bitmap;
-	                tex.bitmap = croppedBitmap;
-	                tex.width = croppedBitmap->GetWidth();
-	                tex.height = croppedBitmap->GetHeight();
+	                tex.create(croppedBitmap->GetWidth(),croppedBitmap->GetHeight());
+					tex.bitmap = croppedBitmap;
+	                
 	            }
 	        }
 	        
@@ -3837,7 +3735,7 @@ namespace ws //SYSTEM ENTITIES
 				            SetStretchBltMode(hdc, HALFTONE); //For better quality stretching
 				            SetBrushOrgEx(hdc, 0, 0, NULL);
 							
-							StretchBlt(hdc,0,0,view.getPortSize().x,view.getPortSize().y,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
+							StretchBlt(hdc,0,0,getSize().x,getSize().y,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
 							SelectObject(hdcMem, hbmOld);
 							DeleteDC(hdcMem);
 							DeleteObject(hBitmap); 

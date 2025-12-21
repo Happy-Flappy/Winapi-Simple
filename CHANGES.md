@@ -151,7 +151,7 @@
 
 * Added ws::Window::close(). 
 
-
+* Added ws::Texture::loadFromMemory()
 
 
 
