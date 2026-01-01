@@ -46,12 +46,65 @@ typedef unsigned long PROPID;
 #include <shlwapi.h>
 #include <objbase.h>
 
-
-
-
-
-namespace ws // WINAPI CONVERTERS
+// ========== CORE UTILITIES ==========
+namespace ws
 {
+	class Timer
+	{
+		public:
+		
+		
+		
+		Timer()
+		{
+			LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            frequency = static_cast<double>(freq.QuadPart);
+			restart();
+		}
+		
+		~Timer()
+		{
+		}
+		
+		double restart()
+		{
+	        double seconds = getSeconds();
+            LARGE_INTEGER counter;
+            QueryPerformanceCounter(&counter);
+            startTime = counter.QuadPart;
+            
+            return seconds;
+		}
+		
+		
+	    double getSeconds() const
+	    {
+	        LARGE_INTEGER currentTime;
+	        QueryPerformanceCounter(&currentTime);
+	        return static_cast<double>(currentTime.QuadPart - startTime) / frequency;
+	      
+	    }
+	    
+	    double getMilliSeconds() const
+	    {
+	        return getSeconds() * 1000.0;
+	    }
+	    
+	    double getMicroSeconds() const
+	    {
+	        return getMilliSeconds() * 1000.0;
+	    }
+	
+		private:
+		    LONGLONG startTime = 0;
+		    double frequency = 1.0;	
+		
+			
+	};
+	
+	
+	
 	bool ResolveRelativePath(std::string path)
 	{
 		// Convert to absolute path to ensure proper resolution
@@ -136,7 +189,8 @@ namespace ws // WINAPI CONVERTERS
 #include <utility>
 
 
-namespace ws //DATA TYPES
+// ========== DATA TYPES ==========
+namespace ws
 {
 
 	// I MUST ADMIT! I did use AI to make these data types support template construction. 
@@ -616,8 +670,8 @@ namespace ws //DATA TYPES
 
 
 
-
-namespace ws //SOUND AND VIDEO ENTITIES
+// ========== SOUND & VIDEO ==========
+namespace ws 
 {
 	
 	class Wav
@@ -1079,7 +1133,10 @@ namespace ws //SOUND AND VIDEO ENTITIES
 
 
 
-namespace ws //GRAPHICS ENTITIES
+
+
+// ========== GRAPHICS ==========
+namespace ws 
 {
 
 
@@ -1390,77 +1447,63 @@ namespace ws //GRAPHICS ENTITIES
 		
 
 
-		void zoomAtPoint(float delta, ws::Vec2i screenPoint = ws::Vec2i(-100000,-100000))
-		{
-			
-			if(screenPoint == ws::Vec2i(-100000,-100000))
-			{
-				screenPoint = getCenter();
-			}
-			
-		    // Convert screen point to world coordinates
-		    ws::Vec2i worldPoint = toWorld(screenPoint);
-		    
-		    // Apply zoom
-		    zoom += delta;
-		    
-		    // Calculate new world rectangle that keeps the world point at the same screen position
-		    float zoomFactor = std::pow(1.1f, delta);
-		    
-		    // Adjust world rectangle to zoom around the point
-		    float newWidth = world.width / zoomFactor;
-		    float newHeight = world.height / zoomFactor;
-		    
-		    // Calculate the proportion of the world rectangle that the world point represents
-		    float propX = static_cast<float>(worldPoint.x - world.left) / world.width;
-		    float propY = static_cast<float>(worldPoint.y - world.top) / world.height;
-		    
-		    // Adjust world rectangle to keep the same point under the cursor
-		    world.left = worldPoint.x - (propX * newWidth);
-		    world.top = worldPoint.y - (propY * newHeight);
-		    world.width = static_cast<int>(newWidth);
-		    world.height = static_cast<int>(newHeight);
-		}
 
-		
 		
 		
 		void apply(Gdiplus::Graphics &graphics)
 		{
-		    matrix.Reset();
-		
-		    // Apply zoom by adjusting scale
-		    float zoomFactor = std::pow(1.1f, zoom);
-		    float scaleX = static_cast<float>(port.width) / world.width * zoomFactor;
-		    float scaleY = static_cast<float>(port.height) / world.height * zoomFactor;
-		    
-		    float worldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
-		    float worldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
-		    
-		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-		    
-		    
-		    
-		    matrix.Translate(portCenterX, portCenterY);           // Step 4
-		    
-		    if (rotation != 0) {
-		        matrix.Rotate(rotation);                          // Step 3
-		    }
-		    
-		    matrix.Scale(scaleX, scaleY);                         // Step 2
-		    matrix.Translate(-worldCenterX, -worldCenterY);       // Step 1
-		
+			
+			matrix.Reset();
+			
+			float scaleX = static_cast<float>(port.width)/static_cast<float>(world.width);
+			float scaleY = static_cast<float>(port.height)/static_cast<float>(world.height);
+			
+			
+			matrix.Scale(scaleX, scaleY);
+			
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-		
-		    
-		    graphics.SetTransform(&matrix);
-	    
-	        
-		}
+		    graphics.SetTransform(&matrix);			
 			
+//		    matrix.Reset();
+//		    
+//		    float zoomFactor = std::pow(2.0f, zoom);
+//		    
+//		    // The VISIBLE portion of the world (after zoom)
+//		    float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
+//		    float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
+//		    
+//		    // We assume we're viewing the CENTER of the world
+//		    float visibleWorldCenterX = static_cast<float>(world.left) + static_cast<float>(world.width) / 2.0f;
+//		    float visibleWorldCenterY = static_cast<float>(world.top) + static_cast<float>(world.height) / 2.0f;
+//		    
+//		    // But the visible rectangle should be centered at this point
+//		    float visibleWorldLeft = visibleWorldCenterX - visibleWorldWidth / 2.0f;
+//		    float visibleWorldTop = visibleWorldCenterY - visibleWorldHeight / 2.0f;
+//		    
+//		    // Calculate scale to fit visible world into port
+//		    float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
+//		    float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
+//		    
+//		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+//		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+//		    
+//		    // Transform from visible world to port
+//		    matrix.Translate(portCenterX, portCenterY);
+//		    
+//		    if (rotation != 0) {
+//		        matrix.Rotate(rotation);
+//		    }
+//		    
+//		    matrix.Scale(scaleX, scaleY);
+//		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
+//		    
+//		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+//		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+//		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+//		    graphics.SetTransform(&matrix);
+		}
 			
 		private:
 			
@@ -1484,7 +1527,6 @@ namespace ws //GRAPHICS ENTITIES
 		private:
 		int width = 0;
 		int height = 0;
-
 
 		public:
 
@@ -1693,6 +1735,20 @@ namespace ws //GRAPHICS ENTITIES
 		    return true;
 		}
 
+		
+		
+		bool loadFromBitmapPlus(Gdiplus::Bitmap &pBitmap)
+		{
+			UINT width = pBitmap.GetWidth();
+			UINT height = pBitmap.GetHeight();
+			bitmap = pBitmap.Clone(0, 0, width, height, PixelFormat32bppARGB);
+			return true;
+		}
+		
+		
+		
+		
+		
 
 
 		
@@ -1746,8 +1802,169 @@ namespace ws //GRAPHICS ENTITIES
 	    	
 	};
 	
-	
-	
+		
+
+
+	class Animate
+	{
+		public:
+		
+		
+	    int totalFrames = 0;
+	    int currentFrame = 0;
+	    int width = 0;
+	    int height = 0;
+	    std::string status = "playing";		
+		
+		
+		
+		
+		Animate()
+		{
+			
+		}
+		
+		~Animate() {
+		    textures.clear();
+		    delays.clear();
+		}
+		
+		
+		
+		bool loadFromFile(std::string path)
+		{
+			
+			
+	        Gdiplus::Image* gif = Gdiplus::Image::FromFile(ws::WIDE(path).c_str(), FALSE);
+			
+			
+			if(!gif || gif->GetLastStatus() != Gdiplus::Ok) 
+				return false;
+			
+			
+	        UINT dimensions = 0;
+	        GUID dimensionID = Gdiplus::FrameDimensionTime;
+	        dimensions = gif->GetFrameDimensionsCount();
+			
+			if(dimensions == 0)
+			{
+				delete gif;
+				return false;
+			}
+			
+	        std::vector<GUID> dims(dimensions);
+	        gif->GetFrameDimensionsList(dims.data(), dimensions);
+	        
+	        totalFrames = static_cast<int>(gif->GetFrameCount(&dims[0]));
+			
+			
+			if(totalFrames <= 0)
+			{
+				delete gif;
+				return false;
+			}
+			
+			
+	        width = gif->GetWidth();
+	        height = gif->GetHeight();			
+			
+			
+		    textures.clear();
+		    delays.clear();
+		    textures.reserve(totalFrames);
+		    delays.reserve(totalFrames);
+		    
+		    
+		    std::unique_ptr<Gdiplus::PropertyItem> pItem;
+		    
+		    
+		    
+		    
+	        UINT totalBufferSize = gif->GetPropertyItemSize(PropertyTagFrameDelay);
+	        if (totalBufferSize > 0)
+	        {
+	            pItem.reset(static_cast<Gdiplus::PropertyItem*>(std::malloc(totalBufferSize)));
+	            if (pItem && gif->GetPropertyItem(PropertyTagFrameDelay, totalBufferSize, pItem.get()) == Gdiplus::Ok)
+	            {
+	                UINT* uintDelays = static_cast<UINT*>(pItem->value);
+	                for (int a = 0; a < totalFrames; a++)
+	                {
+	                    delays.push_back(static_cast<double>(uintDelays[a] * 10));// Was in 100ths of a second. Now is in milliseconds.
+	                }
+	            }
+	        }		    
+	        
+	        //Load the frames into textures.
+	        for (int a = 0; a < totalFrames; a++)
+	        {
+	            GUID pageID = Gdiplus::FrameDimensionTime;
+	            gif->SelectActiveFrame(&pageID, a);
+	            
+	            ws::Texture newtex;
+	            if (!newtex.create(width, height))
+	                return false;
+	            
+	            // Draw frame to the bitmap
+	            Gdiplus::Graphics graphics(newtex.bitmap);
+	            
+				graphics.DrawImage(gif,0, 0, width, height);
+	            
+	            textures.push_back(std::move(newtex));
+	        }
+	        
+	        delete gif;
+	        
+	        currentFrame = 0;
+			currentTexture = textures[0];
+			return true;
+		}
+		
+		
+		
+		
+		ws::Texture& update()
+		{
+			
+			if(status == "playing")
+			{
+				if(lastStatus == "stopped")
+				{
+					timer.restart();
+					currentFrame = 0;
+					lastStatus = status;
+				}
+			
+				if(currentFrame >= totalFrames)
+				{
+					timer.restart();
+					currentFrame = 0;
+				}
+				
+				if(currentFrame < delays.size() && currentFrame < textures.size() && timer.getMilliSeconds() > delays[currentFrame])
+				{	
+					currentTexture = textures[currentFrame];	
+					currentFrame++;
+					timer.restart();
+				}	
+				
+			}
+			return currentTexture;
+		}
+		
+		
+		
+		
+		
+		private:
+	    std::vector<ws::Texture> textures;
+	    ws::Texture currentTexture;
+	    std::vector<double> delays;  
+		ws::Timer timer;
+		std::string lastStatus = "stopped";
+		
+		
+	};
+
 	
 	
 		
@@ -2525,65 +2742,11 @@ namespace ws //GRAPHICS ENTITIES
 
 
 
-
-namespace ws //SYSTEM ENTITIES
+// ========== SYSTEM ==========
+namespace ws 
 {
 	
-	class Timer
-	{
-		public:
-		
-		
-		
-		Timer()
-		{
-			LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
-            frequency = static_cast<double>(freq.QuadPart);
-			restart();
-		}
-		
-		~Timer()
-		{
-		}
-		
-		double restart()
-		{
-	        double seconds = getSeconds();
-            LARGE_INTEGER counter;
-            QueryPerformanceCounter(&counter);
-            startTime = counter.QuadPart;
-            
-            return seconds;
-		}
-		
-		
-	    double getSeconds() const
-	    {
-	        LARGE_INTEGER currentTime;
-	        QueryPerformanceCounter(&currentTime);
-	        return static_cast<double>(currentTime.QuadPart - startTime) / frequency;
-	      
-	    }
-	    
-	    double getMilliSeconds() const
-	    {
-	        return getSeconds() * 1000.0;
-	    }
-	    
-	    double getMicroSeconds() const
-	    {
-	        return getMilliSeconds() * 1000.0;
-	    }
-	
-		private:
-		    LONGLONG startTime = 0;
-		    double frequency = 1.0;	
-		
-			
-	};
-	
-	
+
 
 	
 	
@@ -3732,10 +3895,12 @@ namespace ws //SYSTEM ENTITIES
 							HDC hdcMem = CreateCompatibleDC(hdc);
 							HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hBitmap);
 
-				            SetStretchBltMode(hdc, HALFTONE); //For better quality stretching
+				            //SetStretchBltMode(hdc, HALFTONE); //For better quality stretching - Causes blur though! (NOT GOOD FOR CLEAN STRETCHING)
 				            SetBrushOrgEx(hdc, 0, 0, NULL);
 							
 							StretchBlt(hdc,0,0,getSize().x,getSize().y,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
+							
+							
 							SelectObject(hdcMem, hbmOld);
 							DeleteDC(hdcMem);
 							DeleteObject(hBitmap); 

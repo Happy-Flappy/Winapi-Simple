@@ -153,6 +153,8 @@
 
 * Added ws::Texture::loadFromMemory()
 
+* Added ws::Animate class for the loading of GIF animations. ws::Animate stores frames as ws::Textures for convenience.
+
 
 
 
