@@ -27,6 +27,11 @@ int main()
 	
 	
 	
+	ws::Texture frameTex = gif[0].getFrame(2);
+	
+	
+	
+	
 	ws::View view;
 	view.init(0,0,960/2,540/2);
 	
