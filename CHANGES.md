@@ -157,7 +157,7 @@
 
 * Added get and set functions to Animate class (with exception in width and height variables for texture consistency)
 
-
+* Added Documentation for previous versions.
 
 
 

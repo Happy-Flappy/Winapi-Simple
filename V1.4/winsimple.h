@@ -3,7 +3,7 @@
 
 
 
-
+//Linking = -lgdi32 -luser32 -lole32 -lmsimg32 -lkernel32 -lwinmm -lcomctl32 -lgdiplus
 
 
 #ifndef NOMINMAX

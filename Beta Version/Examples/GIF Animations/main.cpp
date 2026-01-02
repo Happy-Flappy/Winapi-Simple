@@ -19,8 +19,11 @@ int main()
 	gif[2].loadFromFile("word.gif");
 	gif[3].loadFromFile("planet.gif");
 	
-	
-	
+	for(int a=0;a<4;a++)
+	{
+		gif[a].setLoop(true);
+		gif[a].play();
+	}
 	
 	
 	ws::Sprite sprite;

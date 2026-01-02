@@ -2,7 +2,7 @@
 #define WINAPI_SIMPLE_GRAPHICS
 
 
-
+//Linking = -lgdi32 -luser32 -lmsimg32 -lkernel32 
 
 
 #define NOMINMAX        

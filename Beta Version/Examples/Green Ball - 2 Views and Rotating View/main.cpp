@@ -155,7 +155,7 @@ int main()
 	ws::Texture texture;
 	ws::Sprite back;
 	
-	texture.load("back.bmp");
+	texture.loadFromFile("back.bmp");
 	back.setTexture(texture);
 	
 	
@@ -171,11 +171,11 @@ int main()
 
 
 	ws::Texture tileTex;
-	tileTex.load("spike.bmp");
+	tileTex.loadFromFile("spike.bmp");
 
-	for(int x=0;x<tileTex.width;x++)
+	for(int x=0;x<tileTex.getSize().x;x++)
 	{
-		for(int y=0;y<tileTex.height;y++)
+		for(int y=0;y<tileTex.getSize().y;y++)
 		{
 			if(tileTex.getPixel(x,y).GetValue() == Gdiplus::Color(255,255,0,237).GetValue())
 				tileTex.setPixel(x,y,Gdiplus::Color(0,0,0,0));
@@ -253,7 +253,7 @@ int main()
 			
 			view.setPortRotatePointCenter();
 			view.setRotation(view.getRotation() + 2);
-			view.setZoom(8);
+			view.setZoom(1.5);
 			
 			circle.setPosition(circle.getPosition().x + 1,circle.getPosition().y + direction);
 			view.setCenter(circle.getPosition());

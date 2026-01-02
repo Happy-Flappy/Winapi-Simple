@@ -1148,7 +1148,7 @@ namespace ws
 		
 		View()
 		{
-			
+			zoom = 1.0;
 		}
 		
 		
@@ -1452,57 +1452,62 @@ namespace ws
 		
 		void apply(Gdiplus::Graphics &graphics)
 		{
+
 			
-			matrix.Reset();
-			
-			float scaleX = static_cast<float>(port.width)/static_cast<float>(world.width);
-			float scaleY = static_cast<float>(port.height)/static_cast<float>(world.height);
-			
-			
-			matrix.Scale(scaleX, scaleY);
-			
+		    matrix.Reset();
+		    
+		    // Handle zoom - prevent division by zero
+		    float effectiveZoom = (zoom <= 0.0f) ? 0.001f : zoom;
+		    
+		    // Calculate scale factors
+		    // Note: We're scaling from world coordinates to screen coordinates
+		    float scaleX = static_cast<float>(port.width) / static_cast<float>(world.width);
+		    float scaleY = static_cast<float>(port.height) / static_cast<float>(world.height);
+		    
+		    // Apply zoom to scale
+		    scaleX *= effectiveZoom;
+		    scaleY *= effectiveZoom;
+		    
+		    // Apply transformations in the correct order:
+		    // 1. Translate world to origin (negative world position)
+		    // 2. Scale to port size with zoom
+		    // 3. Translate to port position
+		    // 4. Rotate around port origin
+		    
+		    // First, translate the world rectangle so its top-left is at (0,0)
+		    matrix.Translate(static_cast<Gdiplus::REAL>(-world.left - (world.width/2)), 
+		                     static_cast<Gdiplus::REAL>(-world.top) - (world.height/2));
+		    
+		    // Scale to port size
+		    matrix.Scale(scaleX, scaleY, Gdiplus::MatrixOrderAppend);
+		    
+		    // Translate to port position
+		    matrix.Translate(static_cast<Gdiplus::REAL>(port.left + (port.width/2)), 
+		                     static_cast<Gdiplus::REAL>(port.top  + (port.height/2)), 
+		                     Gdiplus::MatrixOrderAppend);
+		    
+		    // Apply rotation if needed
+		    if (rotation != 0.0f) {
+		        // Translate to rotation origin, rotate, then translate back
+		        matrix.Translate(static_cast<Gdiplus::REAL>(portOrigin.x), 
+		                         static_cast<Gdiplus::REAL>(portOrigin.y), 
+		                         Gdiplus::MatrixOrderAppend);
+		                         
+		        PointF center = new PointF(port.left + (port.width/2),port.top + (port.height/2));
+		        
+		        matrix.RotateAt((static_cast<Gdiplus::REAL>(port.left + (port.width/2)),static_cast<Gdiplus::REAL>(port.top  + (port.height/2))
+		        ,rotation);
+		        
+				matrix.Translate(static_cast<Gdiplus::REAL>(-portOrigin.x), 
+		                         static_cast<Gdiplus::REAL>(-portOrigin.y), 
+		                         Gdiplus::MatrixOrderAppend);
+		    }
+		    
+		    // Set graphics properties for pixel-perfect rendering
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-		    graphics.SetTransform(&matrix);			
-			
-//		    matrix.Reset();
-//		    
-//		    float zoomFactor = std::pow(2.0f, zoom);
-//		    
-//		    // The VISIBLE portion of the world (after zoom)
-//		    float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-//		    float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-//		    
-//		    // We assume we're viewing the CENTER of the world
-//		    float visibleWorldCenterX = static_cast<float>(world.left) + static_cast<float>(world.width) / 2.0f;
-//		    float visibleWorldCenterY = static_cast<float>(world.top) + static_cast<float>(world.height) / 2.0f;
-//		    
-//		    // But the visible rectangle should be centered at this point
-//		    float visibleWorldLeft = visibleWorldCenterX - visibleWorldWidth / 2.0f;
-//		    float visibleWorldTop = visibleWorldCenterY - visibleWorldHeight / 2.0f;
-//		    
-//		    // Calculate scale to fit visible world into port
-//		    float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-//		    float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-//		    
-//		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-//		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-//		    
-//		    // Transform from visible world to port
-//		    matrix.Translate(portCenterX, portCenterY);
-//		    
-//		    if (rotation != 0) {
-//		        matrix.Rotate(rotation);
-//		    }
-//		    
-//		    matrix.Scale(scaleX, scaleY);
-//		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
-//		    
-//		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-//		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-//		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-//		    graphics.SetTransform(&matrix);
+		    graphics.SetTransform(&matrix);
 		}
 			
 		private:
@@ -1512,7 +1517,7 @@ namespace ws
 		ws::IntRect world; //World is the world coordinate section of the world that is sent to the view.
 		ws::Vec2i portOrigin;//This is the point of rotation. It does NOT effect the view position.
 		Gdiplus::Matrix matrix;
-		float zoom = 0;
+		float zoom = 1.0;
 		
 		 	
 	};
@@ -1929,8 +1934,9 @@ namespace ws
 		{
 			if(index <= 0 || index > textures.size())
 			{
-				std::cerr << "Invalid texture frame ID requested in getFrame() from ws::Animate! Returned nullptr...\n";
-				return nullptr;
+				std::cerr << "Invalid texture frame ID requested in getFrame() from ws::Animate! Quit program for safety...\n";
+				system("pause");
+				std::exit(EXIT_SUCCESS);
 			}
 			
 			return textures[index];
