@@ -1452,57 +1452,43 @@ namespace ws
 		
 		void apply(Gdiplus::Graphics &graphics)
 		{
-			
-			matrix.Reset();
-			
-			float scaleX = static_cast<float>(port.width)/static_cast<float>(world.width);
-			float scaleY = static_cast<float>(port.height)/static_cast<float>(world.height);
-			
-			
-			matrix.Scale(scaleX, scaleY);
-			
+		    matrix.Reset();
+		    
+		    float zoomFactor = std::pow(2.0f, zoom);
+		    
+		    // The VISIBLE portion of the world (after zoom)
+		    float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
+		    float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
+		    
+		    // We assume we're viewing the CENTER of the world
+		    float visibleWorldCenterX = static_cast<float>(world.left) + static_cast<float>(world.width) / 2.0f;
+		    float visibleWorldCenterY = static_cast<float>(world.top) + static_cast<float>(world.height) / 2.0f;
+		    
+		    // But the visible rectangle should be centered at this point
+		    float visibleWorldLeft = visibleWorldCenterX - visibleWorldWidth / 2.0f;
+		    float visibleWorldTop = visibleWorldCenterY - visibleWorldHeight / 2.0f;
+		    
+		    // Calculate scale to fit visible world into port
+		    float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
+		    float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
+		    
+		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+		    
+		    // Transform from visible world to port
+		    matrix.Translate(portCenterX, portCenterY);
+		    
+		    if (rotation != 0) {
+		        matrix.Rotate(rotation);
+		    }
+		    
+		    matrix.Scale(scaleX, scaleY);
+		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
+		    
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-		    graphics.SetTransform(&matrix);			
-			
-//		    matrix.Reset();
-//		    
-//		    float zoomFactor = std::pow(2.0f, zoom);
-//		    
-//		    // The VISIBLE portion of the world (after zoom)
-//		    float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-//		    float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-//		    
-//		    // We assume we're viewing the CENTER of the world
-//		    float visibleWorldCenterX = static_cast<float>(world.left) + static_cast<float>(world.width) / 2.0f;
-//		    float visibleWorldCenterY = static_cast<float>(world.top) + static_cast<float>(world.height) / 2.0f;
-//		    
-//		    // But the visible rectangle should be centered at this point
-//		    float visibleWorldLeft = visibleWorldCenterX - visibleWorldWidth / 2.0f;
-//		    float visibleWorldTop = visibleWorldCenterY - visibleWorldHeight / 2.0f;
-//		    
-//		    // Calculate scale to fit visible world into port
-//		    float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-//		    float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-//		    
-//		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-//		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-//		    
-//		    // Transform from visible world to port
-//		    matrix.Translate(portCenterX, portCenterY);
-//		    
-//		    if (rotation != 0) {
-//		        matrix.Rotate(rotation);
-//		    }
-//		    
-//		    matrix.Scale(scaleX, scaleY);
-//		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
-//		    
-//		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-//		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-//		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-//		    graphics.SetTransform(&matrix);
+		    graphics.SetTransform(&matrix);
 		}
 			
 		private:
@@ -1925,15 +1911,15 @@ namespace ws
 		}
 		
 		
-		ws::Texture& getFrame(int index)
+		ws::Texture* getFrame(int index)
 		{
-			if(index <= 0 || index > textures.size())
+			if(index < 0 || index > textures.size())
 			{
-				std::cerr << "Invalid texture frame ID requested in getFrame() from ws::Animate! Returned nullptr...\n";
+				std::cerr << "Invalid texture frame ID requested in getFrame() from ws::Animate! Returned Invalid!...\n";
 				return nullptr;
 			}
 			
-			return textures[index];
+			return &textures[index];
 		}
 		
 		
