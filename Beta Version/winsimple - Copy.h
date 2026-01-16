@@ -46,6 +46,10 @@ typedef unsigned long PROPID;
 #include <shlwapi.h>
 #include <objbase.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // ========== CORE UTILITIES ==========
 namespace ws
 {
@@ -2063,95 +2067,158 @@ namespace ws
 	
 	class Drawable
 	{
-		public:
+	public:
+	    //Coordinates and sizes are Local 
 		
-		int x = 0,y = 0,z = 0;
-		int width = 1,height = 1;
-		ws::Vec2f scale = {1,1};		
-		ws::Vec2i origin = {0,0};
-		
-		void setScale(ws::Vec2f s)	
-		{
-			scale.x = s.x;
-			scale.y = s.y;
-		}
-		
-		
-		void setScale(float sx,float sy)	
-		{
-			scale.x = sx;
-			scale.y = sy;
-		}
-		
-		
-		
-		void setOrigin(ws::Vec2i pos)
-		{
-			origin.x = pos.x;
-			origin.y = pos.y;
-		}
-		
-		void setOrigin(int posx,int posy)
-		{
-			origin.x = posx;
-			origin.y = posy;
-		}
-		
-		
-		
-	
-	    // Get the visual width after scaling (always positive)
-	    int getScaledWidth() const {
-	        return static_cast<int>(width * fabs(scale.x));
+		int x = 0, y = 0, z = 0;
+	    int width = 1, height = 1;
+	    ws::Vec2f scale = {1, 1};
+	    ws::Vec2i origin = {0, 0};
+	    //Degrees
+	    float rotation = 0.0f;
+	    
+	    
+	    void setScale(ws::Vec2f s) { scale = s; }
+	    void setScale(float sx, float sy) { scale.x = sx; scale.y = sy; }
+	    void setOrigin(ws::Vec2i pos) { origin = pos; }
+	    void setOrigin(int posx, int posy) { origin.x = posx; origin.y = posy; }
+	    void setRotation(float degrees) { rotation = degrees; }
+	    
+	    int getVisualWidth() const {
+	        return static_cast<int>(std::abs(width * scale.x));
 	    }
 	    
-	    // Get the visual height after scaling (always positive)
-	    int getScaledHeight() const {
-	        return static_cast<int>(height * fabs(scale.y));
+	    int getVisualHeight() const {
+	        return static_cast<int>(std::abs(height * scale.y));
 	    }
-	
-	    // Get the visual bounds of the object
-	    void getBounds(int& left, int& top, int& right, int& bottom) const {
-	        // Calculate the transformation of the local bounds
-	        // Local coordinates relative to origin
-	        int localLeft = -origin.x;
-	        int localTop = -origin.y;
-	        int localRight = width - origin.x;
-	        int localBottom = height - origin.y;
+	    
+	    //Visual bounds
+	    void getBounds(int& left, int& top, int& right, int& bottom) const
+	    {
+	    	
+	        float corners[4][2] = {
+	            {static_cast<float>(-origin.x), static_cast<float>(-origin.y)},
+	            {static_cast<float>(width - origin.x), static_cast<float>(-origin.y)},
+	            {static_cast<float>(width - origin.x), static_cast<float>(height - origin.y)},
+	            {static_cast<float>(-origin.x), static_cast<float>(height - origin.y)}
+	        };
 	        
-	        // Apply scale (can be negative for flipping)
-	        int scaledLeft = static_cast<int>(localLeft * scale.x);
-	        int scaledRight = static_cast<int>(localRight * scale.x);
-	        int scaledTop = static_cast<int>(localTop * scale.y);
-	        int scaledBottom = static_cast<int>(localBottom * scale.y);
+	        // Apply scale
+	        for (int i = 0; i < 4; i++) {
+	            corners[i][0] *= scale.x;
+	            corners[i][1] *= scale.y;
+	        }
 	        
-	        // Normalize (swap if negative scale flipped the bounds)
-	        if (scaledLeft > scaledRight) std::swap(scaledLeft, scaledRight);
-	        if (scaledTop > scaledBottom) std::swap(scaledTop, scaledBottom);
+	        // Apply rotation 
+	        if (rotation != 0.0f) {
+	            float rad = rotation * M_PI / 180.0f;
+	            float cosA = std::cos(rad);
+	            float sinA = std::sin(rad);
+	            
+	            for (int i = 0; i < 4; i++) {
+	                float x = corners[i][0];
+	                float y = corners[i][1];
+	                corners[i][0] = x * cosA - y * sinA;
+	                corners[i][1] = x * sinA + y * cosA;
+	            }
+	        }
 	        
-	        // Translate to world coordinates
-	        left = x + scaledLeft;
-	        top = y + scaledTop;
-	        right = x + scaledRight;
-	        bottom = y + scaledBottom;
+	        // Apply translation to world position and find bounds
+	        float minX = corners[0][0] + x;
+	        float maxX = corners[0][0] + x;
+	        float minY = corners[0][1] + y;
+	        float maxY = corners[0][1] + y;
+	        
+	        for (int i = 1; i < 4; i++) {
+	            float wx = corners[i][0] + x;
+	            float wy = corners[i][1] + y;
+	            
+	            if (wx < minX) minX = wx;
+	            if (wx > maxX) maxX = wx;
+	            if (wy < minY) minY = wy;
+	            if (wy > maxY) maxY = wy;
+	        }
+	        
+	        left = static_cast<int>(minX);
+	        top = static_cast<int>(minY);
+	        right = static_cast<int>(maxX);
+	        bottom = static_cast<int>(maxY);
 	    }
-
-
-		
-		virtual void draw(Gdiplus::Graphics* graphics) = 0;
-		virtual bool contains(ws::Vec2i pos) = 0;
-		
-		
-		virtual ~Drawable() = default;
-		
-		
-		
-		
-		
-		
-		private:
-		
-		
+	    
+	    //Visually contains
+		virtual bool contains(ws::Vec2i point)
+	    {
+	        int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+	        if (point.x < left || point.x > right || point.y < top || point.y > bottom)
+	            return false;
+	            
+	        if (rotation == 0.0f) {
+	            float localX = (point.x - x) / scale.x + origin.x;
+	            float localY = (point.y - y) / scale.y + origin.y;
+	            return (localX >= 0 && localX < width && 
+	                    localY >= 0 && localY < height);
+	        }
+	        
+	        // For rotated objects, do proper transform
+	        float localX = static_cast<float>(point.x - x);
+	        float localY = static_cast<float>(point.y - y);
+	        
+	        // Reverse rotation
+	        float rad = -rotation * M_PI / 180.0f;
+	        float cosA = std::cos(rad);
+	        float sinA = std::sin(rad);
+	        float rotX = localX * cosA - localY * sinA;
+	        float rotY = localX * sinA + localY * cosA;
+	        
+	        // Reverse scale and adjust for origin
+	        rotX = rotX / scale.x + origin.x;
+	        rotY = rotY / scale.y + origin.y;
+	        
+	        return (rotX >= 0 && rotX < width && 
+	                rotY >= 0 && rotY < height);
+	    }
+	    
+	    
+		virtual void drawGlobal(Gdiplus::Graphics* graphics)
+	    {
+	        // Save current state
+	        Gdiplus::GraphicsState state = graphics->Save();
+	        
+	        Gdiplus::Matrix transform;
+	        
+	        // Translate to world position
+	        transform.Translate(static_cast<Gdiplus::REAL>(x), 
+	                           static_cast<Gdiplus::REAL>(y));
+	        
+	        // Apply rotation around scaled origin
+	        if (rotation != 0.0f) {
+	            transform.Translate(static_cast<Gdiplus::REAL>(origin.x * scale.x), 
+	                               static_cast<Gdiplus::REAL>(origin.y * scale.y));
+	            transform.Rotate(rotation);//HOW TO SET THE ROTATION POINT???
+	            transform.Translate(static_cast<Gdiplus::REAL>(-origin.x * scale.x), 
+	                               static_cast<Gdiplus::REAL>(-origin.y * scale.y));
+	        }
+	        
+	        // Apply scale
+	        if (scale.x != 1.0f || scale.y != 1.0f) {        	
+	            transform.Scale(scale.x, scale.y);	            
+	        }
+	        
+	        graphics->SetTransform(&transform);
+	        
+	        // Draw the actual content
+	        draw(graphics);
+	        
+	        
+	        graphics->Restore(state);
+	    }
+	    
+	    // Pure virtual - draw the content in local space
+	    virtual void draw(Gdiplus::Graphics* graphics) = 0;
+	    
+	    virtual ~Drawable() = default;
 	};
 	
 	
@@ -2188,51 +2255,62 @@ namespace ws
 	        return (pos.x >= left && pos.x < right &&
 	                pos.y >= top && pos.y < bottom);
 	    }
-	    
 	    virtual void draw(Gdiplus::Graphics* graphics) override
 	    {
 	        if (!textureRef || !textureRef->isValid()) 
 	            return;
-			        
-			        
-			        
-	        int left, top, right, bottom;
-	        getBounds(left, top, right, bottom);
 	        
-	        Gdiplus::Rect destRect(left, top, right - left, bottom - top);
+	        Gdiplus::Rect destRect(0,0, width, height);
+	        Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
 	        
-	        
-	        
-	        if (scale.x >= 0 && scale.y >= 0)
-	        {
-	            // No flipping
-	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
-	            graphics->DrawImage(textureRef->bitmap, destRect, 
-	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-	                               Gdiplus::UnitPixel);
-	        }
-	        else
-	        {
-	            // Handle flipping with image attributes
-	            Gdiplus::ImageAttributes attributes;
-	            
-	            if (scale.x < 0) {
-	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipX);
-	            }
-	            if (scale.y < 0) {
-	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipY);
-	            }
-	            
-	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
-	            graphics->DrawImage(textureRef->bitmap, destRect,
-	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-	                               Gdiplus::UnitPixel, &attributes);
-	        }
-		    
-	        
-	    }
-		
-		
+	        graphics->DrawImage(textureRef->bitmap, destRect,
+	                           srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+	                           Gdiplus::UnitPixel);
+	    }	    
+//	    virtual void draw(Gdiplus::Graphics* graphics) override
+//	    {
+//	        if (!textureRef || !textureRef->isValid()) 
+//	            return;
+//			        
+//			        
+//			        
+//	        int left, top, right, bottom;
+//	        getBounds(left, top, right, bottom);
+//	        
+//	        Gdiplus::Rect destRect(left, top, right - left, bottom - top);
+//	        
+//	        
+//	        
+//	        if (scale.x >= 0 && scale.y >= 0)
+//	        {
+//	            // No flipping
+//	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+//	            graphics->DrawImage(textureRef->bitmap, destRect, 
+//	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+//	                               Gdiplus::UnitPixel);
+//	        }
+//	        else
+//	        {
+//	            // Handle flipping with image attributes
+//	            Gdiplus::ImageAttributes attributes;
+//	            
+//	            if (scale.x < 0) {
+//	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipX);
+//	            }
+//	            if (scale.y < 0) {
+//	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipY);
+//	            }
+//	            
+//	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+//	            graphics->DrawImage(textureRef->bitmap, destRect,
+//	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+//	                               Gdiplus::UnitPixel, &attributes);
+//	        }
+//		    
+//	        
+//	    }
+//		
+//		
 		
 		
 	    void setTexture(ws::Texture& texture,bool resize = true) {
@@ -2288,56 +2366,6 @@ namespace ws
 	};
 	
 	
-	
-	
-	
-	class Rectangle : public Drawable
-	{
-		public:
-		
-		Gdiplus::Color color = {255,100,200,100};
-		
-		Rectangle()
-		{
-			width = 10;
-			height = 10;
-			
-		}
-		
-
-
-		virtual bool contains(ws::Vec2i pos)  override
-		{
-			int left, top, right, bottom;
-	        getBounds(left, top, right, bottom);
-	        
-	        return (pos.x >= left && pos.x < right &&
-	                pos.y >= top && pos.y < bottom);
-		}
-
-
-		
-	    virtual void draw(Gdiplus::Graphics* canvas)  override
-	    {
-	     
-		 	Gdiplus::SolidBrush brush(color);
-			
-			int left, top, right, bottom;
-	        getBounds(left, top, right, bottom);
-	        
-			Gdiplus::Rect rect(left,top,right,bottom);
-			
-			canvas->FillRectangle(&brush,rect);
-		    
-	    }
-
-
-
-
-		friend class Window;
-		
-		
-	};
 	
 
 
@@ -2437,15 +2465,70 @@ namespace ws
 	class Poly : public ws::Drawable 
 	{
 		public:
+		std::vector<ws::Vec2i> vertices;
+	    
 	
-	
-	
-	    std::vector<ws::Vec2i> vertices;
+		private:
 	    Gdiplus::Color fillColor = {255,255,0,0};    
 	    Gdiplus::Color borderColor = {255,255,0,100};    
 	    int borderWidth = 2;
 	    bool filled = true;
 	    bool closed = true;
+		
+		public:
+			
+			
+		void setFillColor(Gdiplus::Color color)	
+		{
+			fillColor = color;
+		}
+		
+		void setBorderColor(Gdiplus::Color color)
+		{
+			borderColor = color;
+		}
+		
+		Gdiplus::Color getFillColor()
+		{
+			return fillColor;
+		}
+		
+		Gdiplus::Color getBorderColor()
+		{
+			return borderColor;
+		}
+		
+		
+		void setBorderWidth(int w)
+		{
+			borderWidth = w;
+		}
+		
+		int getBorderWidth()
+		{
+			return borderWidth;
+		}
+		
+		void setFilled(bool b = true)
+		{
+			filled = b;
+		}
+		
+		void setClosed(bool b = true)
+		{
+			closed = b;
+		}
+		
+		bool getFilled()
+		{
+			return filled;
+		}
+		
+		bool getClosed()
+		{
+			return closed;
+		}
+	
 	
 	
 	    Poly() = default;
@@ -2471,8 +2554,7 @@ namespace ws
 	        vertices.push_back({x, y});
 	    }
 	
-	
-	
+		
 	
 	    void clear() 
 		{
@@ -2685,8 +2767,8 @@ namespace ws
 
 
 
-
-
+	
+	
 
 
 	
@@ -2697,11 +2779,11 @@ namespace ws
 		
 		Radial()
 		{
-			poly.fillColor = Gdiplus::Color(255,100,200,100);
-			poly.borderColor = Gdiplus::Color(255,50,255,50);
-			poly.borderWidth = 2;
-			poly.closed = true;
-			poly.filled = true;
+			poly.setFillColor(Gdiplus::Color(255,100,200,100));
+			poly.setBorderColor(Gdiplus::Color(255,50,255,50));
+			poly.setBorderWidth(2);
+			poly.setClosed();
+			poly.setFilled();
 			make();
 		}
 		
@@ -2709,12 +2791,14 @@ namespace ws
 		{
 			poly.clear();
 			
-			double inc = (2*3.14)/points; 
 			
-			for(double a=0;a<(2*3.14);a+=inc)
+			double inc = (2 * M_PI)/points; 
+			
+			for(double a=0;a<(2*M_PI);a+=inc)
 			{
-				int resx = static_cast<int>(std::cos(a) * getRadius());
-				int resy = static_cast<int>(std::sin(a) * getRadius());
+				double angle = a;
+				int resx = static_cast<int>(std::cos(angle) * getRadius());
+				int resy = static_cast<int>(std::sin(angle) * getRadius());
 				poly.addVertex(center.x + resx,center.y + resy);
 			}
 			m_points = points;
@@ -2735,6 +2819,11 @@ namespace ws
 			center = pos;
 			make(m_points);
 		}
+		
+		
+		
+		
+		
 		
 		
 		void move(ws::Vec2i delta)
@@ -2764,19 +2853,19 @@ namespace ws
 		
 		void setFillColor(Gdiplus::Color color)
 		{
-			poly.fillColor = color; 
+			poly.setFillColor(color); 
 			make(m_points);
 		}
 		
 		void setBorderColor(Gdiplus::Color color)
 		{
-			poly.borderColor = color;
+			poly.setBorderColor(color);
 			make(m_points);
 		}
 		
 		void setBorderWidth(int size)
 		{
-			poly.borderWidth = size;
+			poly.setBorderWidth(size);
 			make(m_points);
 		}
 		
@@ -2813,7 +2902,6 @@ namespace ws
 		int m_points = 500;
 		int radius = 10;
 		
-		
 		void updateDrawableProperties()
 	    {
 	        // Set Drawable's position and size based on the poly's bounding rect
@@ -2825,6 +2913,10 @@ namespace ws
 	    }
 		
 	};
+
+
+
+	
 
 	
 }
@@ -3895,7 +3987,7 @@ namespace ws
 			view.apply(*canvas);
 			
 			//draw the object in world coords.
-			draw.draw(canvas);
+			draw.drawGlobal(canvas);
 			
 			//Restore the original transformation so that the transform can be applied again next time. 
 			//This is because changes occur and need to be transformed too.

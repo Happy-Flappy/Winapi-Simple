@@ -21,14 +21,14 @@ class Physics
 		{
 			x = 0 + radius;
 			velocity.x = -velocity.x;
-			rotateDirect = -rotateDirect;
+			//rotateDirect = -rotateDirect;
 		}
 		
 		if(x + radius > 960)
 		{
 			x = 960 - radius;
 			velocity.x = -velocity.x;
-			rotateDirect = -rotateDirect;
+			//rotateDirect = -rotateDirect;
 		}
 		
 		if(y + radius > 540)
@@ -47,6 +47,8 @@ class Physics
 		y += velocity.y * dt;
 		
 		rotation += rotateDirect * dt;
+		
+		rotateDirect = velocity.x;
 		
 		return ws::Vec2f(x,y);
 	}

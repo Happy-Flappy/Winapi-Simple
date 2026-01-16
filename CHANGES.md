@@ -159,7 +159,11 @@
 
 * Added Documentation for previous versions.
 
+* Added matrix transformation to ws::Drawable to allow any drawable to be transformed by the based class. Rotation, Scaling, Translation, etc.
 
+* Added example program "Wheels.exe"
+
+* Added ws::Round (creates ellipses)
 
 
 # New major features to be added. 
