@@ -1229,6 +1229,7 @@ namespace ws
 			port.height = portHeight;
 			
 			world = port;
+			updateMatrix();
 		}
 		
 
@@ -1247,6 +1248,7 @@ namespace ws
 		void setRect(ws::IntRect rect)
 		{
 			world = rect;
+			updateMatrix();
 		}
 
 		void setRect(int left,int top,int width,int height)
@@ -1263,6 +1265,7 @@ namespace ws
 		void setPortRect(ws::IntRect rect)
 		{
 			port = rect;
+			updateMatrix();
 		}
 		
 		void setPortRect(int left,int top,int width,int height)
@@ -1275,6 +1278,7 @@ namespace ws
 		{
 			world.width = size.x;
 			world.height = size.y;
+			updateMatrix();
 		}
 		
 		[[nodiscard]] ws::Vec2i getSize()
@@ -1286,6 +1290,7 @@ namespace ws
 		{
 			port.width = size.x;
 			port.height = size.y;
+			updateMatrix();
 		}
 		
 		[[nodiscard]] ws::Vec2i getPortSize()
@@ -1304,6 +1309,7 @@ namespace ws
 		{
 			world.left = cx - (world.width/2);
 			world.top = cy - (world.height/2);
+			updateMatrix();
 		}
 
 		void setCenter(ws::Vec2i pos)
@@ -1323,7 +1329,7 @@ namespace ws
 			ws::Vec2i pos = ws::Vec2i(cx - (port.width/2),cy - (port.height/2));
 			port.left = pos.x;
 			port.top = pos.y;
-			
+			updateMatrix();
 		}
 
 
@@ -1338,6 +1344,7 @@ namespace ws
 		{
 			portOrigin.x = ox;
 			portOrigin.y = oy;
+			updateMatrix();
 		}
 		
 		void setPortRotatePoint(ws::Vec2i pos)
@@ -1349,6 +1356,7 @@ namespace ws
 		void setPortRotatePointCenter()
 		{
 			portOrigin = ws::Vec2i(port.left + (port.width/2), port.top + (port.height/2));
+			updateMatrix();
 		}
 		
 		
@@ -1362,6 +1370,7 @@ namespace ws
 		void setRotation(float angle) 
 		{
 		    rotation = angle;
+		    updateMatrix();
 		}
 		
 		
@@ -1369,6 +1378,7 @@ namespace ws
 		void setZoom(float val)
 		{
 			zoom = val;
+			updateMatrix();
 		}
 		
 		
@@ -1382,6 +1392,7 @@ namespace ws
 		{
 			world.left += dx;
 			world.top += dy;
+			updateMatrix();
 		}
 		
 		void move(ws::Vec2f dir)
@@ -1393,6 +1404,7 @@ namespace ws
 		{
 			world.left += dx;
 			world.top += dy;
+			updateMatrix();
 		}		
 		
 	    void getTransform(Gdiplus::Matrix &m) const
@@ -1409,52 +1421,76 @@ namespace ws
 	        m.GetElements(elements);
 	        matrix.SetElements(elements[0], elements[1], elements[2], 
 	                          elements[3], elements[4], elements[5]);
+	        updateMatrix();
 	    }
 		
 		
 		
 		
-		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos) const
-		{
-			
+	    [[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos) 
+	    {
+	        // Make sure matrix is current
+	        updateMatrix();
+	        
+	        // Create inverse of our current transformation
 	        Gdiplus::Matrix invMatrix;
 	        getTransform(invMatrix);
-	        invMatrix.Invert();			
-			
-	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(screenPos.x),static_cast<Gdiplus::REAL>(screenPos.y));
+	        
+	        // Invert the matrix to go from screen to world
+	        invMatrix.Invert();
+	        
+	        // Transform the point
+	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(screenPos.x), 
+	                             static_cast<Gdiplus::REAL>(screenPos.y));
 	        invMatrix.TransformPoints(&point, 1);
 	        
 	        return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
-		}		
-		
-		[[nodiscard]] ws::Vec2i toWorld(int x,int y) 
-		{
-			return toWorld(ws::Vec2i(x,y));
-		}
-		
-
-	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos) const
+	    }       
+	    
+	    [[nodiscard]] ws::Vec2i toWorld(int x,int y) 
 	    {
+	        return toWorld(ws::Vec2i(x,y));
+	    }
+	    
+	
+	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos) 
+	    {
+	        // Make sure matrix is current
+	        updateMatrix();
+	        
+	        // Use our current transformation (world to screen)
 	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(worldPos.x), 
 	                             static_cast<Gdiplus::REAL>(worldPos.y));
 	        matrix.TransformPoints(&point, 1);
-				        
-			return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
+	                
+	        return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
 	    
-		}
-
-		
-		[[nodiscard]] ws::Vec2i toScreen(int x,int y) 
-		{
-			return toScreen(ws::Vec2i(x,y));
-		}		
-		
+	    }
+	
+	    
+	    [[nodiscard]] ws::Vec2i toScreen(int x,int y) 
+	    {
+	        return toScreen(ws::Vec2i(x,y));
+	    }       		
 
 
 
 		
 		
 		void apply(Gdiplus::Graphics &graphics)
+		{
+			updateMatrix();
+		    
+		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+		    graphics.SetTransform(&matrix);
+		}
+			
+		private:
+			
+			
+		void updateMatrix()			
 		{
 		    matrix.Reset();
 		    
@@ -1487,15 +1523,14 @@ namespace ws
 		    }
 		    
 		    matrix.Scale(scaleX, scaleY);
-		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
-		    
-		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-		    graphics.SetTransform(&matrix);
+		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);			
+
+
+
+
 		}
 			
-		private:
+			
 			
 		float rotation = 0;
 		ws::IntRect port; //Port is always in screen coordinates.

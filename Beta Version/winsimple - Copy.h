@@ -1800,9 +1800,9 @@ namespace ws
 		public:
 		
 		
-
-	    int width = 0;
-	    int height = 0;
+		int width = 0;
+		int height = 0;
+		
 		
 		
 		
@@ -1853,8 +1853,8 @@ namespace ws
 			}
 			
 			
-	        width = gif->GetWidth();
-	        height = gif->GetHeight();			
+	        int width = gif->GetWidth();
+	        int height = gif->GetHeight();			
 			
 			
 		    textures.clear();
@@ -1902,10 +1902,28 @@ namespace ws
 	        
 	        delete gif;
 	        
+	        
 	        currentFrame = 0;
 			currentTexture = textures[0];
 			return true;
 		}
+		
+		
+		
+		void addFrame(ws::Texture &newFrame,double millisecondDelay)
+		{
+			
+			if(newFrame.getSize().x > width)
+				width = newFrame.getSize().x;
+			if(newFrame.getSize().y > height)
+				height = newFrame.getSize().y;
+			
+			textures.push_back(std::move(newFrame));
+			delays.push_back(millisecondDelay);
+				
+			totalFrames++;
+		}
+		
 		
 		
 		
@@ -2077,7 +2095,10 @@ namespace ws
 	    //Degrees
 	    float rotation = 0.0f;
 	    
-	    
+	    void setSize(ws::Vec2i size) {width = size.x;height = size.y;}
+	    void setSize(int w,int h) {width = w;height = h;}
+	    void setPosition(ws::Vec2i pos) {x = pos.x;y = pos.y;}
+	    void setPosition(int xpos,int ypos) {x = xpos;y = ypos;}
 	    void setScale(ws::Vec2f s) { scale = s; }
 	    void setScale(float sx, float sy) { scale.x = sx; scale.y = sy; }
 	    void setOrigin(ws::Vec2i pos) { origin = pos; }
@@ -2188,23 +2209,26 @@ namespace ws
 	        
 	        Gdiplus::Matrix transform;
 	        
-	        // Translate to world position
-	        transform.Translate(static_cast<Gdiplus::REAL>(x), 
-	                           static_cast<Gdiplus::REAL>(y));
+
+
+		    transform.Translate(static_cast<Gdiplus::REAL>(x), 
+		                       static_cast<Gdiplus::REAL>(y));
+		    
+		    // Apply rotation around the origin point
+		    if (rotation != 0.0f) {
+		        transform.Translate(static_cast<Gdiplus::REAL>(origin.x * scale.x), 
+		                           static_cast<Gdiplus::REAL>(origin.y * scale.y));
+		        transform.Rotate(rotation);
+		        transform.Translate(static_cast<Gdiplus::REAL>(-origin.x * scale.x), 
+		                           static_cast<Gdiplus::REAL>(-origin.y * scale.y));
+		    }
+		    
+		    // Apply scale
+		    if (scale.x != 1.0f || scale.y != 1.0f) {        	
+		        transform.Scale(scale.x, scale.y);	            
+		    }
+		    
 	        
-	        // Apply rotation around scaled origin
-	        if (rotation != 0.0f) {
-	            transform.Translate(static_cast<Gdiplus::REAL>(origin.x * scale.x), 
-	                               static_cast<Gdiplus::REAL>(origin.y * scale.y));
-	            transform.Rotate(rotation);//HOW TO SET THE ROTATION POINT???
-	            transform.Translate(static_cast<Gdiplus::REAL>(-origin.x * scale.x), 
-	                               static_cast<Gdiplus::REAL>(-origin.y * scale.y));
-	        }
-	        
-	        // Apply scale
-	        if (scale.x != 1.0f || scale.y != 1.0f) {        	
-	            transform.Scale(scale.x, scale.y);	            
-	        }
 	        
 	        graphics->SetTransform(&transform);
 	        
@@ -2785,25 +2809,32 @@ namespace ws
 			poly.setClosed();
 			poly.setFilled();
 			make();
+			origin.x = radius;
+			origin.y = radius;
 		}
 		
-		void make(int points = 500)
+		void make(int points = 8)
 		{
 			poly.clear();
-			
 			
 			double inc = (2 * M_PI)/points; 
 			
 			for(double a=0;a<(2*M_PI);a+=inc)
 			{
 				double angle = a;
-				int resx = static_cast<int>(std::cos(angle) * getRadius());
-				int resy = static_cast<int>(std::sin(angle) * getRadius());
-				poly.addVertex(center.x + resx,center.y + resy);
+				int resx = static_cast<int>(std::cos(angle) * radius);
+				int resy = static_cast<int>(std::sin(angle) * radius);
+				poly.addVertex(resx + radius, resy + radius);
 			}
 			m_points = points;
 			
-			updateDrawableProperties();
+			// Update Drawable properties
+			width = 2 * radius;
+			height = 2 * radius;
+
+			// Update position based on center
+			x = center.x - origin.x;
+			y = center.y - origin.y;
 		}
 		
 		
@@ -2811,31 +2842,28 @@ namespace ws
 		void setPosition(int posx,int posy)
 		{
 			center = {posx,posy};
-			make(m_points);
+			x = center.x - origin.x;
+			y = center.y - origin.y;
 		}
 		
 		void setPosition(ws::Vec2i pos)
 		{
-			center = pos;
-			make(m_points);
+			setPosition(pos.x, pos.y);
 		}
-		
-		
-		
-		
 		
 		
 		
 		void move(ws::Vec2i delta)
 		{
-			setPosition(center.x + delta.x,center.y + delta.y);
-			make(m_points);
+			center.x += delta.x;
+			center.y += delta.y;
+			x = center.x - origin.x;
+			y = center.y - origin.y;
 		}
 		
 		void move(int deltaX,int deltaY)
 		{
-			setPosition(center.x + deltaX,center.y + deltaY);
-			make(m_points);
+			move(ws::Vec2i(deltaX, deltaY));
 		}
 		
 		
@@ -2854,19 +2882,16 @@ namespace ws
 		void setFillColor(Gdiplus::Color color)
 		{
 			poly.setFillColor(color); 
-			make(m_points);
 		}
 		
 		void setBorderColor(Gdiplus::Color color)
 		{
 			poly.setBorderColor(color);
-			make(m_points);
 		}
 		
 		void setBorderWidth(int size)
 		{
 			poly.setBorderWidth(size);
-			make(m_points);
 		}
 		
 		
@@ -2886,39 +2911,112 @@ namespace ws
 		}
 		
 		
-	    virtual void draw(Gdiplus::Graphics* canvas) override
-	    {
-	    	poly.draw(canvas);
-	    }
-	    
-	    virtual bool contains(ws::Vec2i pos) override
-	    {
-	        return poly.contains(pos);
-	    }	
+		virtual void draw(Gdiplus::Graphics* canvas) override
+		{
+			poly.draw(canvas);
+		}
 		
+		virtual bool contains(ws::Vec2i pos) override
+		{
+			// Convert to local coordinates
+			float localX = static_cast<float>(pos.x - x - origin.x);
+			float localY = static_cast<float>(pos.y - y - origin.y);
+			
+			// Reverse scale
+			if (scale.x != 1.0f) localX /= scale.x;
+			if (scale.y != 1.0f) localY /= scale.y;
+			
+			// Check if point is within circle
+			return (localX * localX + localY * localY) <= (radius * radius);
+		}	
 		
+	
 		private:
-		ws::Vec2i center;
+		ws::Vec2i center = {0, 0};
 		int m_points = 500;
 		int radius = 10;
-		
-		void updateDrawableProperties()
-	    {
-	        // Set Drawable's position and size based on the poly's bounding rect
-	        ws::IntRect bounds = poly.getBoundingRect();
-	        x = bounds.left;
-	        y = bounds.top;
-	        width = bounds.width;
-	        height = bounds.height;
-	    }
-		
 	};
 
 
 
+
+
+
+	class Round : public ws::Drawable
+	{
+		public:
+			
+		
+		virtual void draw(Gdiplus::Graphics* canvas) override
+		{
+	        Gdiplus::Pen borderPen(m_borderColor, static_cast<Gdiplus::REAL>(m_borderWidth));
+	        Gdiplus::SolidBrush fillBrush(m_fillColor);
+			
+			canvas->DrawEllipse(&borderPen,0,0,width,height);
+			canvas->FillEllipse(&fillBrush,0,0,width,height);
+			
+		}
+		
+		
+		
+		bool contains(int px,int py)
+		{
+			return contains(ws::Vec2i(px,py));
+		}
+		
+		//STILL DOES NOT WORK!!!!
+		virtual bool contains(ws::Vec2i p) override
+		{
+			
+		      // Convert to local coordinates
+	        float localX = static_cast<float>(p.x - x);
+	        float localY = static_cast<float>(p.y - y);
+	        
+	        // Reverse scale
+	        if (scale.x != 1.0f) localX /= scale.x;
+	        if (scale.y != 1.0f) localY /= scale.y;
+	        
+	        // Adjust for origin
+	        localX += origin.x;
+	        localY += origin.y;
+	        
+	        // Ellipse equation check
+	        float centerX = width / 2.0f;
+	        float centerY = height / 2.0f;
+	        float radiusX = width / 2.0f;
+	        float radiusY = height / 2.0f;
+	        
+	        if (radiusX <= 0 || radiusY <= 0) return false;
+	        
+	        float normalizedX = (localX - centerX) / radiusX;
+	        float normalizedY = (localY - centerY) / radiusY;
+	        
+	        return (normalizedX * normalizedX + normalizedY * normalizedY) <= 1.0f;		
+			
+		}
+		
+		
+		
+		void setBorderColor(Gdiplus::Color color){m_borderColor = color;}
+		void setFillColor(Gdiplus::Color color){m_fillColor = color;}
+		void setBorderWidth(int w){m_borderWidth = w;}
+		Gdiplus::Color getBorderColor() {return m_borderColor;}
+		Gdiplus::Color getFillColor() {return m_fillColor;}
+		int getBorderWidth() {return m_borderWidth;}
+		
+		
+		private:
+			Gdiplus::Color m_borderColor = Gdiplus::Color(255,100,200,100);
+			Gdiplus::Color m_fillColor = Gdiplus::Color(255,50,150,50);
+			int m_borderWidth = 2;
+	
+		
+
+	};
 	
 
-	
+
+		
 }
 
 
