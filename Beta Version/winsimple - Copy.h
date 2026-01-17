@@ -1323,7 +1323,6 @@ namespace ws
 			ws::Vec2i pos = ws::Vec2i(cx - (port.width/2),cy - (port.height/2));
 			port.left = pos.x;
 			port.top = pos.y;
-			
 		}
 
 
@@ -1409,52 +1408,160 @@ namespace ws
 	        m.GetElements(elements);
 	        matrix.SetElements(elements[0], elements[1], elements[2], 
 	                          elements[3], elements[4], elements[5]);
+	        
 	    }
 		
 		
 		
 		
-		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos) const
-		{
-			
-	        Gdiplus::Matrix invMatrix;
-	        getTransform(invMatrix);
-	        invMatrix.Invert();			
-			
-	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(screenPos.x),static_cast<Gdiplus::REAL>(screenPos.y));
-	        invMatrix.TransformPoints(&point, 1);
-	        
-	        return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
-		}		
-		
-		[[nodiscard]] ws::Vec2i toWorld(int x,int y) 
-		{
-			return toWorld(ws::Vec2i(x,y));
-		}
-		
-
-	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos) const
+	    [[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos,ws::Vec2i screenSize) 
 	    {
-	        Gdiplus::PointF point(static_cast<Gdiplus::REAL>(worldPos.x), 
-	                             static_cast<Gdiplus::REAL>(worldPos.y));
-	        matrix.TransformPoints(&point, 1);
-				        
-			return ws::Vec2i(static_cast<int>(point.X), static_cast<int>(point.Y));
+		    
+			
+			    
+	        // First account for window stretching
+	        ws::Vec2i stretchedPos;
+	        stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
+	                                         (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
+	        stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
+	                                         (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
+	        
+	        
+	        // Now apply the transformation (scaled by zoom)
+	        float zoomFactor = std::pow(2.0f, zoom);
+	        
+	        // Calculate the visible world center
+	        float visibleWorldCenterX = world.left + world.width / 2.0f;
+	        float visibleWorldCenterY = world.top + world.height / 2.0f;
+	        
+	        // Calculate the port center
+	        float portCenterX = port.left + port.width / 2.0f;
+	        float portCenterY = port.top + port.height / 2.0f;
+	        
+	        // Calculate scale to fit visible world into port
+	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
+	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
+	        
+	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
+	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
+	        
+	        // Apply inverse transformation
+	        float worldX = static_cast<float>(stretchedPos.x);
+	        float worldY = static_cast<float>(stretchedPos.y);
+	        
+	        // Reverse the transformation steps
+	        // 1. Translate from port center to origin
+	        worldX -= portCenterX;
+	        worldY -= portCenterY;
+	        
+	        // 2. Reverse rotation
+	        if (rotation != 0) {
+	            Gdiplus::Matrix rotMatrix;
+	            rotMatrix.Rotate(-rotation);
+	            Gdiplus::PointF point(worldX, worldY);
+	            rotMatrix.TransformPoints(&point, 1);
+	            worldX = point.X;
+	            worldY = point.Y;
+	        }
+	        
+	        // 3. Reverse scale
+	        worldX /= scaleX;
+	        worldY /= scaleY;
+	        
+	        // 4. Translate back to world center
+	        worldX += visibleWorldCenterX;
+	        worldY += visibleWorldCenterY;
+	        
+	        
+	        
+	        
+	        return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
+	    }       
 	    
-		}
-
-		
-		[[nodiscard]] ws::Vec2i toScreen(int x,int y) 
-		{
-			return toScreen(ws::Vec2i(x,y));
-		}		
-		
+	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
+	    {
+	        return toWorld(ws::Vec2i(x,y),screenSize);
+	    }
+	    
+	
+	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
+	    {
+		        
+	        // Apply the transformation (scaled by zoom)
+	        float zoomFactor = std::pow(2.0f, zoom);
+	        
+	        // Calculate the visible world center
+	        float visibleWorldCenterX = world.left + world.width / 2.0f;
+	        float visibleWorldCenterY = world.top + world.height / 2.0f;
+	        
+	        // Calculate the port center
+	        float portCenterX = port.left + port.width / 2.0f;
+	        float portCenterY = port.top + port.height / 2.0f;
+	        
+	        // Calculate scale to fit visible world into port
+	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
+	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
+	        
+	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
+	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
+	        
+	        // Apply transformation
+	        float screenX = static_cast<float>(worldPos.x);
+	        float screenY = static_cast<float>(worldPos.y);
+	        
+	        // 1. Translate world center to origin
+	        screenX -= visibleWorldCenterX;
+	        screenY -= visibleWorldCenterY;
+	        
+	        // 2. Apply scale
+	        screenX *= scaleX;
+	        screenY *= scaleY;
+	        
+	        // 3. Apply rotation
+	        if (rotation != 0) {
+	            Gdiplus::Matrix rotMatrix;
+	            rotMatrix.Rotate(rotation);
+	            Gdiplus::PointF point(screenX, screenY);
+	            rotMatrix.TransformPoints(&point, 1);
+	            screenX = point.X;
+	            screenY = point.Y;
+	        }
+	        
+	        // 4. Translate to port center
+	        screenX += portCenterX;
+	        screenY += portCenterY;
+	        
+	        // Now account for window stretching
+	        screenX *= (static_cast<float>(screenSize.x) / static_cast<float>(world.width));
+	        screenY *= (static_cast<float>(screenSize.y) / static_cast<float>(world.height));
+	        
+	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
+	    }
+	
+	    
+	    [[nodiscard]] ws::Vec2i toScreen(int x,int y,ws::Vec2i screenSize) 
+	    {
+	        return toScreen(ws::Vec2i(x,y),screenSize);
+	    }       		
 
 
 
 		
 		
 		void apply(Gdiplus::Graphics &graphics)
+		{
+			updateMatrix();
+		    
+		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+		    graphics.SetTransform(&matrix);
+		}
+			
+		private:
+			
+			
+		void updateMatrix()			
 		{
 		    matrix.Reset();
 		    
@@ -1487,15 +1594,14 @@ namespace ws
 		    }
 		    
 		    matrix.Scale(scaleX, scaleY);
-		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
-		    
-		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
-		    graphics.SetTransform(&matrix);
+		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);			
+
+
+
+
 		}
 			
-		private:
+			
 			
 		float rotation = 0;
 		ws::IntRect port; //Port is always in screen coordinates.
@@ -1503,6 +1609,8 @@ namespace ws
 		ws::Vec2i portOrigin;//This is the point of rotation. It does NOT effect the view position.
 		Gdiplus::Matrix matrix;
 		float zoom = 0;
+		
+		
 		
 		 	
 	};
@@ -1795,7 +1903,7 @@ namespace ws
 		
 
 
-	class Animate
+	class GIF
 	{
 		public:
 		
@@ -1807,12 +1915,12 @@ namespace ws
 		
 		
 		
-		Animate()
+		GIF()
 		{
 			
 		}
 		
-		~Animate() {
+		~GIF() {
 		    textures.clear();
 		    delays.clear();
 		}
@@ -3896,13 +4004,6 @@ namespace ws
   
             RECT rect;
             GetWindowRect(hwnd, &rect);  
-            
-//            RECT clientRect;
-//            GetClientRect(hwnd, &clientRect);
-//            
-//            int clientWidth = clientRect.right - clientRect.left;
-//            int clientHeight = clientRect.bottom - clientRect.top;
-
             int width = rect.right - rect.left;
             int height = rect.bottom - rect.top;
 
@@ -3981,6 +4082,34 @@ namespace ws
 	    }
 
 
+
+
+		
+		ws::Vec2i toWorld(int x,int y)
+		{
+			return view.toWorld(x,y,getSize());
+		}
+		
+		
+		ws::Vec2i toWorld(ws::Vec2i pos)
+		{
+			return toWorld(pos.x,pos.y);
+		}
+		
+		
+		ws::Vec2i toScreen(int x,int y)
+		{
+			return view.toScreen(x,y,getSize());
+		}
+		
+		
+		ws::Vec2i toScreen(ws::Vec2i pos)
+		{
+			return toScreen(pos.x,pos.y);
+		}
+		
+		
+		
 				
 		
 		
@@ -4199,7 +4328,7 @@ namespace ws
 	                return 0;
 
 	            }
-	                
+	            
 
 				
 				
@@ -4262,7 +4391,7 @@ namespace ws //GLOBAL INPUT
 	namespace Global
 	{
 	
-		ws::Vec2i getMousePos(Window &window)
+		ws::Vec2i getMousePos(ws::Window &window)
 		{
 			
 		    POINT p;
@@ -4272,9 +4401,9 @@ namespace ws //GLOBAL INPUT
 		    }
 		    
 		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
-		    ws::Vec2i p2 = p;
-			p2 = window.view.toWorld(p2);
-		    return p2;
+
+
+		    return p;
 		}
 		
 		ws::Vec2i getMousePos()

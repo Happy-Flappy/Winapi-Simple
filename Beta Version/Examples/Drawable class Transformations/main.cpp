@@ -100,24 +100,11 @@ int main()
 	
 	ws::Timer timer;
 	
-	ws::Vec2i mouseScreen = {0,0};
 	
 	while(window.isOpen())
 	{
 		double dt = timer.getSeconds();
 		timer.restart();
-		
-		
-		MSG m;
-		while(window.pollEvent(m))
-		{
-			if(m.message == WM_MOUSEMOVE)
-			{
-				int x = GET_X_LPARAM(m.lParam);
-				int y = GET_Y_LPARAM(m.lParam);
-				mouseScreen = {x,y};
-			}
-		}
 		
 		
 		
@@ -132,35 +119,12 @@ int main()
 			wheel2.setRotation(phy[a].rotation);
 			window.draw(wheel2);
 			
-			static bool released = true;
 			
-			ws::Vec2i MPosition = window.getView().toWorld(mouseScreen);
+			ws::Vec2i MPosition = window.toWorld(ws::Global::getMousePos(window));
 			
 			if(wheel2.contains(MPosition))
 			{
-//				if(ws::Global::getMouseButton(VK_LBUTTON))
-//				{
-//					if(released)
-//						phy[a].drag = !phy[a].drag;
-//					released = false;
-//				}
-//				
 				phy[a].velocity.y = -1000;
-			}
-			
-			if(!ws::Global::getMouseButton(VK_LBUTTON))
-			{
-				released = true;
-			}
-			
-			
-			
-			if(phy[a].drag)
-			{
-				phy[a].x = MPosition.x;
-				phy[a].y = MPosition.y;
-				phy[a].velocity.x = 0;
-				phy[a].velocity.y = 0;
 			}
 			
 			

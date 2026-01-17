@@ -161,9 +161,20 @@
 
 * Added matrix transformation to ws::Drawable to allow any drawable to be transformed by the based class. Rotation, Scaling, Translation, etc.
 
-* Added example program "Wheels.exe"
+* Added Demo program "Wheels.exe"
 
 * Added ws::Round (creates ellipses)
+
+* Fixed View::toWorld function by attaching it to window and adjusting for window stretching.
+
+* Changed ws::Global::getMousePos(ws::Window &window) to only return window area mouse coordinates instead of converting to world coordinates.
+* Added toWorld,toScreen functions to window class so that window can auto-input the screenSize parameter of the View::toWorld(ws::Vec2i point,ws::Vec2i screenSize) function.
+
+* Renamed ws::Animate to ws::GIF since it only handled GIF animations for the most part.
+
+
+
+
 
 
 # New major features to be added. 

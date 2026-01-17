@@ -1,14 +1,5 @@
 
 
-#include <vector>
-#include <chrono>
-#include <optional>
-
-
-struct ShiftRect
-{
-	int left,top,width,height;
-};
 
 
 class ShiftData
@@ -20,31 +11,23 @@ class ShiftData
 	float delay = 0.15;
 	float totaltime=0;
 	bool ended = false;
-	std::vector <ShiftRect> rect;
+	bool start = true;//To make sure that timer is 0 when starting.
+	std::vector <ws::IntRect> rect;
+	ws::Timer timer;
 	
-	std::optional<std::chrono::steady_clock::time_point> last_frame_time;
+	
 };
 
 
-ShiftRect Shift(ShiftData &shift) 
+ws::IntRect Shift(ShiftData &shift) 
 {
+	if(start && !ended)
+	{
+		shift.timer.restart();
+		shift.start = false;
+	}
 	
-    auto current_time = std::chrono::steady_clock::now();
-
-    if (!shift.last_frame_time.has_value())
-    {
-        shift.last_frame_time = current_time;
-        return shift.rect[shift.currentframe];
-    }
-    
-    std::chrono::duration<float> delta_time = current_time - shift.last_frame_time.value();
-    
-    shift.last_frame_time = current_time;
-    
-    shift.totaltime += delta_time.count();	
-	
-	
-	if(shift.totaltime >= shift.delay)
+	if(shift.timer.getSeconds() >= shift.delay)
 	{
 	
 	
@@ -56,6 +39,7 @@ ShiftRect Shift(ShiftData &shift)
 		{
 			shift.currentframe=0;
 			shift.ended = true;
+			shift.start = true;
 		}
 	
 	

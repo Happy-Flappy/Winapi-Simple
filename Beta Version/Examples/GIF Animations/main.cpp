@@ -12,7 +12,7 @@ int main()
 	
 	window.setLayerAfter(HWND_TOPMOST);
 	
-	ws::Animate gif[4];
+	ws::GIF gif[4];
 	
 	gif[0].loadFromFile("source.gif");
 	gif[1].loadFromFile("mole.gif");
@@ -30,7 +30,7 @@ int main()
 	
 	
 	
-	ws::Texture frameTex = gif[0].getFrame(2);
+	ws::Texture *frameTex = gif[0].getFrame(2);
 	
 	
 	
