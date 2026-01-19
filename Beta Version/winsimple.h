@@ -129,14 +129,23 @@ namespace ws
 	    return true;
 	}
 
-	
+
 	std::wstring WIDE(std::string str)
 	{
-	    int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+	    // Try UTF-8 first
+	    int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.c_str(), -1, nullptr, 0);
+	    if (GetLastError() == ERROR_NO_UNICODE_TRANSLATION) {
+	        // Fallback to ANSI (system default code page)
+	        size = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, nullptr, 0);
+	    }
+	    
 	    std::wstring wstr(size, 0);
-	    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
+	    if (size > 0) {
+	        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
+	    }
 	    return wstr;
 	}
+
 	
 	std::string SHORT(const std::wstring& wstr) {
 	    // Determine the size of the required buffer
@@ -2274,6 +2283,16 @@ namespace ws
 	    //Degrees
 	    float rotation = 0.0f;
 	    
+
+
+
+	    ws::Vec2i getSize() {return ws::Vec2i(width,height);}
+	    ws::Vec2i getPosition() {return ws::Vec2i(x,y);}
+	    ws::Vec2f getScale() { return scale; }
+	    ws::Vec2i getOrigin() { return origin; }
+	    float getRotation() { return rotation; }
+			    
+	    
 	    void setSize(ws::Vec2i size) {width = size.x;height = size.y;}
 	    void setSize(int w,int h) {width = w;height = h;}
 	    void setPosition(ws::Vec2i pos) {x = pos.x;y = pos.y;}
@@ -2401,6 +2420,8 @@ namespace ws
 		        transform.Translate(static_cast<Gdiplus::REAL>(-origin.x * scale.x), 
 		                           static_cast<Gdiplus::REAL>(-origin.y * scale.y));
 		    }
+
+
 		    
 		    // Apply scale
 		    if (scale.x != 1.0f || scale.y != 1.0f) {        	
@@ -2448,6 +2469,11 @@ namespace ws
 		}
 		
 		
+		Sprite(ws::Texture &texture)
+		{
+			textureRef = &texture;
+			setTextureRect({0,0,texture.getSize().x,texture.getSize().y});
+		}
 		
 		
 	    virtual bool contains(ws::Vec2i pos) override
@@ -2470,50 +2496,7 @@ namespace ws
 	                           srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
 	                           Gdiplus::UnitPixel);
 	    }	    
-//	    virtual void draw(Gdiplus::Graphics* graphics) override
-//	    {
-//	        if (!textureRef || !textureRef->isValid()) 
-//	            return;
-//			        
-//			        
-//			        
-//	        int left, top, right, bottom;
-//	        getBounds(left, top, right, bottom);
-//	        
-//	        Gdiplus::Rect destRect(left, top, right - left, bottom - top);
-//	        
-//	        
-//	        
-//	        if (scale.x >= 0 && scale.y >= 0)
-//	        {
-//	            // No flipping
-//	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
-//	            graphics->DrawImage(textureRef->bitmap, destRect, 
-//	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-//	                               Gdiplus::UnitPixel);
-//	        }
-//	        else
-//	        {
-//	            // Handle flipping with image attributes
-//	            Gdiplus::ImageAttributes attributes;
-//	            
-//	            if (scale.x < 0) {
-//	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipX);
-//	            }
-//	            if (scale.y < 0) {
-//	                attributes.SetWrapMode(Gdiplus::WrapModeTileFlipY);
-//	            }
-//	            
-//	            Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
-//	            graphics->DrawImage(textureRef->bitmap, destRect,
-//	                               srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-//	                               Gdiplus::UnitPixel, &attributes);
-//	        }
-//		    
-//	        
-//	    }
-//		
-//		
+
 		
 		
 	    void setTexture(ws::Texture& texture,bool resize = true) {
@@ -2664,78 +2647,332 @@ namespace ws
 
 
 
+	
+	
+	class Font
+	{
 
-	class Poly : public ws::Drawable 
+		
+		public:
+		
+		
+		
+		
+		Font()
+		{
+			family = std::make_unique<Gdiplus::FontFamily>(L"Arial");
+			fontCollection = std::make_unique<Gdiplus::PrivateFontCollection>();
+			loadFromSystem("Arial");
+		}
+		
+		~Font()
+		{
+			gdiFont.reset();
+		    family.reset();
+		    fontCollection.reset();
+		}
+		
+		
+		
+		Gdiplus::Font* getFontHandle()
+		{ return gdiFont.get(); }
+		
+		Gdiplus::FontFamily* getFamilyHandle()
+		{ return family.get(); }
+		
+
+		
+		
+		bool isSystemFont()
+		{ return isCustomFont; }
+		
+		std::string getFilePath()
+		{ return fontFilePath; }
+		
+		
+		std::string getName()
+		{ return fontName; }
+		
+		
+
+		
+		bool loadFromSystem(std::string name)
+		{
+			fontFilePath.clear();
+			isCustomFont = false;
+			
+			fontCollection.reset(new Gdiplus::PrivateFontCollection());
+			
+			fontName = name;
+			
+			return update();
+			
+		}
+		
+		
+		bool loadFromFile(std::string path)
+		{	
+			//reset the font collection to be empty and then add a single font.
+			fontFilePath = path;
+	        fontCollection.reset(new Gdiplus::PrivateFontCollection());
+	        Gdiplus::Status status = fontCollection->AddFontFile(ws::WIDE(fontFilePath).c_str());
+	        
+	        if(status != Gdiplus::Ok)
+	        	return false;
+	        
+	        //check if the family exists(a family is a font but it is called a family because a font has different versions(bold,italic,etc.))
+			int familyCount = fontCollection->GetFamilyCount();	
+	        
+			if(familyCount <= 0)//Means the family failed to be created.
+				return false;
+			
+			
+			//Get the first font family from the collection. (The only one since this is a collection per ws::Font object now).
+			foundFamily = 0;
+			fontCollection->GetFamilies(1,family.get(),&foundFamily);
+			
+			
+			if(foundFamily == 0)
+				return false;
+			
+			//Get the overall font name. Ignore subnames like (Arial-Bold,Arial-Italic,etc.)
+			wchar_t familyName[LF_FACESIZE]; //LF_FACESIZE == 32
+			
+			if(family->GetFamilyName(familyName) != Gdiplus::Ok)
+				return false;
+			
+			
+			std::string name = ws::SHORT(familyName);	
+			
+			//Remove /0 null terminator from name
+			if (!name.empty() && name.back() == '\0')
+	        {
+	            name.pop_back();
+	        }
+			
+			//Store the font name
+			fontName = name;
+			fontFilePath = path;
+			isCustomFont = true;
+			
+			//initial update
+			return update();
+		}
+		
+		
+		
+		bool isValid()
+	    {
+	        return gdiFont && gdiFont->GetLastStatus() == Gdiplus::Ok;
+	    }
+		
+		
+		
+		private:
+			
+		bool update()
+		{
+
+			
+			if(isCustomFont)
+			{
+			
+	            if(!fontCollection || fontCollection->GetFamilyCount() <= 0)
+	                return false;			
+			
+				if(foundFamily == 0)
+					return false;
+				
+				//Create the font
+				gdiFont.reset(new Gdiplus::Font(family.get(),24,Gdiplus::FontStyleRegular,Gdiplus::UnitPixel));
+				
+			}
+			else
+			{
+				
+				gdiFont.reset(new Gdiplus::Font(ws::WIDE(fontName).c_str(), 
+	            24, 
+	            Gdiplus::FontStyleRegular, 
+	            Gdiplus::UnitPixel));
+			}
+			
+			
+			return gdiFont->GetLastStatus() == Gdiplus::Ok;			
+		}	
+			
+		
+		std::string fontName = "Arial";
+	    std::unique_ptr<Gdiplus::PrivateFontCollection> fontCollection;
+	    std::unique_ptr<Gdiplus::Font> gdiFont;
+		std::unique_ptr<Gdiplus::FontFamily> family;	
+		int foundFamily = 0;
+		bool isCustomFont = false;
+		std::string fontFilePath;
+	};
+
+
+
+	class Text : public ws::Drawable
 	{
 		public:
-		std::vector<ws::Vec2i> vertices;
-	    
-	
+		
+		
+		
+		
+		Text(){}
+		~Text(){}
+		
+		
+		
+		
+		Text(ws::Font &newfont)
+		{ fontRef = &newfont; }
+		
+		
+		
+		void setFont(ws::Font &newFont)
+		{ fontRef = &newFont; }
+		
+		ws::Font* getFont()
+		{ return fontRef; }
+		
+		void setString(std::string str)
+		{ text = str; }
+		
+		std::string getString()
+		{ return text; }
+		
+		
+		void setCharacterSize(int size)
+		{ charSize = size;}
+		
+		int getCharacterSize()
+		{ return charSize; }	
+		
+		void setStyle(Gdiplus::FontStyle fontStyle)
+		{ style = fontStyle;}
+		
+		Gdiplus::FontStyle getStyle()
+		{ return style; }		
+		
+		void setFillColor(Gdiplus::Color color)
+		{ fillColor = color; }
+		
+		Gdiplus::Color getFillColor()
+		{ return fillColor; }
+		
+		void setBorderColor(Gdiplus::Color color)
+		{ borderColor = color; }
+		
+		Gdiplus::Color getBorderColor()
+		{ return borderColor; }
+		
+		void setBorderWidth(int w)
+		{ borderWidth = w; }
+		
+		int getBorderWidth()
+		{ return borderWidth; }
+		
+		
+		
+
+		
+		
+		
+		virtual bool contains(ws::Vec2i pos) override
+		{
+			return false;//needs to be implemented
+		}
+		
+		virtual void draw(Gdiplus::Graphics* canvas) override 
+		{
+			
+			Gdiplus::FontFamily &family = *fontRef->getFamilyHandle();
+			
+			if(!family.IsStyleAvailable(style))
+            {
+            	std::cerr << "Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed."<<std::endl;
+                if(family.IsStyleAvailable(Gdiplus::FontStyleRegular))
+                    style = Gdiplus::FontStyleRegular;
+                else if(family.IsStyleAvailable(Gdiplus::FontStyleBold))
+                    style = Gdiplus::FontStyleBold;
+                else if(family.IsStyleAvailable(Gdiplus::FontStyleItalic))
+                    style = Gdiplus::FontStyleItalic;
+                else
+                    return;
+            }
+			
+			
+			
+			Gdiplus::GraphicsPath path;
+			
+		    Gdiplus::StringFormat format(Gdiplus::StringFormat::GenericTypographic());
+			format.SetFormatFlags(format.GetFormatFlags() | Gdiplus::StringFormatFlagsNoFitBlackBox | Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
+			
+			path.AddString(
+			ws::WIDE(text).c_str(), 
+			int(text.length()),
+			fontRef->getFamilyHandle(), 
+			style, 
+			charSize, 
+			Gdiplus::PointF(0,0), 
+			&format
+			);
+    
+    		Gdiplus::Pen outlinePen(borderColor, borderWidth);
+    		outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
+		    
+		    Gdiplus::SolidBrush fillBrush(fillColor);
+    
+    		//drawing the outline
+    		canvas->DrawPath(&outlinePen, &path);
+    		
+    		//filling text
+    		canvas->FillPath(&fillBrush, &path);
+    		
+		} 
+		
+		
 		private:
+		
+		Gdiplus::Color fillColor = Gdiplus::Color(255,0,0,0);	
+		Gdiplus::Color borderColor = Gdiplus::Color(255,255,0,0);	
+		ws::Font *fontRef = nullptr;	
+		std::string text = "";
+		int borderWidth = 0;
+		int charSize = 12;	
+		Gdiplus::FontStyle style = Gdiplus::FontStyleRegular;
+		
+		
+	};
+	
+	
+	
+	
+	class Poly : public ws::Drawable 
+	{
+	    public:
+	    std::vector<ws::Vec2i> vertices;
+	    
+	    
+	    private:
 	    Gdiplus::Color fillColor = {255,255,0,0};    
 	    Gdiplus::Color borderColor = {255,255,0,100};    
 	    int borderWidth = 2;
 	    bool filled = true;
 	    bool closed = true;
-		
-		public:
-			
-			
-		void setFillColor(Gdiplus::Color color)	
-		{
-			fillColor = color;
-		}
-		
-		void setBorderColor(Gdiplus::Color color)
-		{
-			borderColor = color;
-		}
-		
-		Gdiplus::Color getFillColor()
-		{
-			return fillColor;
-		}
-		
-		Gdiplus::Color getBorderColor()
-		{
-			return borderColor;
-		}
-		
-		
-		void setBorderWidth(int w)
-		{
-			borderWidth = w;
-		}
-		
-		int getBorderWidth()
-		{
-			return borderWidth;
-		}
-		
-		void setFilled(bool b = true)
-		{
-			filled = b;
-		}
-		
-		void setClosed(bool b = true)
-		{
-			closed = b;
-		}
-		
-		bool getFilled()
-		{
-			return filled;
-		}
-		
-		bool getClosed()
-		{
-			return closed;
-		}
-	
-	
-	
+	    
+	    ws::Texture *textureRef = nullptr;
+	    ws::Texture effectTexture;
+	    bool textureNeedsUpdate = true;
+	    
+	    std::vector<ws::Vec2f> uvs;
+	    bool hasUVs = false;
+	    
+	    public:
+	        
 	    Poly() = default;
-	
+	    
 	    
 	    Poly(std::vector<ws::Vec2i>& vertices, Gdiplus::Color fillColor = {255,255,0,0}, Gdiplus::Color borderColor = {255,255,0,255}, int borderWidth = 2, bool filled = true)
 	    {
@@ -2745,40 +2982,44 @@ namespace ws
 	        this->borderWidth = borderWidth;
 	        this->filled = filled;
 	    }
-	
-	
+	    
+	    
 	    void addVertex(ws::Vec2i vertex) 
-		{
+	    {
 	        vertices.push_back(vertex);
+	        uvs.push_back(ws::Vec2f(0, 0));
+	        textureNeedsUpdate = true;
 	    }
-	
+	    
 	    void addVertex(int x, int y) 
-		{
+	    {
 	        vertices.push_back({x, y});
+	        uvs.push_back(ws::Vec2f(0, 0));
+	        textureNeedsUpdate = true;
 	    }
-	
-		
-	
+	    
 	    void clear() 
-		{
+	    {
 	        vertices.clear();
+	        uvs.clear();
+	        hasUVs = false;
+	        textureNeedsUpdate = true;
 	    }
-	
+	    
 	    size_t vertexCount() 
-		{
+	    {
 	        return vertices.size();
 	    }
-	
-	
-	    // Check if enough points to make valid shape. Minimum = 3
+	    
+	    
 	    bool isValid() 
-		{
+	    {
 	        return vertices.size() >= 3;
 	    }
-	
-	    // Calculate centroid of the polygon
+	    
+	    
 	    ws::Vec2i getCentroid() 
-		{
+	    {
 	        if (vertices.empty()) return {0, 0};
 	        
 	        long long sumX = 0, sumY = 0;
@@ -2790,32 +3031,27 @@ namespace ws
 	        return {static_cast<int>(sumX / vertices.size()), 
 	                static_cast<int>(sumY / vertices.size())};
 	    }
-	
-	
-	
-	    // Check if a point is inside the polygon using ray casting algorithm
+	    
+	    
 	    virtual bool contains(ws::Vec2i point) override 
-		{
+	    {
 	        if (vertices.size() < 3) return false;
 	        
 	        int crossings = 0;
 	        size_t n = vertices.size();
 	        
 	        for (size_t a = 0; a < n; a++) 
-			{
+	        {
 	            ws::Vec2i p1 = vertices[a];
 	            ws::Vec2i p2 = vertices[(a + 1) % n];
 	            
-	            // Check if point is on vertex
 	            if (point.x == p1.x && point.y == p1.y) return true;
 	            
-	            // Check if point is on horizontal edge
 	            if (p1.y == p2.y && point.y == p1.y && 
 	                point.x >= std::min(p1.x, p2.x) && point.x <= std::max(p1.x, p2.x)) {
 	                return true;
 	            }
 	            
-	            // Check for crossing
 	            if ((p1.y > point.y) != (p2.y > point.y)) {
 	                double xIntersection = (p2.x - p1.x) * (point.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
 	                
@@ -2827,13 +3063,12 @@ namespace ws
 	        
 	        return (crossings % 2 == 1);
 	    }
-	
 	    
-		bool intersects(Line &line) 
-		{
+	    
+	    bool intersects(Line &line) 
+	    {
 	        if (vertices.size() < 2) return false;
 	        
-	        // Check if any edge intersects with the line
 	        for (size_t i = 0; i < vertices.size(); i++) {
 	            ws::Vec2i p1 = vertices[i];
 	            ws::Vec2i p2 = vertices[(i + 1) % vertices.size()];
@@ -2844,37 +3079,30 @@ namespace ws
 	            }
 	        }
 	        
-	        // Check if line is completely inside polygon
 	        if (contains(line.start) || contains(line.end)) {
 	            return true;
 	        }
 	        
 	        return false;
 	    }
-	
 	    
-	
-	
-	
-		bool intersects(Poly &other) 
-		{
-	        // Check if any vertex of other is inside this polygon
+	    
+	    bool intersects(Poly &other) 
+	    {
 	        for (const auto& vertex : other.vertices) 
-			{
+	        {
 	            if (contains(vertex)) 
-				{
+	            {
 	                return true;
 	            }
 	        }
 	        
-	        // Check if any vertex of this polygon is inside the other
 	        for (const auto& vertex : vertices) {
 	            if (other.contains(vertex)) {
 	                return true;
 	            }
 	        }
 	        
-	        // Check if any edges intersect
 	        for (size_t i = 0; i < vertices.size(); i++) {
 	            ws::Vec2i p1 = vertices[i];
 	            ws::Vec2i p2 = vertices[(i + 1) % vertices.size()];
@@ -2893,19 +3121,13 @@ namespace ws
 	        
 	        return false;
 	    }
-	
 	    
-	
-		ws::IntRect getBoundingRect() 
-		{
+	    
+	    ws::IntRect getBoundingRect() 
+	    {
 	        if (vertices.empty()) return {0, 0, 0, 0};
 	        
-	        RECT rect1 = {vertices[0].x, vertices[0].y, vertices[0].x, vertices[0].y};
-	        ws::IntRect rect = rect1;
-	        rect.width = rect.width - rect.left;
-	        rect.height = rect.height - rect.top;
-	        
-	        
+	        ws::IntRect rect = {vertices[0].x, vertices[0].y, vertices[0].x, vertices[0].y};
 	        
 	        for (const auto& vertex : vertices) {
 	            rect.left = std::min(rect.left, vertex.x);
@@ -2914,62 +3136,302 @@ namespace ws
 	            rect.height = std::max(rect.height, vertex.y);
 	        }
 	        
+	        rect.width = rect.width - rect.left;
+	        rect.height = rect.height - rect.top;
+	        
 	        return rect;
 	    }
-	
-	
-	
 	    
-	
-	
-		virtual void draw(Gdiplus::Graphics* canvas) override 
-		{
-	
+	    
+	    void setTexture(ws::Texture &tex)
+	    {
+	        textureRef = &tex;
+	        textureNeedsUpdate = true;
+	    }   
+	    
+	    void removeTexture()
+	    {
+	        textureRef = nullptr;
+	    }
+	    
+	    ws::Texture* getTexture()
+	    {
+	        return textureRef;
+	    }
+	    
+	    void setUV(int vertexIndex, float u, float v)
+	    {
+	        if(vertexIndex >= 0 && vertexIndex < vertices.size())
+	        {
+	            if(vertexIndex >= uvs.size())
+	            {
+	                uvs.resize(vertices.size(), ws::Vec2f(0, 0));
+	            }
+	            uvs[vertexIndex] = ws::Vec2f(u, v);
+	            hasUVs = true;
+	            textureNeedsUpdate = true;
+	        }
+	    }
+	    
+	    void updateTexture()
+	    {
+	        textureNeedsUpdate = true;
+	    }
+	    
+	    void setFillColor(Gdiplus::Color color)    
+	    {
+	        fillColor = color;
+	    }
+	    
+	    void setBorderColor(Gdiplus::Color color)
+	    {
+	        borderColor = color;
+	    }
+	    
+	    Gdiplus::Color getFillColor()
+	    {
+	        return fillColor;
+	    }
+	    
+	    Gdiplus::Color getBorderColor()
+	    {
+	        return borderColor;
+	    }
+	    
+	    
+	    void setBorderWidth(int w)
+	    {
+	        borderWidth = w;
+	    }
+	    
+	    int getBorderWidth()
+	    {
+	        return borderWidth;
+	    }
+	    
+	    void setFilled(bool b = true)
+	    {
+	        filled = b;
+	    }
+	    
+	    void setClosed(bool b = true)
+	    {
+	        closed = b;
+	    }
+	    
+	    bool getFilled()
+	    {
+	        return filled;
+	    }
+	    
+	    bool getClosed()
+	    {
+	        return closed;
+	    }
+	    
+	    
+	    private:
+	    
+	    bool pointInPolygon(ws::Vec2i p) 
+	    {
+	        if (vertices.size() < 3) return false;
+	        
+	        int crossings = 0;
+	        size_t n = vertices.size();
+	        
+	        for (size_t a = 0; a < n; a++) 
+	        {
+	            ws::Vec2i p1 = vertices[a];
+	            ws::Vec2i p2 = vertices[(a + 1) % n];
+	            
+	            if (p.x == p1.x && p.y == p1.y) return true;
+	            
+	            if (p1.y == p2.y && p.y == p1.y && 
+	                p.x >= std::min(p1.x, p2.x) && p.x <= std::max(p1.x, p2.x)) {
+	                return true;
+	            }
+	            
+	            if ((p1.y > p.y) != (p2.y > p.y)) {
+	                double xIntersection = (p2.x - p1.x) * (p.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
+	                
+	                if (p.x <= xIntersection) {
+	                    crossings++;
+	                }
+	            }
+	        }
+	        
+	        return (crossings % 2 == 1);
+	    }
+	    
+	    void generateEffectTexture()
+	    {
+	        if(!textureRef || !textureRef->isValid()) return;
+	        
+	        ws::IntRect bounds = getBoundingRect();
+	        if(bounds.width <= 0 || bounds.height <= 0) return;
+	        
+	        effectTexture.create(bounds.width, bounds.height, Gdiplus::Color(0, 0, 0, 0));
+	        
+	        int texWidth = textureRef->getSize().x;
+	        int texHeight = textureRef->getSize().y;
+	        
+	        if(!hasUVs || uvs.size() != vertices.size())
+	        {
+	            uvs.clear();
+	            for(const auto& vertex : vertices)
+	            {
+	                float u = static_cast<float>(vertex.x - bounds.left) / bounds.width;
+	                float v = static_cast<float>(vertex.y - bounds.top) / bounds.height;
+	                uvs.push_back(ws::Vec2f(u, v));
+	            }
+	            hasUVs = true;
+	        }
+	        
+	        for(int y = 0; y < bounds.height; y++)
+	        {
+	            for(int x = 0; x < bounds.width; x++)
+	            {
+	                ws::Vec2i worldPoint(x + bounds.left, y + bounds.top);
+	                
+	                if(pointInPolygon(worldPoint))
+	                {
+	                    ws::Vec2f uv = getUVForPoint(worldPoint, bounds);
+	                    
+	                    uv.x = std::max(0.0f, std::min(1.0f, uv.x));
+	                    uv.y = std::max(0.0f, std::min(1.0f, uv.y));
+	                    
+	                    int texX = static_cast<int>(uv.x * (texWidth - 1));
+	                    int texY = static_cast<int>(uv.y * (texHeight - 1));
+	                    
+	                    Gdiplus::Color texColor = textureRef->getPixel(texX, texY);
+	                    effectTexture.setPixel(x, y, texColor);
+	                }
+	            }
+	        }
+	        
+	        textureNeedsUpdate = false;
+	    }
+	    
+	    ws::Vec2f getUVForPoint(ws::Vec2i point, ws::IntRect bounds)
+	    {
+	        if(vertices.size() == 3)
+	        {
+	            return barycentricUV(point, vertices[0], vertices[1], vertices[2],
+	                                uvs[0], uvs[1], uvs[2]);
+	        }
+	        
+	        for(size_t i = 1; i < vertices.size() - 1; i++)
+	        {
+	            if(pointInTriangle(point, vertices[0], vertices[i], vertices[i + 1]))
+	            {
+	                return barycentricUV(point, vertices[0], vertices[i], vertices[i + 1],
+	                                    uvs[0], uvs[i], uvs[i + 1]);
+	            }
+	        }
+	        
+	        return ws::Vec2f(0, 0);
+	    }
+	    
+	    bool pointInTriangle(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c)
+	    {
+	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) /
+	                     ((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
+	        float beta = ((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y)) /
+	                    ((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
+	        float gamma = 1.0f - alpha - beta;
+	        
+	        return (alpha >= 0 && beta >= 0 && gamma >= 0);
+	    }
+	    
+	    ws::Vec2f barycentricUV(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c,
+	                           ws::Vec2f uvA, ws::Vec2f uvB, ws::Vec2f uvC)
+	    {
+	        float denom = (b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y);
+	        if(fabs(denom) < 0.0001f) return uvA;
+	        
+	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) / denom;
+	        float beta = ((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y)) / denom;
+	        float gamma = 1.0f - alpha - beta;
+	        
+	        float u = alpha * uvA.x + beta * uvB.x + gamma * uvC.x;
+	        float v = alpha * uvA.y + beta * uvB.y + gamma * uvC.y;
+	        
+	        return ws::Vec2f(u, v);
+	    }
+	    
+	    public:
+	    virtual void draw(Gdiplus::Graphics* canvas) override 
+	    {
 	        if (vertices.size() < 2) return;
 	        
-	        std::vector<Gdiplus::PointF> transformedPoints;
-	        
-		    // Convert to Gdiplus::REAL
-		    for (const auto& vertex : vertices) {
-		        transformedPoints.push_back(Gdiplus::PointF(
-		            static_cast<Gdiplus::REAL>(vertex.x),
-		            static_cast<Gdiplus::REAL>(vertex.y)
-		        ));
-		    }
-	        
-	        
-		    Gdiplus::Pen borderPen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
-		    Gdiplus::SolidBrush fillBrush(fillColor);
-	        
-	        
-	  
-		    // Draw filled polygon
-		    if (filled && closed && vertices.size() >= 3) {
-		        canvas->FillPolygon(&fillBrush, transformedPoints.data(), 
-		                          static_cast<INT>(transformedPoints.size()));
-		    }
-		    
-		    // Draw border/outline
-		    if (closed && vertices.size() >= 3) {
-		        canvas->DrawPolygon(&borderPen, transformedPoints.data(), 
-		                          static_cast<INT>(transformedPoints.size()));
-		    } 
-		    else if (vertices.size() >= 2) {
-		        // Draw as polyline if not closed
-		        canvas->DrawLines(&borderPen, transformedPoints.data(), 
-		                        static_cast<INT>(transformedPoints.size()));
-		    }
-	  
+	        if(!textureRef)
+	        {
+	            std::vector<Gdiplus::PointF> transformedPoints;
+	            
+	            for (const auto& vertex : vertices) {
+	                transformedPoints.push_back(Gdiplus::PointF(
+	                    static_cast<Gdiplus::REAL>(vertex.x),
+	                    static_cast<Gdiplus::REAL>(vertex.y)
+	                ));
+	            }
+	            
+	            Gdiplus::Pen borderPen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+	            Gdiplus::SolidBrush fillBrush(fillColor);
+	            
+	            if (filled && closed && vertices.size() >= 3) {
+	                canvas->FillPolygon(&fillBrush, transformedPoints.data(), 
+	                                  static_cast<INT>(transformedPoints.size()));
+	            }
+	            
+	            if (closed && vertices.size() >= 3) {
+	                canvas->DrawPolygon(&borderPen, transformedPoints.data(), 
+	                                  static_cast<INT>(transformedPoints.size()));
+	            } 
+	            else if (vertices.size() >= 2) {
+	                canvas->DrawLines(&borderPen, transformedPoints.data(), 
+	                                static_cast<INT>(transformedPoints.size()));
+	            }
+	        }
+	        else
+	        {
+	            if(textureNeedsUpdate || !effectTexture.isValid())
+	            {
+	                generateEffectTexture();
+	            }
+	            
+	            if(effectTexture.isValid())
+	            {
+	                ws::IntRect bounds = getBoundingRect();
+	                
+	                Gdiplus::TextureBrush textureBrush(effectTexture.bitmap);
+	                
+	                Gdiplus::Matrix transform;
+	                transform.Translate(static_cast<Gdiplus::REAL>(bounds.left), 
+	                                  static_cast<Gdiplus::REAL>(bounds.top));
+	                textureBrush.SetTransform(&transform);
+	                
+	                std::vector<Gdiplus::PointF> transformedPoints;
+	                for (const auto& vertex : vertices) {
+	                    transformedPoints.push_back(Gdiplus::PointF(
+	                        static_cast<Gdiplus::REAL>(vertex.x),
+	                        static_cast<Gdiplus::REAL>(vertex.y)
+	                    ));
+	                }
+	                
+	                canvas->FillPolygon(&textureBrush, transformedPoints.data(), 
+	                                  static_cast<INT>(transformedPoints.size()));
+	                
+	                if(borderWidth > 0)
+	                {
+	                    Gdiplus::Pen borderPen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+	                    canvas->DrawPolygon(&borderPen, transformedPoints.data(), 
+	                                      static_cast<INT>(transformedPoints.size()));
+	                }
+	            }
+	        }
 	    }
 	};
 	
-	
-	
-	
-
-
-
-
 	
 	
 

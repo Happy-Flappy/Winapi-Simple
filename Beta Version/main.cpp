@@ -1,36 +1,62 @@
 #include "winsimple.h"
 
-#include <cmath>
+
 
 
 int main()
 {
-	ws::ShiftData shift;
-	shift.add(0,0,85,85);
-	shift.add(85,0,85,85);
-	shift.add(85 * 2,0,85,85);
-	shift.add(85 * 3,0,85,85);
 	
+	ws::Window window(1920,1080,"");
+	ws::Font font;
 	
-	ws::Texture texture;
-	texture.loadFromFile("wheels.png");
+	font.loadFromSystem("Comic Sans MS");
 	
-	ws::Sprite sprite;
-	sprite.setTexture(texture);
+	// ֎۞༗႟↭⌾⍬
 	
+	ws::Text text;
+	text.setFont(font);
 	
+	std::string str = "Testing a string. Testing @ Character.\nTesting Odd Unicode ©haracters - © ® ™ € £ ¥ — – • … « » ♠ ♣ ♥ ♦ ★ ☆ ☺ ☹";
+	text.setString(str);
+
+	text.setPosition(0,100);
+	text.setFillColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));
+	text.setBorderColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));
+	text.setBorderWidth(2);
+	text.setStyle(Gdiplus::FontStyleBoldItalic);
+	text.setCharacterSize(30);
 	
-	
-	ws::Window window;
-	window.create(960,540,"");
+	ws::Timer timer;
 	
 	while(window.isOpen())
 	{
-		window.clear();
-		sprite.setTextureRect(ws::Shift(shift));
-		sprite.setOrigin(sprite.width/2,sprite.height/2);
-		sprite.setRotation(sprite.rotation += 2);
-		window.draw(sprite);
+		
+		if(timer.getSeconds() > 2)
+		{
+			text.setFillColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));
+			text.setBorderColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));			
+			timer.restart();
+		}
+		
+		if(ws::Global::getKey(VK_ESCAPE))
+			window.close();
+		
+		static bool released = true;
+		if(ws::Global::getKey(VK_UP) && released)
+		{
+			text.setBorderWidth(text.getBorderWidth()+1); 
+			released = false;
+		}
+		if(ws::Global::getKey(VK_DOWN) && released)
+		{
+			text.setBorderWidth(text.getBorderWidth()-1); 
+			released = false;
+		}
+		if(!ws::Global::getKey(VK_UP) && !ws::Global::getKey(VK_DOWN))
+			released = true;
+		
+		window.clear(Gdiplus::Color(255,0,255,255));
+		window.draw(text);
 		window.display();
 	}
 	return 0;

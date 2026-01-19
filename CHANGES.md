@@ -171,9 +171,9 @@
 * Added toWorld,toScreen functions to window class so that window can auto-input the screenSize parameter of the View::toWorld(ws::Vec2i point,ws::Vec2i screenSize) function.
 
 * Renamed ws::Animate to ws::GIF since it only handled GIF animations for the most part.
+* Added ws::ShiftData class for handling spritesheet animations.
 
-
-
+* Added GDI+ ws::Font class and ws::Text class.
 
 
 
