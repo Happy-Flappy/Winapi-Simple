@@ -1856,6 +1856,7 @@ namespace ws
 		
 		
 		
+		
 
 
 		
@@ -1906,6 +1907,13 @@ namespace ws
 		{
 			return ws::Vec2i(width,height); 
 		}
+		
+		
+		void saveToFile(std::string path)
+		{
+			
+		}
+		
 	    	
 	};
 	
@@ -2881,7 +2889,7 @@ namespace ws
 		
 		virtual bool contains(ws::Vec2i pos) override
 		{
-			return false;//needs to be implemented
+			return Drawable::contains(pos);
 		}
 		
 		virtual void draw(Gdiplus::Graphics* canvas) override 
@@ -2921,6 +2929,13 @@ namespace ws
     
     		Gdiplus::Pen outlinePen(borderColor, borderWidth);
     		outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
+		    
+		    Gdiplus::RectF bounds;
+		    path.GetBounds(&bounds, NULL, &outlinePen);
+		    
+		    width = bounds.Width;
+		    height = bounds.Height;
+		    
 		    
 		    Gdiplus::SolidBrush fillBrush(fillColor);
     

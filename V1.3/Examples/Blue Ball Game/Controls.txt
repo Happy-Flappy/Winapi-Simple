@@ -1,0 +1,1 @@
+Click on the window to make the ball move upwards.

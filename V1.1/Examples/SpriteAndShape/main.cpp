@@ -33,6 +33,17 @@ int main()
 	while(window.isOpen())
 	{
 
+		MSG m;
+		while(window.pollEvent(m))
+		{
+			
+			if(m.message == WM_KEYDOWN)
+			{
+				if(m.wParam == VK_ESCAPE)
+					return 0;
+			}
+		}
+
 		lolly.x += 5;
 		if(lolly.x > window.view.getSize().x)
 			lolly.x = -100;

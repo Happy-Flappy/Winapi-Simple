@@ -19,8 +19,6 @@ int main()
 	ws::Window window(960,540,"My Window");
 	
 	
-	window.setChromaKey(RGB(0,0,255));
-	window.setLayerAfter(HWND_TOPMOST);
 	
 	
 	ws::Shape shape;
@@ -84,7 +82,7 @@ int main()
 			shape.y += y;
 		}
 		
-		window.clear(RGB(0,0,255));
+		window.clear(RGB(37,37,37));
 
 		window.draw(shape);
 		

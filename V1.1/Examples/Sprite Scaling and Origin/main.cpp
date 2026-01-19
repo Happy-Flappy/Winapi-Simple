@@ -153,6 +153,12 @@ int main()
 				mouse = window.view.toWorld({mouseX,mouseY});
 				
 			}
+			
+			if(m.message == WM_KEYDOWN)
+			{
+				if(m.wParam == VK_ESCAPE)
+					return 0;
+			}
 		}
 		
 		

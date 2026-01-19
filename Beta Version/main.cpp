@@ -20,23 +20,15 @@ int main()
 	text.setString(str);
 
 	text.setPosition(0,100);
-	text.setFillColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));
-	text.setBorderColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));
+	text.setBorderColor(Gdiplus::Color(255,100,200,100));
 	text.setBorderWidth(2);
 	text.setStyle(Gdiplus::FontStyleBoldItalic);
 	text.setCharacterSize(30);
 	
-	ws::Timer timer;
+	
 	
 	while(window.isOpen())
 	{
-		
-		if(timer.getSeconds() > 2)
-		{
-			text.setFillColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));
-			text.setBorderColor(Gdiplus::Color(rand()%255,rand()%255,rand()%255,rand()%255));			
-			timer.restart();
-		}
 		
 		if(ws::Global::getKey(VK_ESCAPE))
 			window.close();
@@ -54,6 +46,16 @@ int main()
 		}
 		if(!ws::Global::getKey(VK_UP) && !ws::Global::getKey(VK_DOWN))
 			released = true;
+		
+		
+		if(text.contains(ws::Global::getMousePos(window)))
+		{
+			text.setFillColor(Gdiplus::Color(255,0,0,255));
+		}
+		else
+		{
+			text.setFillColor(Gdiplus::Color(255,255,0,0));
+		}
 		
 		window.clear(Gdiplus::Color(255,0,255,255));
 		window.draw(text);

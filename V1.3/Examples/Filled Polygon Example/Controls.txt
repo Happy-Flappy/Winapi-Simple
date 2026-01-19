@@ -1,0 +1,3 @@
+Escape quits program
+
+Arrow keys move pen

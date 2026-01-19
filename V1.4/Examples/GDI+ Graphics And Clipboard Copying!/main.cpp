@@ -102,7 +102,7 @@ int main()
 				button.update(&m);
 				if(button.isPressed(m))
 				{
-					clipboard.copyTexture(window.backBuffer);
+					ws::clipboard.copyTexture(window.backBuffer);
 				}
 	
 			}
