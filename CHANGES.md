@@ -175,6 +175,22 @@
 
 * Added GDI+ ws::Font class and ws::Text class.
 
+* Added saveToFile(std::string path) to ws::Texture.
+
+* Added ws::FileWindow. For Save and Open file dialogs.
+
+* Added ws::ClickMenu. For right click menu.(can be used with any trigger)
+
+* Added ws::FolderWindow. For opening a folder dialog.
+
+* Added copyFile() pasteFile() copyFiles() pasteFiles() and hasFile() to the clipboard class. This means that files can be copied to and even from the program.
+
+* Added ws::Combobox class. It's a dropdown list that is not the kind that is connected to the window.
+
+* Added ws::Menu and ws::Dropdown for window dropdown menu items.
+
+
+
 
 
 # New major features to be added. 

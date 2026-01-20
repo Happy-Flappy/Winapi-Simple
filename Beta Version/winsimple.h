@@ -20,6 +20,7 @@
 #include <windows.h>  
 #include <windowsx.h>  
 #include <commctrl.h>  
+#include <commdlg.h>
 #include <iostream>
 #include <string>
 #include <cstdlib>      
@@ -32,6 +33,8 @@
 #include <mmsystem.h>
 #include <filesystem>
 #include <cwchar>
+#include <algorithm>
+
 
 // Define missing Windows types BEFORE including GDI+
 #ifndef SHORT
@@ -45,6 +48,8 @@ typedef unsigned long PROPID;
 #include <gdiplus.h>
 #include <shlwapi.h>
 #include <objbase.h>
+#include <Shlobj.h>
+#include <shellapi.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -121,10 +126,10 @@ namespace ws
 	        filePath = exeDir / filePath;
 	    }
 	    
-	    if (!std::filesystem::exists(filePath)) {
-	        std::cerr << "File not found at: " << filePath.string() << std::endl;
-	        return false;
-	    }
+//	    if (!std::filesystem::exists(filePath)) {
+//	        std::cerr << "File not found at: " << filePath.string() << std::endl;
+//	        return false;
+//	    }
 	    path = filePath.string();
 	    return true;
 	}
@@ -192,6 +197,40 @@ namespace ws
 	    shortPath.resize(bufferSize);
 	    return shortPath;
 	}
+
+
+	//A microsoft function that I just copied. It is required for the saving of images to file.
+	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+	{
+	    UINT  num = 0;          // number of image encoders
+	    UINT  size = 0;         // size of the image encoder array in bytes
+	
+	    Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
+	
+	    Gdiplus::GetImageEncodersSize(&num, &size);
+	    if(size == 0)
+	        return -1;  // Failure
+	
+	    pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+	    if(pImageCodecInfo == NULL)
+	        return -1;  // Failure
+	
+	    Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
+	
+	    for(UINT j = 0; j < num; ++j)
+	    {
+	        if( wcscmp(pImageCodecInfo[j].MimeType, format) == 0 )
+	        {
+	            *pClsid = pImageCodecInfo[j].Clsid;
+	            free(pImageCodecInfo);
+	            return j;  // Success
+	        }    
+	    }
+	
+	    free(pImageCodecInfo);
+	    return -1;  // Failure
+	}
+
 
 		
 }
@@ -1909,9 +1948,68 @@ namespace ws
 		}
 		
 		
-		void saveToFile(std::string path)
+		bool saveToFile(std::string path)
 		{
-			
+		    if (!bitmap || width <= 0 || height <= 0)
+		    {
+		        std::cerr << "Cannot save: Invalid bitmap\n";
+		        return false;
+		    }
+		
+		    if (!ResolveRelativePath(path))
+		    {
+		        std::cerr << "Failed to resolve path: " << path << "\n";
+		        return false;
+		    }
+		    
+		    
+		
+		    
+		    // determine the encoder based on the file extension
+		    CLSID encoderClsid;
+		    std::string ext = path.substr(path.find_last_of(".") + 1);
+		    
+		    // lowercase extension for compare
+		    std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
+		    
+		    // Get encoder CLSID based on file extension
+		    if (ext == "png")
+		    {
+		        GetEncoderClsid(L"image/png", &encoderClsid);
+		    }
+		    else if (ext == "jpg" || ext == "jpeg")
+		    {
+		        GetEncoderClsid(L"image/jpeg", &encoderClsid);
+		    }
+		    else if (ext == "bmp")
+		    {
+		        GetEncoderClsid(L"image/bmp", &encoderClsid);
+		    }
+		    else if (ext == "gif")
+		    {
+		        GetEncoderClsid(L"image/gif", &encoderClsid);
+		    }
+		    else if (ext == "tiff")
+		    {
+		        GetEncoderClsid(L"image/tiff", &encoderClsid);
+		    }
+		    else
+		    {
+		        // default to PNG if extension not recognized
+		        std::cerr << "Unsupported format. Using PNG.\n";
+		        GetEncoderClsid(L"image/png", &encoderClsid);
+		        path += ".png"; // Add extension
+		    }
+		
+		    // save the image
+		    Gdiplus::Status status = bitmap->Save(ws::WIDE(path).c_str(), &encoderClsid, NULL);
+		    
+		    if (status != Gdiplus::Ok)
+		    {
+			    std::cerr << "Failed to save image to: " << path << "\n";
+				return false;
+			}
+			return true;
 		}
 		
 	    	
@@ -4039,6 +4137,192 @@ namespace ws
 	        
 	        return tex;
 	    }
+
+
+	    bool copyFile(const std::string& filePath)
+	    {
+	        std::wstring widePath = ws::WIDE(filePath);
+	        
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        // Calculate required memory size
+	        size_t pathSize = (widePath.length() + 1) * sizeof(wchar_t);
+	        size_t dropFilesSize = sizeof(DROPFILES) + pathSize + sizeof(wchar_t); // +1 wchar_t for double null terminator
+	        
+	        // Allocate global memory
+	        HGLOBAL hGlobal = GlobalAlloc(GHND | GMEM_SHARE, dropFilesSize);
+	        if (!hGlobal) {
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Lock and prepare DROPFILES structure
+	        DROPFILES* pDropFiles = (DROPFILES*)GlobalLock(hGlobal);
+	        if (!pDropFiles) {
+	            GlobalFree(hGlobal);
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Initialize DROPFILES structure
+	        pDropFiles->pFiles = sizeof(DROPFILES);  // Offset to file list
+	        pDropFiles->pt = { 0, 0 };              // Drop point (unused)
+	        pDropFiles->fNC = FALSE;                 // Client area
+	        pDropFiles->fWide = TRUE;                // Unicode strings
+	        
+	        // Copy file path(s) after the DROPFILES structure
+	        wchar_t* pFileList = (wchar_t*)((BYTE*)pDropFiles + sizeof(DROPFILES));
+	        wcscpy_s(pFileList, widePath.length() + 1, widePath.c_str());
+	        
+	        // Double null-terminate the file list
+	        pFileList[widePath.length() + 1] = L'\0';
+	        
+	        GlobalUnlock(hGlobal);
+	        
+	        // Set clipboard data
+	        bool success = SetClipboardData(CF_HDROP, hGlobal) != NULL;
+	        CloseClipboard();
+	        
+	        if (!success) {
+	            GlobalFree(hGlobal);
+	        }
+	        
+	        return success;
+	    }
+	    
+
+	    bool copyFiles(const std::vector<std::string>& filePaths)
+	    {
+	        if (filePaths.empty()) {
+	            return false;
+	        }
+	        
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        // Calculate total size needed
+	        size_t totalPathsSize = 0;
+	        std::vector<std::wstring> widePaths;
+	        for (const auto& path : filePaths) {
+	            std::wstring widePath = ws::WIDE(path);
+	            widePaths.push_back(widePath);
+	            totalPathsSize += (widePath.length() + 1) * sizeof(wchar_t);
+	        }
+	        
+	        size_t dropFilesSize = sizeof(DROPFILES) + totalPathsSize + sizeof(wchar_t); // +1 for final null
+	        
+	        // Allocate global memory
+	        HGLOBAL hGlobal = GlobalAlloc(GHND | GMEM_SHARE, dropFilesSize);
+	        if (!hGlobal) {
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Lock and prepare DROPFILES structure
+	        DROPFILES* pDropFiles = (DROPFILES*)GlobalLock(hGlobal);
+	        if (!pDropFiles) {
+	            GlobalFree(hGlobal);
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Initialize DROPFILES structure
+	        pDropFiles->pFiles = sizeof(DROPFILES);
+	        pDropFiles->pt = { 0, 0 };
+	        pDropFiles->fNC = FALSE;
+	        pDropFiles->fWide = TRUE;
+	        
+	        // Copy all file paths
+	        wchar_t* pFileList = (wchar_t*)((BYTE*)pDropFiles + sizeof(DROPFILES));
+	        size_t offset = 0;
+	        
+	        for (const auto& widePath : widePaths) {
+	            wcscpy_s(pFileList + offset, widePath.length() + 1, widePath.c_str());
+	            offset += widePath.length() + 1;  // +1 for null terminator
+	        }
+	        
+	        // Final null terminator
+	        pFileList[offset] = L'\0';
+	        
+	        GlobalUnlock(hGlobal);
+	        
+	        // Set clipboard data
+	        bool success = SetClipboardData(CF_HDROP, hGlobal) != NULL;
+	        CloseClipboard();
+	        
+	        if (!success) {
+	            GlobalFree(hGlobal);
+	        }
+	        
+	        return success;
+	    }
+	    
+
+	    std::vector<std::string> pasteFiles()
+	    {
+	        std::vector<std::string> filePaths;
+	        
+	        if (!OpenClipboardCheck()) {
+	            return filePaths;
+	        }
+	        
+	        if (IsClipboardFormatAvailable(CF_HDROP)) {
+	            HANDLE hData = GetClipboardData(CF_HDROP);
+	            if (hData) {
+	                HDROP hDrop = (HDROP)GlobalLock(hData);
+	                if (hDrop) {
+	                    // Get number of files
+	                    UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+	                    
+	                    // Get each file path
+	                    for (UINT i = 0; i < fileCount; i++) {
+	                        // Get required buffer size
+	                        UINT bufferSize = DragQueryFileW(hDrop, i, NULL, 0);
+	                        
+	                        if (bufferSize > 0) {
+	                            std::wstring widePath(bufferSize + 1, L'\0');
+	                            DragQueryFileW(hDrop, i, &widePath[0], bufferSize + 1);
+	                            filePaths.push_back(ws::SHORT(widePath));
+	                        }
+	                    }
+	                    
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+	        
+	        CloseClipboard();
+	        return filePaths;
+	    }
+	    
+	    std::string pasteFile()
+	    {
+	        auto files = pasteFiles();
+	        if (!files.empty()) {
+	            return files[0];
+	        }
+	        return "";
+	    }
+	    
+
+	    bool hasFiles()
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        bool hasFiles = IsClipboardFormatAvailable(CF_HDROP);
+	        CloseClipboard();
+	        return hasFiles;
+	    }
+
+
 	    
 	    bool hasText() 
 	    {
@@ -4094,6 +4378,10 @@ namespace ws
 		}
 		
 	}gdi;
+
+
+
+
 	
 	
 		
@@ -4994,6 +5282,91 @@ namespace ws //GLOBAL INPUT
 namespace ws //CHILD WINDOW API
 {
 	
+
+
+
+	class Dropdown
+	{
+		public:
+	    
+		Dropdown(int newID, std::string newName)
+	    {
+	        if (newID != 0) // Leaf items don't need a menu handle
+	            handle = CreatePopupMenu();
+	        ID = newID;
+	        name = newName;
+	        isPopup = (newID != 0);
+	    }
+	    
+	    void addItem(int id,DWORD type, std::string itemName)
+	    {
+	        if (isPopup)
+	            AppendMenuA(handle, type, id, ws::TO_LPCSTR(itemName));
+	    }
+	    
+	    void addSubmenu(Dropdown &submenu)
+	    {
+	        if (isPopup && submenu.isPopup)
+	            AppendMenuA(handle, MF_POPUP, (UINT_PTR)submenu.getHandle(), 
+	                       ws::TO_LPCSTR(submenu.getName()));
+	    }
+		
+		HMENU getHandle()
+		{ return handle; }
+		
+		std::string getName()
+		{ return name;}
+		
+		int getID()
+		{ return ID;}
+		
+		void addItem(Dropdown drop)
+		{
+			if (isPopup)
+				AppendMenuA(this->handle, MF_STRING, drop.getID(), ws::TO_LPCSTR(drop.getName()));
+		}
+		
+		
+		private:
+	    HMENU handle = nullptr;
+	    int ID = 0;
+	    std::string name = "";
+	    bool isPopup = false;
+			
+	};
+	
+	class Menu
+	{
+		public:
+		HMENU bar;
+		
+		Menu()
+		{
+			bar = CreateMenu();
+		}
+		
+		void addDropdown(ws::Dropdown &drop)
+		{
+			AppendMenuA(bar, MF_POPUP, (UINT_PTR)drop.getHandle(), ws::TO_LPCSTR(drop.getName()));
+			
+		}
+		
+		void setWindow(ws::Window &window)
+		{
+			SetMenu(window.hwnd, bar);	
+		}
+		
+		
+		int getEvent(MSG &m)//You can use this for readability or you can use the normal way.
+		{
+			if(m.message == WM_COMMAND)
+				return LOWORD(m.wParam);
+			return -1;
+		}
+		
+	};
+
+
 	
 	
 	
@@ -5275,9 +5648,515 @@ namespace ws //CHILD WINDOW API
 		
 	};
 	
+
+
+
+
+
+
+
+	
+	class ClickMenu
+	{
+		public:
+		
+		
+		
+		void addFlag(DWORD newFlag)
+		{ flags |= newFlag; }
+		
+		void removeFlag(DWORD removeFlag)
+		{ flags &= ~removeFlag;}
+		
+		DWORD getFlags()
+		{ return flags; }		
+		
+		
+		int getCommand()
+		{return command;}
+		
+		std::vector<std::string> getList()
+		{ return list; }
+		
+		void setList(std::vector<std::string> newList)
+		{ list = newList; }
+		
+		void addItem(std::string item)
+		{ list.push_back(item);}
+		
+		void removeItem(std::string item)
+		{	
+			for(int a=0;a<list.size();a++)
+			{
+				if(list[a] == item)
+				{
+					list.erase(list.begin() + a);
+					break;
+				}
+			}
+			
+		}
+		
+		void init(ws::Window &newParent)
+		{ parentRef = &newParent;}
+		
+		ws::Window *getParent()
+		{ return parentRef;}
+		
+		
+		
+		
+		
+		bool show(ws::Vec2i mouse)
+		{
+			if(parentRef == nullptr)
+			{
+				std::cerr << "Attempted to show a ClickMenu without referencing a parent window! Use Init().\n";
+				return false;
+			}
+			HMENU hMenu = CreatePopupMenu();
+			if(!hMenu)
+				return false;
+			
+			for(int a=0;a<list.size();a++)
+			{
+				AppendMenu(hMenu, MF_STRING, 1+a, list[a].c_str());
+            }
+            
+
+            POINT pt = mouse;
+            ClientToScreen(parentRef->hwnd, &pt);
+
+
+            // Show context menu and get selection
+            command = TrackPopupMenu(
+                hMenu, 
+                flags,
+                pt.x,
+                pt.y,
+                0,
+                parentRef->hwnd,
+                NULL
+            );
+
+			
+
+            DestroyMenu(hMenu); // Cleanup
+            
+            
+            return true;
+		}	
+		
+		private:
+		int command = 0;	
+		std::vector<std::string> list;	
+		ws::Window *parentRef = nullptr;
+		DWORD flags = TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD;
+	};
 	
 	
 	
+	
+	
+	class FileWindow
+	{
+		public:
+		
+		FileWindow()
+		{
+			
+		}
+		
+		
+		void setFileName(std::string file)
+		{
+			const char* initialText = file.c_str();
+		    strncpy(szFile, initialText, sizeof(szFile) - 1);
+		    szFile[sizeof(szFile) - 1] = '\0'; 
+		}
+		
+		std::string getFileName()
+		{
+			std::string file(szFile);
+			return file;
+		}
+		
+		
+		void setTitle(std::string name)
+		{ title = name; }
+		std::string getTitle()
+		{ return title; }
+		
+		void addFlag(DWORD newFlag)
+		{ flags |= newFlag; }
+		
+		void removeFlag(DWORD removeFlag)
+		{ flags &= ~removeFlag;}
+		
+		DWORD getFlags()
+		{ return flags; }
+		
+		
+		
+		
+		
+		bool open(ws::Window *parent = nullptr)
+		{
+			if(parent == nullptr)
+				ofn.hwndOwner = NULL;
+			else
+				ofn.hwndOwner = parent->hwnd;
+		
+			setFileName("");
+		    szFile[0] = '\0';
+		    ofn.lStructSize = sizeof(OPENFILENAME);
+		    ofn.lpstrFilter = "All Files\0*.*\0";
+		    ofn.lpstrInitialDir = ws::TO_LPCSTR(getFileName());
+		    ofn.lpstrFile = szFile;
+		    ofn.nMaxFile = sizeof(szFile);
+		    ofn.lpstrTitle = ws::TO_LPCSTR(title);
+		    //OFN_NOCHANGEDIR is essential to avoid having the dialog change the program's executable directory.
+		    ofn.Flags = flags;
+		    ofn.nFilterIndex = defaultFilter;
+			ofn.lpstrDefExt = "";
+
+			if(parent)
+			{
+				MSG m;
+		        while(parent->pollEvent(m)) {} // Clear event queue because of the blocking nature of this dialog
+			}
+			
+			if(GetOpenFileName(&ofn))
+				return true;
+			else
+			{
+				setFileName("");
+				return false;
+			}
+		}
+		
+		bool save(ws::Window *parent = nullptr)
+		{
+			if(parent == nullptr)
+				ofn.hwndOwner = NULL;
+			else
+				ofn.hwndOwner = parent->hwnd;
+			
+			setFileName("");
+		    szFile[0] = '\0';
+		    ofn.lStructSize = sizeof(OPENFILENAME);
+		    ofn.lpstrFilter = "All Files\0*.*\0";
+		    ofn.lpstrInitialDir = ws::TO_LPCSTR(getFileName());
+		    ofn.lpstrFile = szFile;
+		    ofn.nMaxFile = sizeof(szFile);
+		    ofn.lpstrTitle = ws::TO_LPCSTR(title);
+		    
+		    //OFN_NOCHANGEDIR is essential to avoid having the dialog change the program's executable directory.
+		    ofn.Flags = flags;//OFN_NODEREFERENCELINKS allows shortcuts to stay shortcuts
+		    ofn.lpstrDefExt = "";
+			
+			
+			if(parent)
+			{
+				MSG m;
+		        while(parent->pollEvent(m)) {} // Clear event queue because of the blocking nature of this dialog
+			}
+			
+			
+			
+			if(GetSaveFileName(&ofn))
+			{
+				return true;
+			}
+			else
+			{
+				setFileName("");
+				return false;				
+			}
+		}
+		
+		private:
+		
+		DWORD flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NODEREFERENCELINKS | OFN_NOCHANGEDIR | OFN_EXPLORER;	
+		std::string title = "File Explorer";	
+		int defaultFilter = 1;
+		char szFile[260];
+		
+		OPENFILENAME ofn = {0};
+	};
+	
+	class FolderWindow
+	{
+		public:
+		
+		FolderWindow()
+		{
+			
+		}
+		
+		void setTitle(std::string name)
+		{title = name;}
+		std::string getTitle()
+		{return title;}
+		void addFlag(DWORD flag)
+		{ flags |= flag;}
+		void setFlags(DWORD allFlags)
+		{ flags = allFlags;}
+		void removeFlag(DWORD flag)
+		{ flags &= ~flag;}
+		DWORD getFlags()
+		{return flags;}
+		
+		std::string getFolderName()
+		{ return folderName;}
+		
+		
+		
+		
+		bool open(ws::Window *parent = nullptr)
+		{
+		
+		    bi.lpszTitle = ws::TO_LPCSTR(title);
+		    
+		    //OFN_NOCHANGEDIR is essential to avoid having the dialog change the program's executable directory.
+		    bi.ulFlags = flags;
+			if(parent == nullptr)
+				bi.hwndOwner = NULL;
+			else
+				bi.hwndOwner = parent->hwnd;
+		
+			if(parent)
+			{
+				MSG m;
+		        while(parent->pollEvent(m)) {} // Clear event queue because of the blocking nature of this dialog
+			}
+			
+		
+		    LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+		    if (pidl != 0) {
+		        // Get the name of the folder
+		        char path[MAX_PATH];
+		        if (SHGetPathFromIDList(pidl, path)) {
+		            // Free memory used
+		            IMalloc* imalloc = 0;
+		            if (SUCCEEDED(SHGetMalloc(&imalloc))) {
+		                imalloc->Free(pidl);
+		                imalloc->Release();
+		            }
+		            folderName = std::string(path);
+		            return true;
+			
+		        }
+		    }
+		    folderName = "";
+		    return false;
+			
+		}		
+		
+		
+		private:
+		BROWSEINFO bi = {0};	
+		std::string title = "Open Folder";
+		DWORD flags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_RETURNFSANCESTORS | OFN_NOCHANGEDIR;	
+		std::string folderName = "";
+	};
+	
+	
+
+
+	class ComboBox : public Child
+	{
+	    public:
+	    ComboBox()
+	    {
+	    }
+	    
+	    bool init(ws::Window &parent)
+	    {
+	        if(!parent.hwnd)
+	        {
+	            std::cerr << "Child Error: Selected parent is not valid!\n";
+	            return false;
+	        }
+	        
+	        parentRef = &parent;
+	        
+	        // Add combo box specific styles
+	        addStyle(CBS_DROPDOWN);
+	        addStyle(WS_VSCROLL);
+	        
+	        hwnd = CreateWindowEx(
+	            0,
+	            TEXT("COMBOBOX"),
+	            NULL,
+	            style,
+	            getPosition().x,
+	            getPosition().y,
+	            getSize().x,
+	            getSize().y,  // Dropdown height
+	            parent.hwnd,
+	            (HMENU)(UINT_PTR)controlID,
+	            GetModuleHandle(nullptr),
+	            nullptr);
+	            
+	        if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create ComboBox!\n";
+	            return false;
+	        }
+	        
+	        // Set extended UI for better appearance
+	        SendMessage(hwnd, CB_SETEXTENDEDUI, (WPARAM)TRUE, 0);
+	        
+	        ShowWindow(hwnd, SW_SHOW);
+	        UpdateWindow(hwnd);
+	        
+	        return true;
+	    }
+	    
+	    // Add an item to the dropdown
+	    void addItem(const std::string& item)
+	    {
+	        if (!hwnd) return;
+	        SendMessageA(hwnd, CB_ADDSTRING, 0, (LPARAM)item.c_str());
+	    }
+	    
+	    // Add multiple items
+	    void addItems(const std::vector<std::string>& items)
+	    {
+	        if (!hwnd) return;
+	        for (const auto& item : items)
+	        {
+	            addItem(item);
+	        }
+	    }
+	    
+	    // Remove an item by index
+	    void removeItem(int index)
+	    {
+	        if (!hwnd) return;
+	        SendMessage(hwnd, CB_DELETESTRING, (WPARAM)index, 0);
+	    }
+	    
+	    // Clear all items
+	    void clear()
+	    {
+	        if (!hwnd) return;
+	        SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
+	    }
+	    
+	    // Get selected index
+	    int getSelectedIndex()
+	    {
+	        if (!hwnd) return -1;
+	        return (int)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
+	    }
+	    
+	    // Set selected index
+	    void setSelectedIndex(int index)
+	    {
+	        if (!hwnd) return;
+	        SendMessage(hwnd, CB_SETCURSEL, (WPARAM)index, 0);
+	    }
+	    
+	    // Get selected text
+	    std::string getSelectedText()
+	    {
+	        if (!hwnd) return "";
+	        
+	        int index = getSelectedIndex();
+	        if (index == -1) return "";
+	        
+	        int length = (int)SendMessage(hwnd, CB_GETLBTEXTLEN, (WPARAM)index, 0);
+	        if (length == CB_ERR) return "";
+	        
+	        std::vector<char> buffer(length + 1);
+	        SendMessageA(hwnd, CB_GETLBTEXT, (WPARAM)index, (LPARAM)buffer.data());
+	        
+	        return std::string(buffer.data());
+	    }
+	    
+	    // Get item count
+	    int getItemCount()
+	    {
+	        if (!hwnd) return 0;
+	        return (int)SendMessage(hwnd, CB_GETCOUNT, 0, 0);
+	    }
+	    
+	    // Get item text at index
+	    std::string getItemText(int index)
+	    {
+	        if (!hwnd || index < 0) return "";
+	        
+	        int length = (int)SendMessage(hwnd, CB_GETLBTEXTLEN, (WPARAM)index, 0);
+	        if (length == CB_ERR) return "";
+	        
+	        std::vector<char> buffer(length + 1);
+	        SendMessageA(hwnd, CB_GETLBTEXT, (WPARAM)index, (LPARAM)buffer.data());
+	        
+	        return std::string(buffer.data());
+	    }
+	    
+	    // Check if selection changed in a message
+	    bool selectionChanged(MSG &msg)
+	    {
+	        if (msg.message == WM_COMMAND && HIWORD(msg.wParam) == CBN_SELCHANGE)
+	        {
+	            if (LOWORD(msg.wParam) == controlID)
+	            {
+	                return true;
+	            }
+	        }
+	        return false;
+	    }
+	    
+	    // Set dropdown style (CBS_DROPDOWN or CBS_DROPDOWNLIST)
+	    void setDropdownStyle(bool allowEdit = true)
+	    {
+	        if (!hwnd) return;
+	        
+	        removeStyle(CBS_DROPDOWN);
+	        removeStyle(CBS_DROPDOWNLIST);
+	        
+	        if (allowEdit)
+	        {
+	            addStyle(CBS_DROPDOWN);  // Editable combo box
+	        }
+	        else
+	        {
+	            addStyle(CBS_DROPDOWNLIST);  // Non-editable combo box
+	        }
+	        
+	        SetWindowLong(hwnd, GWL_STYLE, style);
+	        SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+	                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	    }
+	    
+	    // Get text from edit control (when using CBS_DROPDOWN)
+	    std::string getEditText()
+	    {
+	        if (!hwnd) return "";
+	        
+	        LRESULT textLength = SendMessage(hwnd, WM_GETTEXTLENGTH, 0, 0);
+	        if (textLength <= 0)
+	            return "";
+	        
+	        std::vector<char> buffer(static_cast<size_t>(textLength) + 1);
+	        SendMessageA(hwnd, WM_GETTEXT, static_cast<WPARAM>(buffer.size()), 
+	                    reinterpret_cast<LPARAM>(buffer.data()));
+	        
+	        return std::string(buffer.data());
+	    }
+	    
+	    // Set edit text (when using CBS_DROPDOWN)
+	    void setEditText(const std::string& text)
+	    {
+	        if (!hwnd) return;
+	        SendMessageA(hwnd, WM_SETTEXT, 0, (LPARAM)text.c_str());
+	    }
+	};
+
+
 	
 	
 	class Button : public Child
