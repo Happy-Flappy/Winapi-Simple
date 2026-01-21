@@ -45,27 +45,15 @@ typedef short SHORT;
 typedef unsigned long PROPID;
 #endif
 
-
 #include <gdiplus.h>
 #include <shlwapi.h>
 #include <objbase.h>
-//Save/Open dialog
 #include <Shlobj.h>
 #include <shellapi.h>
-//PI
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-//Network
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <stdio.h>
-//Data Types
-#include <type_traits>
-#include <utility>
-//
-
-
 
 // ========== CORE UTILITIES ==========
 namespace ws
@@ -249,6 +237,8 @@ namespace ws
 
 
 
+#include <type_traits>
+#include <utility>
 
 
 // ========== DATA TYPES ==========
@@ -3786,140 +3776,10 @@ namespace ws
 
 
 
-
 // ========== SYSTEM ==========
 namespace ws 
 {
 	
-	
-	
-	
-
-
-	namespace Network
-	{
-		
-		
-		class Host
-		{
-			public:
-			
-			
-			Host(std::string ip)
-			{
-				host = gethostbyname(ip.c_str());
-				
-				if(host == nullptr)
-					std::cerr << "Failed to create Host!\n";	
-			}
-			
-			
-			HOSTENT* getHandle()
-			{return host;}
-			
-			
-			
-			private:
-			HOSTENT *host = nullptr;
-		};
-
-
-		class Server
-		{
-			public:
-			
-			Server(ws::Network::Host &host,int PORT = 80)
-			{
-				//Define server info
-				//A struct that will hold socket info like ip and port.
-				
-				
-				ZeroMemory(&sin,sizeof(sin));
-				
-				//Network byte order requires Big endian instead of little endian. Convert it.
-				sin.sin_port = htons(PORT);
-				sin.sin_family = AF_INET;
-				
-				//define address
-				memcpy(&sin.sin_addr.S_un.S_addr, host.getHandle()->h_addr_list[0], sizeof(sin.sin_addr.S_un.S_addr));
-								
-			}
-			
-			
-			SOCKADDR_IN &getHandle()
-			{ return sin;}
-			
-			private:
-			SOCKADDR_IN sin;
-		};
-		
-		
-		class Socket
-		{
-			public:
-			
-			Socket()
-			{
-				//AF_INET defines the socket as being through the internet(not just network. public Internet)
-				//SOCK_STREAM defines the socket as streaming over tcpIP.
-			    sock = socket(AF_INET,SOCK_STREAM,0); //Raw Socket
-			    
-			    if(sock < 0)
-			    	std::cerr << "Failed to create socket!\n";
-			}
-			
-			~Socket()
-			{
-				closesocket(sock);
-			}
-
-			SOCKET &getHandle()
-			{return sock;}			
-
-
-			bool connectToServer(ws::Network::Server &server)
-			{
-				//Connect
-				//Type cast &sin to const sockaddr*
-				if(connect(sock,(const sockaddr*)&server.getHandle(), sizeof(server.getHandle())) != 0)
-					return false;
-				return true;
-			}
-			
-			
-			
-			bool sendData(std::string data)
-			{ 
-				const char* mdata = data.c_str(); 
-				
-				if(!send(sock,mdata,strlen(mdata),0))
-					return false;
-				return true;
-			}
-			
-			
-			std::string getData(int maximumBytes = 4096)
-			{
-				//Receives data line by line. Do the while loop to get the entire thing.
-				char szBuffer[4096];
-				char szTemp[4096];
-				
-				while(recv(sock,szTemp,maximumBytes/*Choose Maximum chars received*/,0))
-				{
-					//Put temp onto buffer
-					strcat(szBuffer,szTemp);
-				}
-				std::string str = szBuffer;
-				return str;
-			}
-			
-			private:
-			SOCKET sock;		
-		};
-		
-	}
-
-
 
 
 	
@@ -4500,47 +4360,24 @@ namespace ws
 	
 	
 	
-	class InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict
+	class GDIPLUS
 	{
-		private:
-		
-		//GDI+	
+		public:
+			
 		Gdiplus::GdiplusStartupInput gdiplusstartup;
 		ULONG_PTR gdiplustoken;
-		//Network - Winsock
-		WSADATA data;
 		
-		public:	
-		
-		InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
+		GDIPLUS()
 		{
-			//GDI+
 			Gdiplus::GdiplusStartup(&gdiplustoken,&gdiplusstartup,nullptr);
-			
-			//Network <><><><><><><><><><><><><><>
-			
-			//Make a WORD(DWORD is double WORD). 
-			//Winsock takes a 16 bit WORD.
-			//The WORD for winsock is two parts combined. 2 and 2 make winsock V2.2
-			
-			WORD version = MAKEWORD(2,2);
-			
-			//Startup winsock as V2.2
-			if(WSAStartup(version, &data) != 0)
-		    	std::cerr << "Failed to initialize Networking!" << std::endl;
-						
 		}
 		
-		~InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
+		~GDIPLUS()
 		{
-			//Gdi+
 			Gdiplus::GdiplusShutdown(gdiplustoken);
-			
-			//Network
-			WSACleanup();
 		}
 		
-	}initializerandreallyreallylongnamesothatitwontcauseanamingconflict;//Nobody should be messing with this class anyways...
+	}gdi;
 
 
 
