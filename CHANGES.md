@@ -189,7 +189,7 @@
 
 * Added ws::Menu and ws::Dropdown for window dropdown menu items.
 
-
+* Added ws::Hue in place of Gdiplus::Color. Backwards compatible.
 
 
 

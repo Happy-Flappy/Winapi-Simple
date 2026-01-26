@@ -3,6 +3,17 @@
 
 
 
+//-lgdi32 -luser32 -lole32 -lmsimg32 -lkernel32 -lwinmm -lcomctl32 -lgdiplus -lshlwapi
+
+
+
+#ifndef UNICODE
+#define UNICODE
+#endif
+#ifndef _UNICODE
+#define _UNICODE
+#endif
+
 
 
 
@@ -12,11 +23,15 @@
 #ifndef STRICT
 #define STRICT
 #endif          
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
+//#ifndef WIN32_LEAN_AND_MEAN
+//#define WIN32_LEAN_AND_MEAN
+//#endif
 
- 
+//Network
+//#include <winsock2.h>
+//#include <ws2tcpip.h>
+//#include <stdio.h>
+// 
 #include <windows.h>  
 #include <windowsx.h>  
 #include <commctrl.h>  
@@ -56,10 +71,6 @@ typedef unsigned long PROPID;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-//Network
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <stdio.h>
 //Data Types
 #include <type_traits>
 #include <utility>
@@ -185,7 +196,13 @@ namespace ws
 	{
 		return LPCSTR(str.c_str());
 	}
-		
+	
+	LPCWSTR TO_LPCWSTR(std::string str)
+	{
+	    return WIDE(str).c_str();
+	}	
+	
+
 
 
 	std::wstring GetShortPathNameSafe(const std::wstring& longPath) 
@@ -725,7 +742,87 @@ namespace ws
 	        return result;
 	    }
 	};
+	
+	
+	
+	
+	
+	
+	
+	
+	class Hue
+	{
+		public:
+		int r=0,g=0,b=0,a=255;
 		
+	    static const Hue red;
+	    static const Hue green;
+	    static const Hue blue;
+	    static const Hue orange;
+	    static const Hue brown;
+	    static const Hue yellow;
+	    static const Hue cyan;
+	    static const Hue purple;
+	    static const Hue pink;
+	    static const Hue grey;
+	    static const Hue black;
+	    static const Hue white;
+		
+		
+		
+		Hue() = default;
+		
+		Hue(Gdiplus::Color &color)
+		{
+			r = color.GetR();
+			g = color.GetG();
+			b = color.GetB();
+			a = color.GetA();
+		}
+
+	    Hue(COLORREF color)
+	    {
+	        r = GetRValue(color);
+	        g = GetGValue(color);
+	        b = GetBValue(color);
+	        a = 255;  // COLORREF doesn't have alpha
+	    }
+		
+		Hue(int r1,int g1,int b1,int a1=255)
+		{
+			r = r1;
+			g = g1;
+			b = b1;
+			a = a1;
+		}
+		
+		
+		operator Gdiplus::Color() const
+		{
+			return Gdiplus::Color(a,r,g,b); 
+		}
+		
+		operator COLORREF() const
+		{
+			return RGB(r,g,b);
+		}
+		
+		
+	};
+	
+	const Hue Hue::red = Hue(255, 0, 0, 255);
+	const Hue Hue::green = Hue(0, 255, 0, 255);
+	const Hue Hue::blue = Hue(0, 0, 255, 255);
+	const Hue Hue::orange = Hue(255, 150, 0, 255);
+	const Hue Hue::brown = Hue(255, 80, 0, 255);
+	const Hue Hue::yellow = Hue(255, 255, 0, 255);
+	const Hue Hue::cyan = Hue(0, 255, 255, 255);
+	const Hue Hue::purple = Hue(140, 0, 255, 255);
+	const Hue Hue::pink = Hue(255, 0, 255, 255);
+	const Hue Hue::grey = Hue(150, 150, 150, 255);
+	const Hue Hue::black = Hue(0, 0, 0, 255);
+	const Hue Hue::white = Hue(255, 255, 255, 255);
+	
 }
 
 
@@ -3796,129 +3893,129 @@ namespace ws
 	
 
 
-	namespace Network
-	{
-		
-		
-		class Host
-		{
-			public:
-			
-			
-			Host(std::string ip)
-			{
-				host = gethostbyname(ip.c_str());
-				
-				if(host == nullptr)
-					std::cerr << "Failed to create Host!\n";	
-			}
-			
-			
-			HOSTENT* getHandle()
-			{return host;}
-			
-			
-			
-			private:
-			HOSTENT *host = nullptr;
-		};
-
-
-		class Server
-		{
-			public:
-			
-			Server(ws::Network::Host &host,int PORT = 80)
-			{
-				//Define server info
-				//A struct that will hold socket info like ip and port.
-				
-				
-				ZeroMemory(&sin,sizeof(sin));
-				
-				//Network byte order requires Big endian instead of little endian. Convert it.
-				sin.sin_port = htons(PORT);
-				sin.sin_family = AF_INET;
-				
-				//define address
-				memcpy(&sin.sin_addr.S_un.S_addr, host.getHandle()->h_addr_list[0], sizeof(sin.sin_addr.S_un.S_addr));
-								
-			}
-			
-			
-			SOCKADDR_IN &getHandle()
-			{ return sin;}
-			
-			private:
-			SOCKADDR_IN sin;
-		};
-		
-		
-		class Socket
-		{
-			public:
-			
-			Socket()
-			{
-				//AF_INET defines the socket as being through the internet(not just network. public Internet)
-				//SOCK_STREAM defines the socket as streaming over tcpIP.
-			    sock = socket(AF_INET,SOCK_STREAM,0); //Raw Socket
-			    
-			    if(sock < 0)
-			    	std::cerr << "Failed to create socket!\n";
-			}
-			
-			~Socket()
-			{
-				closesocket(sock);
-			}
-
-			SOCKET &getHandle()
-			{return sock;}			
-
-
-			bool connectToServer(ws::Network::Server &server)
-			{
-				//Connect
-				//Type cast &sin to const sockaddr*
-				if(connect(sock,(const sockaddr*)&server.getHandle(), sizeof(server.getHandle())) != 0)
-					return false;
-				return true;
-			}
-			
-			
-			
-			bool sendData(std::string data)
-			{ 
-				const char* mdata = data.c_str(); 
-				
-				if(!send(sock,mdata,strlen(mdata),0))
-					return false;
-				return true;
-			}
-			
-			
-			std::string getData(int maximumBytes = 4096)
-			{
-				//Receives data line by line. Do the while loop to get the entire thing.
-				char szBuffer[4096];
-				char szTemp[4096];
-				
-				while(recv(sock,szTemp,maximumBytes/*Choose Maximum chars received*/,0))
-				{
-					//Put temp onto buffer
-					strcat(szBuffer,szTemp);
-				}
-				std::string str = szBuffer;
-				return str;
-			}
-			
-			private:
-			SOCKET sock;		
-		};
-		
-	}
-
+//	namespace Network
+//	{
+//		
+//		
+//		class Host
+//		{
+//			public:
+//			
+//			
+//			Host(std::string ip)
+//			{
+//				host = gethostbyname(ip.c_str());
+//				
+//				if(host == nullptr)
+//					std::cerr << "Failed to create Host!\n";	
+//			}
+//			
+//			
+//			HOSTENT* getHandle()
+//			{return host;}
+//			
+//			
+//			
+//			private:
+//			HOSTENT *host = nullptr;
+//		};
+//
+//
+//		class Server
+//		{
+//			public:
+//			
+//			Server(ws::Network::Host &host,int PORT = 80)
+//			{
+//				//Define server info
+//				//A struct that will hold socket info like ip and port.
+//				
+//				
+//				ZeroMemory(&sin,sizeof(sin));
+//				
+//				//Network byte order requires Big endian instead of little endian. Convert it.
+//				sin.sin_port = htons(PORT);
+//				sin.sin_family = AF_INET;
+//				
+//				//define address
+//				memcpy(&sin.sin_addr.S_un.S_addr, host.getHandle()->h_addr_list[0], sizeof(sin.sin_addr.S_un.S_addr));
+//								
+//			}
+//			
+//			
+//			SOCKADDR_IN &getHandle()
+//			{ return sin;}
+//			
+//			private:
+//			SOCKADDR_IN sin;
+//		};
+//		
+//		
+//		class Socket
+//		{
+//			public:
+//			
+//			Socket()
+//			{
+//				//AF_INET defines the socket as being through the internet(not just network. public Internet)
+//				//SOCK_STREAM defines the socket as streaming over tcpIP.
+//			    sock = socket(AF_INET,SOCK_STREAM,0); //Raw Socket
+//			    
+//			    if(sock < 0)
+//			    	std::cerr << "Failed to create socket!\n";
+//			}
+//			
+//			~Socket()
+//			{
+//				closesocket(sock);
+//			}
+//
+//			SOCKET &getHandle()
+//			{return sock;}			
+//
+//
+//			bool connectToServer(ws::Network::Server &server)
+//			{
+//				//Connect
+//				//Type cast &sin to const sockaddr*
+//				if(connect(sock,(const sockaddr*)&server.getHandle(), sizeof(server.getHandle())) != 0)
+//					return false;
+//				return true;
+//			}
+//			
+//			
+//			
+//			bool sendData(std::string data)
+//			{ 
+//				const char* mdata = data.c_str(); 
+//				
+//				if(!send(sock,mdata,strlen(mdata),0))
+//					return false;
+//				return true;
+//			}
+//			
+//			
+//			std::string getData(int maximumBytes = 4096)
+//			{
+//				//Receives data line by line. Do the while loop to get the entire thing.
+//				char szBuffer[4096];
+//				char szTemp[4096];
+//				
+//				while(recv(sock,szTemp,maximumBytes/*Choose Maximum chars received*/,0))
+//				{
+//					//Put temp onto buffer
+//					strcat(szBuffer,szTemp);
+//				}
+//				std::string str = szBuffer;
+//				return str;
+//			}
+//			
+//			private:
+//			SOCKET sock;		
+//		};
+//		
+//	}
+//
 
 
 
@@ -4508,7 +4605,7 @@ namespace ws
 		Gdiplus::GdiplusStartupInput gdiplusstartup;
 		ULONG_PTR gdiplustoken;
 		//Network - Winsock
-		WSADATA data;
+		//WSADATA data;
 		
 		public:	
 		
@@ -4526,8 +4623,8 @@ namespace ws
 			WORD version = MAKEWORD(2,2);
 			
 			//Startup winsock as V2.2
-			if(WSAStartup(version, &data) != 0)
-		    	std::cerr << "Failed to initialize Networking!" << std::endl;
+			//if(WSAStartup(version, &data) != 0)
+		    //	std::cerr << "Failed to initialize Networking!" << std::endl;
 						
 		}
 		
@@ -4537,7 +4634,7 @@ namespace ws
 			Gdiplus::GdiplusShutdown(gdiplustoken);
 			
 			//Network
-			WSACleanup();
+			//WSACleanup();
 		}
 		
 	}initializerandreallyreallylongnamesothatitwontcauseanamingconflict;//Nobody should be messing with this class anyways...
@@ -4720,12 +4817,10 @@ namespace ws
 			
 			HINSTANCE hInstance = GetModuleHandle(nullptr);
 			
-		    LPCSTR CLASS_NAME = "Window";
-		    
 		    WNDCLASS wc = {};
 		    wc.lpfnWndProc = ws::Window::StaticWindowProc;
 		    wc.hInstance = hInstance;
-		    wc.lpszClassName = CLASS_NAME;
+		    wc.lpszClassName = L"Window";
 		    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 		    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		
@@ -4738,8 +4833,8 @@ namespace ws
 			
 			hwnd = CreateWindowEx(
 			exStyle,
-			CLASS_NAME,
-			TO_LPCSTR(title),
+			L"Window",
+			ws::TO_LPCWSTR(title),
 			style,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -5883,7 +5978,7 @@ namespace ws //CHILD WINDOW API
 			
 			for(int a=0;a<list.size();a++)
 			{
-				AppendMenu(hMenu, MF_STRING, 1+a, list[a].c_str());
+				AppendMenu(hMenu, MF_STRING, 1+a, TO_LPCWSTR(list[a]));
             }
             
 
@@ -5923,207 +6018,277 @@ namespace ws //CHILD WINDOW API
 	
 	class FileWindow
 	{
-		public:
-		
-		FileWindow()
-		{
-			
-		}
-		
-		
-		void setFileName(std::string file)
-		{
-			const char* initialText = file.c_str();
-		    strncpy(szFile, initialText, sizeof(szFile) - 1);
-		    szFile[sizeof(szFile) - 1] = '\0'; 
-		}
-		
-		std::string getFileName()
-		{
-			std::string file(szFile);
-			return file;
-		}
-		
-		
-		void setTitle(std::string name)
-		{ title = name; }
-		std::string getTitle()
-		{ return title; }
-		
-		void addFlag(DWORD newFlag)
-		{ flags |= newFlag; }
-		
-		void removeFlag(DWORD removeFlag)
-		{ flags &= ~removeFlag;}
-		
-		DWORD getFlags()
-		{ return flags; }
-		
-		
-		
-		
-		
-		bool open(ws::Window *parent = nullptr)
-		{
-			if(parent == nullptr)
-				ofn.hwndOwner = NULL;
-			else
-				ofn.hwndOwner = parent->hwnd;
-		
-			setFileName("");
-		    szFile[0] = '\0';
-		    ofn.lStructSize = sizeof(OPENFILENAME);
-		    ofn.lpstrFilter = "All Files\0*.*\0";
-		    ofn.lpstrInitialDir = ws::TO_LPCSTR(getFileName());
-		    ofn.lpstrFile = szFile;
-		    ofn.nMaxFile = sizeof(szFile);
-		    ofn.lpstrTitle = ws::TO_LPCSTR(title);
-		    //OFN_NOCHANGEDIR is essential to avoid having the dialog change the program's executable directory.
-		    ofn.Flags = flags;
-		    ofn.nFilterIndex = defaultFilter;
-			ofn.lpstrDefExt = "";
+	    public:
+	    
+	    FileWindow()
+	    {
+	        
+	    }
+	    
+	    void setFileName(std::string file)
+	    {
+	        fileName = file;
+	    }
+	    
+	    std::string getFileName()
+	    {
+	        return fileName;
+	    }
+	    
+	    void setTitle(std::string name)
+	    { 
+	        title = name; 
+	    }
+	    
+	    std::string getTitle()
+	    { 
+	        return title; 
+	    }
+	    
+	    void addFlag(DWORD newFlag)
+	    { 
+	        flags |= newFlag; 
+	    }
+	    
+	    void removeFlag(DWORD removeFlag)
+	    { 
+	        flags &= ~removeFlag;
+	    }
+	    
+	    DWORD getFlags()
+	    { 
+	        return flags; 
+	    }
+	    
+	    bool open(ws::Window *parent = nullptr)
+	    {
+	        std::wstring wtitle = ws::WIDE(title);
+	        std::wstring wfileName = ws::WIDE(fileName);
+	        
+	        wcsncpy(szFile, wfileName.c_str(), MAX_PATH - 1);
+	        szFile[MAX_PATH - 1] = L'\0';
+	        
 
-			if(parent)
-			{
-				MSG m;
-		        while(parent->pollEvent(m)) {} // Clear event queue because of the blocking nature of this dialog
-			}
-			
-			if(GetOpenFileName(&ofn))
-				return true;
-			else
-			{
-				setFileName("");
-				return false;
-			}
-		}
-		
-		bool save(ws::Window *parent = nullptr)
-		{
-			if(parent == nullptr)
-				ofn.hwndOwner = NULL;
-			else
-				ofn.hwndOwner = parent->hwnd;
-			
-			setFileName("");
-		    szFile[0] = '\0';
-		    ofn.lStructSize = sizeof(OPENFILENAME);
-		    ofn.lpstrFilter = "All Files\0*.*\0";
-		    ofn.lpstrInitialDir = ws::TO_LPCSTR(getFileName());
-		    ofn.lpstrFile = szFile;
-		    ofn.nMaxFile = sizeof(szFile);
-		    ofn.lpstrTitle = ws::TO_LPCSTR(title);
-		    
-		    //OFN_NOCHANGEDIR is essential to avoid having the dialog change the program's executable directory.
-		    ofn.Flags = flags;//OFN_NODEREFERENCELINKS allows shortcuts to stay shortcuts
-		    ofn.lpstrDefExt = "";
-			
-			
-			if(parent)
-			{
-				MSG m;
-		        while(parent->pollEvent(m)) {} // Clear event queue because of the blocking nature of this dialog
-			}
-			
-			
-			
-			if(GetSaveFileName(&ofn))
-			{
-				return true;
-			}
-			else
-			{
-				setFileName("");
-				return false;				
-			}
-		}
-		
-		private:
-		
-		DWORD flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NODEREFERENCELINKS | OFN_NOCHANGEDIR | OFN_EXPLORER;	
-		std::string title = "File Explorer";	
-		int defaultFilter = 1;
-		char szFile[260];
-		
-		OPENFILENAME ofn = {0};
+	    
+	        OPENFILENAMEW ofn = {0};
+	        ofn.lStructSize = sizeof(OPENFILENAMEW);
+	        ofn.lpstrFilter = L"All Files\0*.*\0";
+	        ofn.lpstrFile = szFile;
+	        ofn.nMaxFile = MAX_PATH;
+	        ofn.lpstrTitle = wtitle.c_str();
+	        ofn.Flags = flags;
+	        ofn.nFilterIndex = defaultFilter;
+	        ofn.lpstrDefExt = L"";
+
+
+	        if(parent == nullptr)
+	            ofn.hwndOwner = NULL;
+	        else
+	            ofn.hwndOwner = parent->hwnd;
+
+	        
+	        if (!fileName.empty()) {
+	            std::filesystem::path p(fileName);
+	            if (std::filesystem::exists(p)) {
+	                std::wstring wdir = ws::WIDE(p.parent_path().string());
+	                ofn.lpstrInitialDir = wdir.c_str();
+	            }
+	        }
+	        
+	        if(parent)
+	        {
+	            MSG m;
+	            while(parent->pollEvent(m)) {}
+	        }
+	        
+	        if(GetOpenFileNameW(&ofn))
+	        {
+	            fileName = ws::SHORT(szFile);
+	            return true;
+	        }
+	        else
+	        {
+	            fileName.clear();
+	            return false;
+	        }
+	    }
+	    
+	    bool save(ws::Window *parent = nullptr)
+	    {
+	        std::wstring wtitle = ws::WIDE(title);
+	        std::wstring wfileName = ws::WIDE(fileName);
+	        
+	        wcsncpy(szFile, wfileName.c_str(), MAX_PATH - 1);
+	        szFile[MAX_PATH - 1] = L'\0';
+	        
+
+	        OPENFILENAMEW ofn = {0};
+	        ofn.lStructSize = sizeof(OPENFILENAMEW);
+	        ofn.lpstrFilter = L"All Files\0*.*\0";
+	        ofn.lpstrFile = szFile;
+	        ofn.nMaxFile = MAX_PATH;
+	        ofn.lpstrTitle = wtitle.c_str();
+	        ofn.Flags = flags | OFN_OVERWRITEPROMPT;
+	        ofn.nFilterIndex = defaultFilter;
+	        ofn.lpstrDefExt = L"";
+
+
+	        if(parent == nullptr)
+	            ofn.hwndOwner = NULL;
+	        else
+	            ofn.hwndOwner = parent->hwnd;
+	        
+
+	        
+	        if (!fileName.empty()) {
+	            std::filesystem::path p(fileName);
+	            if (p.has_parent_path()) {
+	                std::wstring wdir = ws::WIDE(p.parent_path().string());
+	                ofn.lpstrInitialDir = wdir.c_str();
+	            }
+	        }
+	        
+	        if(parent)
+	        {
+	            MSG m;
+	            while(parent->pollEvent(m)) {}
+	        }
+	        
+	        if(GetSaveFileNameW(&ofn))
+	        {
+	            fileName = ws::SHORT(szFile);
+	            return true;
+	        }
+	        else
+	        {
+	            fileName.clear();
+	            return false;                
+	        }
+	    }
+	    
+	    private:
+	    
+	    DWORD flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NODEREFERENCELINKS | OFN_NOCHANGEDIR | OFN_EXPLORER;    
+	    std::string title = "File Explorer";    
+	    int defaultFilter = 1;
+	    std::string fileName = ""; 
+	    
+	    //Temporary buffer
+	    wchar_t szFile[MAX_PATH] = L"";
+	    
 	};
+	
+	
 	
 	class FolderWindow
 	{
-		public:
-		
-		FolderWindow()
-		{
-			
-		}
-		
-		void setTitle(std::string name)
-		{title = name;}
-		std::string getTitle()
-		{return title;}
-		void addFlag(DWORD flag)
-		{ flags |= flag;}
-		void setFlags(DWORD allFlags)
-		{ flags = allFlags;}
-		void removeFlag(DWORD flag)
-		{ flags &= ~flag;}
-		DWORD getFlags()
-		{return flags;}
-		
-		std::string getFolderName()
-		{ return folderName;}
-		
-		
-		
-		
-		bool open(ws::Window *parent = nullptr)
-		{
-		
-		    bi.lpszTitle = ws::TO_LPCSTR(title);
-		    
-		    //OFN_NOCHANGEDIR is essential to avoid having the dialog change the program's executable directory.
-		    bi.ulFlags = flags;
-			if(parent == nullptr)
-				bi.hwndOwner = NULL;
-			else
-				bi.hwndOwner = parent->hwnd;
-		
-			if(parent)
-			{
-				MSG m;
-		        while(parent->pollEvent(m)) {} // Clear event queue because of the blocking nature of this dialog
-			}
-			
-		
-		    LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
-		    if (pidl != 0) {
-		        // Get the name of the folder
-		        char path[MAX_PATH];
-		        if (SHGetPathFromIDList(pidl, path)) {
-		            // Free memory used
-		            IMalloc* imalloc = 0;
-		            if (SUCCEEDED(SHGetMalloc(&imalloc))) {
-		                imalloc->Free(pidl);
-		                imalloc->Release();
-		            }
-		            folderName = std::string(path);
-		            return true;
-			
-		        }
-		    }
-		    folderName = "";
-		    return false;
-			
-		}		
-		
-		
-		private:
-		BROWSEINFO bi = {0};	
-		std::string title = "Open Folder";
-		DWORD flags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_RETURNFSANCESTORS | OFN_NOCHANGEDIR;	
-		std::string folderName = "";
+	    public:
+	    
+	    FolderWindow()
+	    {
+	        
+	    }
+	    
+	    void setTitle(std::string name)
+	    {
+	        title = name;
+	    }
+	    
+	    std::string getTitle()
+	    {
+	        return title;
+	    }
+	    
+	    void addFlag(DWORD flag)
+	    { 
+	        flags |= flag;
+	    }
+	    
+	    void setFlags(DWORD allFlags)
+	    { 
+	        flags = allFlags;
+	    }
+	    
+	    void removeFlag(DWORD flag)
+	    { 
+	        flags &= ~flag;
+	    }
+	    
+	    DWORD getFlags()
+	    {
+	        return flags;
+	    }
+	    
+	    std::string getFolderName()
+	    { 
+	        return folderName;
+	    }
+	    
+	    bool open(ws::Window *parent = nullptr)
+	    {
+	        std::wstring wtitle = ws::WIDE(title);
+	        
+	        BROWSEINFOW bi = {0};
+	        bi.lpszTitle = wtitle.c_str();
+	        bi.ulFlags = flags;
+	        
+	        if(parent == nullptr)
+	            bi.hwndOwner = NULL;
+	        else
+	            bi.hwndOwner = parent->hwnd;
+	        
+	        if (!initialFolder.empty()) {
+	            std::wstring winitial = ws::WIDE(initialFolder);
+	            bi.lParam = (LPARAM)winitial.c_str();
+	            bi.lpfn = BrowseCallbackProc;
+	            bi.ulFlags |= BIF_NEWDIALOGSTYLE;
+	        }
+	    
+	        if(parent)
+	        {
+	            MSG m;
+	            while(parent->pollEvent(m)) {}
+	        }
+	        
+	        LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
+	        if (pidl != nullptr) {
+	            // Get the path of the selected folder
+	            wchar_t path[MAX_PATH];
+	            if (SHGetPathFromIDListW(pidl, path)) {
+	                
+					folderName = ws::SHORT(path);
+	                
+	                // Free the PIDL
+	                CoTaskMemFree(pidl);
+	                return true;
+	            }
+	            CoTaskMemFree(pidl);
+	        }
+	        
+	        folderName = "";
+	        return false;
+	    }
+	    
+	    void setInitialFolder(std::string folder)
+	    {
+	        initialFolder = folder;
+	    }
+	    
+	    private:
+	    std::string title = "Select Folder";
+	    DWORD flags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+	    std::string folderName = "";
+	    std::string initialFolder = "";
+	    
+	    // callback function for setting initial folder
+	    static int __stdcall BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
+	    {
+	        if (uMsg == BFFM_INITIALIZED) {
+	            SendMessageW(hwnd, BFFM_SETSELECTIONW, TRUE, lpData);
+	        }
+	        return 0;
+	    }
 	};
-	
 	
 
 
@@ -6348,8 +6513,8 @@ namespace ws //CHILD WINDOW API
 			
 			hwnd = CreateWindowEx(
 			0,
-			ws::TO_LPCSTR("BUTTON"),
-			ws::TO_LPCSTR(getText()),
+			L"BUTTON",
+			ws::TO_LPCWSTR(getText()),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6421,7 +6586,7 @@ namespace ws //CHILD WINDOW API
 			hwnd = CreateWindowEx(
 			0,
 			TRACKBAR_CLASS,
-			ws::TO_LPCSTR(getText()),
+			ws::TO_LPCWSTR(getText()),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6525,7 +6690,7 @@ namespace ws //CHILD WINDOW API
 			hwnd = CreateWindowEx(
 			WS_EX_CLIENTEDGE,
 			TEXT("EDIT"),
-			ws::TO_LPCSTR(getText()),
+			ws::TO_LPCWSTR(getText()),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6589,7 +6754,7 @@ namespace ws //CHILD WINDOW API
 			hwnd = CreateWindowEx(
 			0,
 			TEXT("STATIC"),
-			ws::TO_LPCSTR(getText()),
+			ws::TO_LPCWSTR(getText()),
 			style,
 			getPosition().x,
 			getPosition().y,
