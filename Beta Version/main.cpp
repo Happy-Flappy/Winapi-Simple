@@ -3,31 +3,46 @@
 
 
 
+
 int main()
 {
-	
 	ws::Window window(960,540,"");
+	DragAcceptFiles(window.hwnd,TRUE);
 	
 	
-	ws::Texture texture;
-	texture.create(100,100,ws::Hue(255,0,0));
+	
+	//ws::ClipData clip = ws::clipboard.paste();
+	ws::ClipData dropData;
 	
 	
-	ws::Sprite sprite;
-	sprite.setTexture(texture);
+	//ws::Texture texture = clip.getTexture();
 	
+	//ws::Sprite sprite;
+	//sprite.setTexture(texture);
 	
 	while(window.isOpen())
 	{
+		MSG m;
+		while(window.pollEvent(m))
+		{
+			if(m.message == WM_DROPFILES)
+				dropData = ws::mover.get(m);
+		}
 		
-		ws::Hue hue = ws::Hue::yellow;
+		/*
+		for(int a=0;a<dropData.getFiles().size();a++)
+		{
+			std::cout << dropData.getFiles()[a] << "\n";
+			system("pause");
+			return 0;
+		}
+		*/
 		
-		Gdiplus::Color gdiColor;
-		gdiColor = hue;
 		
-		
-		window.clear(hue);
-		window.draw(sprite);
+		window.clear();
+		//window.draw(sprite);
 		window.display();
 	}
+	return 0;
+	
 }

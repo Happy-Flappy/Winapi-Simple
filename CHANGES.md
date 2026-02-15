@@ -191,6 +191,7 @@
 
 * Added ws::Hue in place of Gdiplus::Color. Backwards compatible.
 
+* Fixed ws::Window to allow creation of many windows and window polls.
 
 
 # New major features to be added. 

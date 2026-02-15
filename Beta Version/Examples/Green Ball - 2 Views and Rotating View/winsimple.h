@@ -814,7 +814,7 @@ namespace ws
 	const Hue Hue::green = Hue(0, 255, 0, 255);
 	const Hue Hue::blue = Hue(0, 0, 255, 255);
 	const Hue Hue::orange = Hue(255, 150, 0, 255);
-	const Hue Hue::brown = Hue(255, 80, 0, 255);
+	const Hue Hue::brown = Hue(150,100, 50, 255);
 	const Hue Hue::yellow = Hue(255, 255, 0, 255);
 	const Hue Hue::cyan = Hue(0, 255, 255, 255);
 	const Hue Hue::purple = Hue(140, 0, 255, 255);
@@ -1711,6 +1711,7 @@ namespace ws
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
 		    graphics.SetTransform(&matrix);
+			
 		}
 			
 		private:
@@ -1750,7 +1751,6 @@ namespace ws
 		    
 		    matrix.Scale(scaleX, scaleY);
 		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);			
-
 
 
 
@@ -3683,8 +3683,8 @@ namespace ws
 			for(double a=0;a<(2*M_PI);a+=inc)
 			{
 				double angle = a;
-				int resx = static_cast<int>(std::cos(angle) * radius);
-				int resy = static_cast<int>(std::sin(angle) * radius);
+				int resx = static_cast<int>(std::cos(angle) * float(radius));
+				int resy = static_cast<int>(std::sin(angle) * float(radius));
 				poly.addVertex(resx + radius, resy + radius);
 			}
 			m_points = points;
@@ -5177,6 +5177,12 @@ namespace ws
 
 
 
+		void setChromaKey(ws::Hue hue)
+		{
+			addExStyle(WS_EX_LAYERED);
+			SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
+		}
+
 
 		
 		ws::Vec2i toWorld(int x,int y)
@@ -5299,10 +5305,11 @@ namespace ws
 
 
 
-
+			
 
 			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
         	canvas->GetTransform(&originalMatrix);
+			
 			
 			//Apply the transformation
 			view.apply(*canvas);
@@ -5313,6 +5320,7 @@ namespace ws
 			//Restore the original transformation so that the transform can be applied again next time. 
 			//This is because changes occur and need to be transformed too.
 			canvas->SetTransform(&originalMatrix);
+			
 		}
 		
 		
