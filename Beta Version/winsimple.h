@@ -4908,17 +4908,16 @@ namespace ws
 		
 		std::string getText()
 		{
-		    LRESULT textLength = SendMessage(hwnd, WM_GETTEXTLENGTH, 0, 0);
-		
-		    if (textLength <= 0)
-		        return "";
-		    
-		    std::vector<char> buffer(static_cast<size_t>(textLength) + 1);
-		
-		    SendMessage(hwnd, WM_GETTEXT, static_cast<WPARAM>(buffer.size()), reinterpret_cast<LPARAM>(buffer.data()));
-		
-		    return std::string(buffer.data());		    
-		    
+			if (!hwnd) return text;
+
+			int len = GetWindowTextLengthW(hwnd);
+			if (len == 0) return "";
+
+			std::wstring wbuf(len + 1, L'\0');
+			GetWindowTextW(hwnd, &wbuf[0], len + 1);
+			wbuf.resize(len); // remove the null terminator
+
+			return ws::SHORT(wbuf);
 		}
 
 		void setFont(ws::Font &font, ws::Text &textSettings)
@@ -5163,18 +5162,33 @@ namespace ws
 				return false;
 			
 			MSG msg;
-			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
+			{
+				
 				if (msg.message == WM_QUIT) {
 					isRunning = false;
 					return false;
 				}
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
 				
-				if (msg.hwnd == hwnd) {
+				
+				bool isOurs = (msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd));
+				
+				if (isOurs) 
+				{
 					msgQ.push(msg);
 				}
-			}
+				
+				if (isOurs && !IsDialogMessage(hwnd, &msg)) 
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				} 
+				else if(!isOurs) 
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+			}				
 			
 			return isRunning && hwnd;
 		}
@@ -5580,6 +5594,17 @@ namespace ws
 				case WM_CLOSE:
 					DestroyWindow(hwnd);
 					return 0;
+
+				case WM_COMMAND:
+				{
+					MSG msg = {};
+					msg.hwnd = hwnd;
+					msg.message = WM_COMMAND;
+					msg.wParam = wParam;
+					msg.lParam = lParam;
+					msgQ.push(msg);
+					return 0;
+				}
 				
 				
 	            case WM_PAINT: {
@@ -6710,12 +6735,22 @@ namespace ws //CHILD WINDOW API
 			text.setCharacterSize(15);
 			setFont(font,text);
 		
+			SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)char_limit, 0);
+		
 			ShowWindow(hwnd,SW_SHOW);
 			UpdateWindow(hwnd);
 			
 		
 			return true;		
 		}		
+		int char_limit = 0;
+		void setCharacterLimit(int max_chars = 0)//0 is infinite
+		{
+			if(!hwnd)
+				char_limit = max_chars;
+			else
+				SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)max_chars, 0);			
+		}
 		
 		
 		bool getFocus()
