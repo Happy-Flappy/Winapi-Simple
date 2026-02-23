@@ -74,6 +74,7 @@ typedef unsigned long PROPID;
 //Data Types
 #include <type_traits>
 #include <utility>
+#include <mutex>
 //
 
 
@@ -1569,69 +1570,57 @@ namespace ws
 		
 		
 		
-	    [[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos,ws::Vec2i screenSize) 
-	    {
-		    
+		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
+		{
+			// First account for window stretching
+			ws::Vec2i stretchedPos;
+			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
+											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
+			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
+											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
 			
-			    
-	        // First account for window stretching
-	        ws::Vec2i stretchedPos;
-	        stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
-	                                         (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
-	        stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
-	                                         (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
-	        
-	        
-	        // Now apply the transformation (scaled by zoom)
-	        float zoomFactor = std::pow(2.0f, zoom);
-	        
-	        // Calculate the visible world center
-	        float visibleWorldCenterX = world.left + world.width / 2.0f;
-	        float visibleWorldCenterY = world.top + world.height / 2.0f;
-	        
-	        // Calculate the port center
-	        float portCenterX = port.left + port.width / 2.0f;
-	        float portCenterY = port.top + port.height / 2.0f;
-	        
-	        // Calculate scale to fit visible world into port
-	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-	        
-	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-	        
-	        // Apply inverse transformation
-	        float worldX = static_cast<float>(stretchedPos.x);
-	        float worldY = static_cast<float>(stretchedPos.y);
-	        
-	        // Reverse the transformation steps
-	        // 1. Translate from port center to origin
-	        worldX -= portCenterX;
-	        worldY -= portCenterY;
-	        
-	        // 2. Reverse rotation
-	        if (rotation != 0) {
-	            Gdiplus::Matrix rotMatrix;
-	            rotMatrix.Rotate(-rotation);
-	            Gdiplus::PointF point(worldX, worldY);
-	            rotMatrix.TransformPoints(&point, 1);
-	            worldX = point.X;
-	            worldY = point.Y;
-	        }
-	        
-	        // 3. Reverse scale
-	        worldX /= scaleX;
-	        worldY /= scaleY;
-	        
-	        // 4. Translate back to world center
-	        worldX += visibleWorldCenterX;
-	        worldY += visibleWorldCenterY;
-	        
-	        
-	        
-	        
-	        return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
-	    }       
+			// Calculate the visible world center
+			float visibleWorldCenterX = world.left + world.width / 2.0f;
+			float visibleWorldCenterY = world.top + world.height / 2.0f;
+			
+			// Calculate the port center
+			float portCenterX = port.left + port.width / 2.0f;
+			float portCenterY = port.top + port.height / 2.0f;
+			
+			// Calculate scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Apply inverse transformation
+			float worldX = static_cast<float>(stretchedPos.x);
+			float worldY = static_cast<float>(stretchedPos.y);
+			
+			// Reverse transformations in opposite order
+			worldX -= portCenterX;
+			worldY -= portCenterY;
+			
+			if (rotation != 0) {
+				Gdiplus::Matrix rotMatrix;
+				rotMatrix.Rotate(-rotation);
+				Gdiplus::PointF point(worldX, worldY);
+				rotMatrix.TransformPoints(&point, 1);
+				worldX = point.X;
+				worldY = point.Y;
+			}
+			
+			worldX /= scaleX;
+			worldY /= scaleY;
+			
+			worldX += visibleWorldCenterX;
+			worldY += visibleWorldCenterY;
+			
+			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
+		}
 	    
 	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
 	    {
@@ -1711,7 +1700,6 @@ namespace ws
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
 		    graphics.SetTransform(&matrix);
-			
 		}
 			
 		private:
@@ -1719,41 +1707,34 @@ namespace ws
 			
 		void updateMatrix()			
 		{
-		    matrix.Reset();
-		    
-		    float zoomFactor = std::pow(2.0f, zoom);
-		    
-		    // The VISIBLE portion of the world (after zoom)
-		    float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-		    float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-		    
-		    // We assume we're viewing the CENTER of the world
-		    float visibleWorldCenterX = static_cast<float>(world.left) + static_cast<float>(world.width) / 2.0f;
-		    float visibleWorldCenterY = static_cast<float>(world.top) + static_cast<float>(world.height) / 2.0f;
-		    
-		    // But the visible rectangle should be centered at this point
-		    float visibleWorldLeft = visibleWorldCenterX - visibleWorldWidth / 2.0f;
-		    float visibleWorldTop = visibleWorldCenterY - visibleWorldHeight / 2.0f;
-		    
-		    // Calculate scale to fit visible world into port
-		    float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-		    float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-		    
-		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-		    
-		    // Transform from visible world to port
-		    matrix.Translate(portCenterX, portCenterY);
-		    
-		    if (rotation != 0) {
-		        matrix.Rotate(rotation);
-		    }
-		    
-		    matrix.Scale(scaleX, scaleY);
-		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);			
-
-
-
+			matrix.Reset();
+			
+			// Port center
+			float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+			float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+			
+			// Visible world uses full world dimensions (zoom doesn't change visible area)
+			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
+			
+			// Scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom as a direct multiplier
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Transform
+			matrix.Translate(portCenterX, portCenterY);
+			
+			if (rotation != 0) {
+				matrix.Rotate(rotation);
+			}
+			
+			matrix.Scale(scaleX, scaleY);
+			matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
 		}
 			
 			
@@ -1800,11 +1781,14 @@ namespace ws
 		
 	    ~Texture()
 	    {
+			
 	        if (bitmap != nullptr)
 	        {
 	            delete bitmap;
 	            bitmap = nullptr;
 	        }
+			width = 0;
+			height = 0;
 	    }		
 		
 
@@ -1858,14 +1842,15 @@ namespace ws
 	        return *this;
 	    }
 
-
+		//move assignment
 	    Texture& operator=(Texture&& other) noexcept
 	    {
 	        if (this != &other)
 	        {
 	            if (bitmap != NULL)
 	            {
-	                delete bitmap;
+					delete bitmap;
+					bitmap = nullptr;
 	            }
 	            
 	            bitmap = other.bitmap;
@@ -1883,6 +1868,10 @@ namespace ws
 	
 		bool create(int w,int h,Gdiplus::Color color = {0,0,0,0})
 		{
+			if (bitmap != nullptr) {
+				delete bitmap;
+				bitmap = nullptr;
+			}
 			
 			bitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
 			
@@ -1903,6 +1892,7 @@ namespace ws
 			height = h;
 			return true;
 		}
+	
 	
 		
 		
@@ -2643,8 +2633,9 @@ namespace ws
 		    
 	        
 	        
-	        graphics->SetTransform(&transform);
-	        
+	        //graphics->SetTransform(&transform);
+	        graphics->MultiplyTransform(&transform, Gdiplus::MatrixOrderPrepend);
+			
 	        // Draw the actual content
 	        draw(graphics);
 	        
@@ -4019,7 +4010,46 @@ namespace ws
 
 
 
-	
+	class ClipData
+	{
+		private:
+		std::vector<std::string> files;
+		std::string text = "";
+		ws::Texture texture;
+		
+		public:
+		
+		ClipData()
+		{
+		}
+		
+		
+		void setTexture(ws::Texture tex)
+		{
+			texture = tex;
+		}
+		void setText(std::string str)
+		{
+			text = str;
+		}
+		void setFiles(std::vector<std::string> FilesVector)
+		{
+			files = FilesVector;
+		}
+		ws::Texture getTexture()
+		{
+			return texture;
+		}
+		std::string getText()
+		{
+			return text;
+		}
+		std::vector<std::string>& getFiles()
+		{
+			return files;
+		}
+		
+	};
 	
 	
 	
@@ -4208,6 +4238,41 @@ namespace ws
 	public:
 	    Clipboard()
 		{}
+
+	    ClipData paste() 
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return ClipData();
+	        }
+			
+			ClipData data;
+	        
+			//text
+	        if (IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+	            HANDLE hData = GetClipboardData(CF_UNICODETEXT);
+	            if (hData) {
+	                LPCWSTR pGlobal = (LPCWSTR)GlobalLock(hData);
+	                if (pGlobal) {
+	                    data.setText(ws::SHORT(pGlobal));
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+			
+			ws::Texture tex = pasteTexture();
+			
+			//texture
+			data.setTexture(tex);
+			
+			//files
+			data.setFiles(pasteFiles());
+			
+			
+	        
+	        CloseClipboard();
+	        return data;
+	    }
+
 	    
 	    bool copyText(const std::string& str) 
 	    {
@@ -4241,28 +4306,7 @@ namespace ws
 	        return true;
 	    }
 	    
-	    std::string pasteText() 
-	    {
-	        if (!OpenClipboardCheck()) {
-	            return "";
-	        }
-				        
-	        std::string result;
-	        
-	        if (IsClipboardFormatAvailable(CF_UNICODETEXT)) {
-	            HANDLE hData = GetClipboardData(CF_UNICODETEXT);
-	            if (hData) {
-	                LPCWSTR pGlobal = (LPCWSTR)GlobalLock(hData);
-	                if (pGlobal) {
-	                    result = ws::SHORT(pGlobal);
-	                    GlobalUnlock(hData);
-	                }
-	            }
-	        }
-	        
-	        CloseClipboard();
-	        return result;
-	    }
+
 	    
 	    bool copyTexture(ws::Texture &texture, ws::IntRect rect = {0,0,0,0}) 
 	    {
@@ -4305,7 +4349,7 @@ namespace ws
 	        return success;
 	    }
 	    
-	    
+	    private:
 	    ws::Texture pasteTexture(ws::IntRect rect = {0,0,0,0}) 
 	    {
 	        ws::Texture tex;
@@ -4313,6 +4357,11 @@ namespace ws
 	        if (!OpenClipboardCheck()) {
 	            return tex;
 	        }
+
+			if (tex.bitmap) {
+				delete tex.bitmap;
+				tex.bitmap = nullptr;
+			}
 	        
 	        // Try to get DIB first (better quality)
 	        if (IsClipboardFormatAvailable(CF_DIB)) {
@@ -4334,8 +4383,7 @@ namespace ws
 	                        pPixels);
 	                    
 	                    if (bitmap && bitmap->GetLastStatus() == Gdiplus::Ok) {
-	                        tex.create(bitmap->GetWidth(),bitmap->GetHeight());
-	                        tex.bitmap = bitmap;
+	                        tex.loadFromBitmapPlus(*bitmap);
 	                    } else {
 	                        delete bitmap;
 	                    }
@@ -4352,7 +4400,7 @@ namespace ws
 	                if (clipboardBitmap && clipboardBitmap->GetLastStatus() == Gdiplus::Ok) {
 	                    
 						tex.create(clipboardBitmap->GetWidth(),clipboardBitmap->GetHeight());
-						tex.bitmap = clipboardBitmap;
+						tex.loadFromBitmapPlus(*clipboardBitmap);
 	                } else {
 	                    delete clipboardBitmap;
 	                }
@@ -4367,14 +4415,14 @@ namespace ws
 	            if (croppedBitmap) {
 	                delete tex.bitmap;
 	                tex.create(croppedBitmap->GetWidth(),croppedBitmap->GetHeight());
-					tex.bitmap = croppedBitmap;
+					tex.loadFromBitmapPlus(*croppedBitmap);
 	                
 	            }
 	        }
 	        
 	        return tex;
 	    }
-
+		public:
 
 	    bool copyFile(const std::string& filePath)
 	    {
@@ -4501,6 +4549,7 @@ namespace ws
 	        return success;
 	    }
 	    
+		private:
 
 	    std::vector<std::string> pasteFiles()
 	    {
@@ -4542,12 +4591,16 @@ namespace ws
 	    std::string pasteFile()
 	    {
 	        auto files = pasteFiles();
-	        if (!files.empty()) {
-	            return files[0];
+	        if (!files.empty()) 
+			{
+				return files[0];
 	        }
 	        return "";
 	    }
+		
+		public:
 	    
+		/*
 
 	    bool hasFiles()
 	    {
@@ -4581,6 +4634,8 @@ namespace ws
 	        return hasImage;
 	    }
 	    
+		*/
+		
 	    bool clear() 
 	    {
 	        if (!OpenClipboardCheck()) {
@@ -4591,23 +4646,92 @@ namespace ws
 	        return success;
 	    }
 	    
+		
+		
+		
 	}clipboard;
 	
+
+
+
+	class Mover //Drag-N-Drop
+	{
+		
+		private:
+		bool initialized = false;
+		
+		public:
+		Mover()
+		{
+			if(!initialized)
+				OleInitialize(NULL);
+			initialized = true;
+		}
+		~Mover()
+		{
+			if(initialized)
+				OleUninitialize();
+		}		
+		
+		ClipData get(MSG &m)
+		{
+			
+
+			
+			ClipData data;
+			
+			if(m.message == WM_DROPFILES)
+			{
+				
+				HDROP hDrop = (HDROP)m.wParam;
+				UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+				
+				
+				std::vector<std::string> f;
+				
+				for (UINT i = 0; i < count; i++)
+				{
+					wchar_t szFile[MAX_PATH] = {0};
+					UINT charsCopied = DragQueryFileW(hDrop, i, szFile, MAX_PATH);
+					if(charsCopied > 0)
+					{
+						std::wstring wfile(szFile);
+						f.push_back(ws::SHORT(wfile));
+					}
+				}
+				data.setFiles(f);
+				
+				DragFinish(hDrop);
+				
+			}
+
+			return data;
+
+		}
+		
+		
+		
+		
+		
+	}mover;
+
+
 	
 	
 	
 	
 	class InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict
 	{
-		private:
+		public:	
 		
 		//GDI+	
 		Gdiplus::GdiplusStartupInput gdiplusstartup;
 		ULONG_PTR gdiplustoken;
 		//Network - Winsock
 		//WSADATA data;
+		int maxControlID = 0;
 		
-		public:	
+		
 		
 		InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
 		{
@@ -4620,7 +4744,7 @@ namespace ws
 			//Winsock takes a 16 bit WORD.
 			//The WORD for winsock is two parts combined. 2 and 2 make winsock V2.2
 			
-			WORD version = MAKEWORD(2,2);
+			//WORD version = MAKEWORD(2,2);
 			
 			//Startup winsock as V2.2
 			//if(WSAStartup(version, &data) != 0)
@@ -4640,11 +4764,256 @@ namespace ws
 	}initializerandreallyreallylongnamesothatitwontcauseanamingconflict;//Nobody should be messing with this class anyways...
 
 
-
-
 	
-	
+	class Window;
+
+	class Child
+	{
+		public:
 		
+		HWND hwnd = NULL;
+		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
+		DWORD textStyle = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+		
+
+		unsigned int controlID = 0;
+		COLORREF backgroundColor = RGB(0,0,0);
+		COLORREF textColor = RGB(255,255,255);
+		COLORREF borderColor = RGB(0,0,0);
+		
+		private:
+		
+		HFONT customFont = nullptr;
+		std::string text = "";
+		int x = 0,y = 0,width = 100,height = 100;		
+
+		public:
+		
+		Child()
+		{
+			int &maxControlID = initializerandreallyreallylongnamesothatitwontcauseanamingconflict.maxControlID;
+			controlID = maxControlID+1;
+			maxControlID++;
+		}
+
+        virtual ~Child()
+        {
+            if (hwnd && IsWindow(hwnd))
+            {
+                DestroyWindow(hwnd);
+            }
+        }				
+		
+		void setPosition(int xPos,int yPos)
+		{
+			x = xPos;
+			y = yPos;
+			
+			if (hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}		
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			setPosition(pos.x, pos.y);
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			return {x,y};
+		}
+		
+		void setSize(int w,int h)
+		{
+			width = w;
+			height = h;
+			
+			if (hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		
+		void setSize(ws::Vec2i size)
+		{
+			setSize(size.x, size.y);
+		}
+		
+		ws::Vec2i getSize()
+		{
+			return {width,height};
+		}
+		
+		void addStyle(DWORD addedStyle)
+		{
+            style |= addedStyle;
+			if (hwnd)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style);
+                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+            
+		}
+		
+		void removeStyle(DWORD removedStyle)
+		{
+			
+			style &= ~removedStyle;
+			if (hwnd)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style);
+                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }	
+					
+		}
+		
+        bool hasStyle(DWORD checkStyle)
+        {
+            if (hwnd)
+            {
+                DWORD currentStyle = GetWindowLong(hwnd, GWL_STYLE);
+                return (currentStyle & checkStyle) != 0;
+            }
+            return (style & checkStyle) != 0;
+        }
+		
+		void setText(std::string newText)
+		{
+			
+			text = newText;
+			if (hwnd)
+                SetWindowTextA(hwnd, text.c_str());
+            
+		}
+		
+		std::string getText()
+		{
+			if (!hwnd) return text;
+
+			int len = GetWindowTextLengthW(hwnd);
+			if (len == 0) return "";
+
+			std::wstring wbuf(len + 1, L'\0');
+			GetWindowTextW(hwnd, &wbuf[0], len + 1);
+			wbuf.resize(len); // remove the null terminator
+
+			return ws::SHORT(wbuf);
+		}
+
+		void setFont(ws::Font &font, ws::Text &textSettings)
+		{
+			if (!hwnd || !font.isValid()) return;
+			
+			if (customFont)
+			{
+				DeleteObject(customFont);
+				customFont = NULL;
+			}
+			
+			Gdiplus::Font* gdipFont = font.getFontHandle();
+			if (!gdipFont) return;
+			
+			Gdiplus::FontFamily family;
+			gdipFont->GetFamily(&family);
+			
+			WCHAR familyName[LF_FACESIZE];
+			family.GetFamilyName(familyName);
+			
+			int style = textSettings.getStyle();
+			bool isBold = (style & Gdiplus::FontStyleBold) != 0;
+			bool isItalic = (style & Gdiplus::FontStyleItalic) != 0;
+			bool isUnderline = (style & Gdiplus::FontStyleUnderline) != 0;
+			bool isStrikeout = (style & Gdiplus::FontStyleStrikeout) != 0;
+			
+			int heightInPixels = textSettings.getCharacterSize();
+			
+			customFont = CreateFontW(
+				-heightInPixels,               
+				0,                             
+				0,                             
+				0,                             
+				isBold ? FW_BOLD : FW_NORMAL, 
+				isItalic ? TRUE : FALSE,       
+				isUnderline ? TRUE : FALSE,    
+				isStrikeout ? TRUE : FALSE,    
+				DEFAULT_CHARSET,               
+				OUT_DEFAULT_PRECIS,            
+				CLIP_DEFAULT_PRECIS,           
+				DEFAULT_QUALITY,               
+				DEFAULT_PITCH | FF_DONTCARE,   
+				familyName                     
+			);
+			
+			if (customFont)
+			{
+				SendMessage(hwnd, WM_SETFONT, (WPARAM)customFont, TRUE);
+			}
+		}
+		
+		
+		bool contains(ws::Vec2i point)
+		{
+			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
+		}
+		
+		
+		
+		virtual bool init(ws::Window &parent){return false;}
+		
+		
+		
+		
+		
+		
+		void setFillColor(COLORREF color)
+	    {
+	        backgroundColor = color;
+	        if (hwnd)
+	            InvalidateRect(hwnd, NULL, TRUE);
+	    }
+	    
+	    void setTextColor(COLORREF color)
+	    {
+	        textColor = color;
+	        if (hwnd)
+	            InvalidateRect(hwnd, NULL, TRUE);
+	    }
+		
+		void setBorderColor(COLORREF color)
+		{
+			borderColor = color;
+			if (hwnd)
+			    InvalidateRect(hwnd, NULL, TRUE);
+		}
+		
+		
+		
+		
+	};
+
+
+	class Window;
+	
+	class WindowManager
+	{
+		public:
+		static std::map<HWND, ws::Window*> windows;
+		static std::mutex windowsMutex;
+		static bool initialized;
+		
+		
+		static void init();		
+		static LRESULT CALLBACK GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam);
+		static void addWindow(ws::Window* window);
+		static void removeWindow(HWND hwnd);		
+		static Window* GetWindow(HWND hwnd);
+		
+	};
+
+
+	
+	
+	
 	class Window
 	{
 		public:
@@ -4652,19 +5021,21 @@ namespace ws
 		HWND hwnd;	
 
 		private:
-			
+		
+		friend class WindowManager;
+		
 		bool isRunning = false;
 		
 		std::queue<MSG> msgQ;
 		
 		INITCOMMONCONTROLSEX icex;
 		
-				
+		
 		public:		
 		
 		
 		ws::View view;
-		
+		std::vector<ws::Child*> children;
 		ws::Texture backBuffer;
 	    Gdiplus::Graphics* canvas;
 
@@ -4683,123 +5054,18 @@ namespace ws
 		}
 		
 		
-		
-		Window(HWND otherHwnd)
-		{
-			createFromHwnd(otherHwnd);	
-		}
-		
-		
-		
-		bool createFromHwnd(HWND otherHwnd)
-		{
-			if(!otherHwnd)
-			{
-				std::cerr << "Failed to create window from HWND!\n";
-				return false;
-			}
-			
-			
-			WINDOWINFO winInfo;
-            winInfo.cbSize = sizeof(WINDOWINFO);
-            
-            if (!GetWindowInfo(otherHwnd, &winInfo))
-            {
-            	std::cerr << "Failed to create window from HWND!\n";
-				return false;
-			}
-			
-			
-			
-			char title[256];
-            GetWindowTextA(otherHwnd, title, sizeof(title));
-			
-			
-			int width = winInfo.rcClient.right - winInfo.rcClient.left;
-			int height = winInfo.rcClient.bottom - winInfo.rcClient.top;
-			create(width,height,std::string(title),winInfo.dwStyle,winInfo.dwExStyle);
-			if(winInfo.dwWindowStatus == WS_ACTIVECAPTION)
-				setVisible(true);
-			else
-				setVisible(false);	
-			
-			return true;
-		}
-		
-		
-		
-		Window(Window &other)
-		{
-			isRunning = other.isRunning;
-	        msgQ = other.msgQ;
-	        
-	        view = other.view;
-	        
-	        isFullscreen = other.isFullscreen;
-	        windowedRect = other.windowedRect;
-	        
-			
-
-	        
-	        // Copy icex
-	        icex = other.icex;
-	        
-	        
-		    if (other.hwnd) 
-		    {
-		        // Get the other window's properties
-		        RECT rect;
-		        GetWindowRect(other.hwnd, &rect);
-		        
-		        char title[256];
-		        GetWindowTextA(other.hwnd, title, sizeof(title));
-		        
-		        DWORD style = GetWindowLong(other.hwnd, GWL_STYLE);
-		        DWORD exStyle = GetWindowLong(other.hwnd, GWL_EXSTYLE);
-		        
-		        // Create a new window
-		        create(
-		            other.getSize().x,
-		            other.getSize().y,
-		            std::string(title),
-		            style,
-		            exStyle
-		        );
-		        
-		        // Copy the view
-		        view = other.view;
-		        
-		        backBuffer = other.backBuffer;
-		        
-		        setVisible(other.getVisible());
-		        if(other.hasFocus())
-					setFocus();
-		        
-		        
-		        if(other.getFullscreen())
-		        	setFullscreen(true);
-		        
-//		        // Copy backbuffer
-//		        if (other.backBuffer.isValid() && backBuffer.isValid()) {
-//		            delete backBuffer.bitmap;
-//		            backBuffer.bitmap = other.backBuffer.bitmap->Clone(
-//		                0, 0, other.backBuffer.width, other.backBuffer.height, 
-//		                PixelFormat32bppARGB
-//		            );
-//		            backBuffer.width = other.backBuffer.width;
-//		            backBuffer.height = other.backBuffer.height;
-//		        }
-		    }
-		}
-		
-
-
+	
 
 		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
+			
+			//Check if manager is initialized and init if so.
+			WindowManager::init();
+			
+			
 			//Note to self: the style must be set this way because hwnd has not been initialized yet!
 			style |= WS_CLIPCHILDREN;
-			exStyle |= WS_EX_COMPOSITED;
+			//exStyle |= WS_EX_COMPOSITED;
 			
 			
 			//This is for initialization of winapi child objects sucg as buttons and textboxes.
@@ -4812,29 +5078,10 @@ namespace ws
 			view.init({0,0,width,height});
 			
 			
-			isRunning = true;
-			
-			
-			HINSTANCE hInstance = GetModuleHandle(nullptr);
-			
-		    WNDCLASS wc = {};
-		    wc.lpfnWndProc = ws::Window::StaticWindowProc;
-		    wc.hInstance = hInstance;
-		    wc.lpszClassName = L"Window";
-		    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-		    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-		
-		    if (!RegisterClass(&wc)) {
-		        std::cerr << "Failed to register window class!" << std::endl;
-		        exit(-1);
-		    }		
-			
-			
-			
 			hwnd = CreateWindowEx(
 			exStyle,
 			L"Window",
-			ws::TO_LPCWSTR(title),
+			ws::WIDE(title).c_str(),
 			style,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -4842,40 +5089,28 @@ namespace ws
 			height,
 			nullptr,
 			nullptr,
-			hInstance,
+			GetModuleHandle(nullptr),
 			this
 			);
 			
 			
 		    if (hwnd == nullptr) {
 		        std::cerr << "Failed to create window!" << std::endl;
-		        exit(-1);
+				exit(-1);
 		    }			
 			
 				
-			
+			//The window manager will add the window in WM_NCCREATE so theres no need to call addWindow() here.
 			
 			backBuffer.create(view.getSize().x,view.getSize().y); 
 			canvas = new Gdiplus::Graphics(backBuffer.bitmap);
 			
 
-            ShowWindow(hwnd, SW_SHOW);
-            UpdateWindow(hwnd);
-
-			
-			windowInstances[hwnd] = this;			
-
-
 			isRunning = true;
-			
 			setVisible(true);
-			setFocus();
-						
+			UpdateWindow(hwnd);
+			setFocus();						
 		}
-
-
-		
-		
 
         ~Window()
         {
@@ -4887,6 +5122,9 @@ namespace ws
 		        delete backBuffer.bitmap;
 		        backBuffer.bitmap = nullptr;
 		    }
+			if (hwnd && IsWindow(hwnd)) {
+				DestroyWindow(hwnd);
+			}			
         }
 		
 		
@@ -4896,12 +5134,124 @@ namespace ws
 		        DestroyWindow(hwnd);
 		    }
 		    isRunning = false;
-		    
-		    
 		}
 		
+		bool isOpen()
+		{
+			if(!isRunning || !hwnd)
+				return false;
+			
+			MSG msg;
+			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
+			{
+				
+				if (msg.message == WM_QUIT) {
+					isRunning = false;
+					return false;
+				}
+				
+				
+				bool isOurs = (msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd));
+				
+				if (isOurs) 
+				{
+					msgQ.push(msg);
+				}
+				
+				if (isOurs && !IsDialogMessage(hwnd, &msg)) 
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				} 
+				else if(!isOurs) 
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+			}				
+			
+			return isRunning && hwnd;
+		}
+		
+	    bool pollEvent(MSG &message) {
+	        if (msgQ.empty()) {
+	            return false;
+	        }
+	        
+	        message = msgQ.front();
+	        msgQ.pop();
+	        return true;
+	    }	
+		
+	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
+		{
+			if(!hwnd)
+				return;
+				
+			
+		    // Clean up old resources
+		    if (canvas) {
+		        delete canvas;
+		        canvas = nullptr;
+		    }
+		    //Do the cleanup here or suffer memory overload
+		    if (backBuffer.bitmap) {
+		        delete backBuffer.bitmap;
+		        backBuffer.bitmap = nullptr;
+		    }
+		    
+			backBuffer.create(view.getSize().x,view.getSize().y);
+		    canvas = new Gdiplus::Graphics(backBuffer.bitmap);
+			
+			canvas->SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+			canvas->SetPixelOffsetMode(Gdiplus::PixelOffsetModeNone);
+			canvas->SetSmoothingMode(Gdiplus::SmoothingModeNone);
+
+			canvas->Clear(color);			
+	    }
+		
+		void draw(Drawable &draw)
+		{
+			if(!canvas || !hwnd) return;
+
+
+
+
+
+			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
+        	canvas->GetTransform(&originalMatrix);
+			
+			//Apply the transformation
+			view.apply(*canvas);
+			
+			//draw the object in world coords.
+			draw.drawGlobal(canvas);
+			
+			//Restore the original transformation so that the transform can be applied again next time. 
+			//This is because changes occur and need to be transformed too.
+			canvas->SetTransform(&originalMatrix);
+		}
+		
+	    void display() 
+		{
+			if(!hwnd)
+		    	return;
+			InvalidateRect(hwnd, NULL, FALSE);
+		    UpdateWindow(hwnd);
+	    }		
 		
 		
+		
+		
+		void setPixel(int x,int y,ws::Hue hue)
+		{
+			backBuffer.setPixel(x,y,hue);
+		}
+		
+		ws::Hue getPixel(int x,int y)
+		{
+			return backBuffer.getPixel(x,y).GetValue();
+		}
 		
 		std::string getTitle()
 		{
@@ -4913,7 +5263,6 @@ namespace ws
 			return std::string(title);			
 		}
 		
-		
 		void setTitle(std::string title)
 		{
 			if(!hwnd)
@@ -4921,18 +5270,15 @@ namespace ws
 			SetWindowTextA(hwnd,ws::TO_LPCSTR(title));
 		}
 		
-		
 		void setView(ws::View &v)
 		{
 			view = v;
 		}
 		
-		
 		ws::View getView()
 		{
 			return view;
 		}
-		
 		
 		void setVisible(bool val)
 		{
@@ -4952,8 +5298,6 @@ namespace ws
 			return IsWindowVisible(hwnd);
 		}
 		
-		
-		
 		void setFocus()
 		{
 			SetFocus(hwnd);
@@ -4965,13 +5309,10 @@ namespace ws
 			return (focus == hwnd);
 		}
 		
-		
-		
 		void setLayerAfter(HWND lastHwnd)
 		{
 			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
 		}
-		
 		
 		void addStyle(DWORD style)
 		{
@@ -5007,7 +5348,6 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_STYLE,style);			
 		}
 
-
 		void addExStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5042,20 +5382,16 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
 		}
 
-		
-		
 		DWORD getExStyle()
 		{	
 			return GetWindowLong(hwnd, GWL_EXSTYLE);
 		}
-		
 	    
 	    DWORD getStyle()
 	    {
 	    	return GetWindowLong(hwnd, GWL_STYLE);
             
 		}
-	    
 	    
 	    bool hasStyle(DWORD checkStyle)
 	    {
@@ -5066,8 +5402,6 @@ namespace ws
 	    {
 	    	return (getExStyle() & checkStyle);
 		}
-		
-		
 		
 		void setSize(ws::Vec2i size)
 		{
@@ -5083,28 +5417,25 @@ namespace ws
 				return;
 			}
 	    	SetWindowPos(hwnd, 
-			0, 
+			nullptr, 
 			0, 
 			0, 
 			screenWidth, 
 			screenHeight,
-			SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+			SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
             
 		}
 		
-		
 		ws::Vec2i getSize()
 		{
-  
-            RECT rect;
-            GetWindowRect(hwnd, &rect);  
+			RECT rect;
+			GetClientRect(hwnd, &rect);
             int width = rect.right - rect.left;
             int height = rect.bottom - rect.top;
 
 
 			return ws::Vec2i(width,height);			
 		}
-		
 		
 		void setPosition(ws::Vec2i pos)
 		{
@@ -5114,12 +5445,12 @@ namespace ws
 		void setPosition(int posx,int posy)
 		{
 	    	SetWindowPos(hwnd, 
-			0, 
+			nullptr, 
 			posx, 
 			posy, 
 			0, 
 			0,
-			SWP_FRAMECHANGED | SWP_SHOWWINDOW);			
+			SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);			
 		}
 		
 		ws::Vec2i getPosition()
@@ -5136,255 +5467,130 @@ namespace ws
             
 			return ws::Vec2i(clientRect.left,clientRect.top);			
 		}
-		
-	    
 
-
-	    void setFullscreen(bool fullscreen) 
+		void setFullscreen(bool fullscreen = true) 
 		{
-	        if (fullscreen == isFullscreen) return;
-	        
-	        if (fullscreen) 
+			if (fullscreen == isFullscreen) return;
+			
+			if (fullscreen) 
 			{
-	            windowedStyle = getExStyle();
-	            
+				//save the style
+				windowedStyle = getStyle();
 				GetWindowRect(hwnd, &windowedRect);
-	            
-	            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-	            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-	            
-	            
-	            removeStyle(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
-	            addStyle(WS_POPUP | WS_VISIBLE);
-	            setSize(screenWidth,screenHeight);
-	            
-	            isFullscreen = true;
-	        } else {
-	            setAllStyle(windowedStyle);
-	            
-	            setPosition(windowedRect.left,windowedRect.top);
-	            setSize(windowedRect.right - windowedRect.left,
-	            windowedRect.bottom - windowedRect.top);
-	            
-	            isFullscreen = false;
-	        }
-	    }
-	    
+				
+				int screenWidth  = GetSystemMetrics(SM_CXSCREEN);
+				int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+				
+				removeStyle(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+				addStyle(WS_POPUP | WS_VISIBLE);
+				
+				SetWindowPos(hwnd, HWND_TOP, 0, 0, screenWidth, screenHeight,SWP_FRAMECHANGED | SWP_NOACTIVATE);
+				
+				isFullscreen = true;
+			} 
+			else 
+			{
+				setAllStyle(windowedStyle);
+				
+				SetWindowPos(hwnd, HWND_TOP,
+				windowedRect.left, windowedRect.top,
+				windowedRect.right  - windowedRect.left,
+				windowedRect.bottom - windowedRect.top,
+				SWP_FRAMECHANGED | SWP_NOACTIVATE);
+				
+				isFullscreen = false;
+			}
+		}
 	    
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
 
-
-
-		void setChromaKey(ws::Hue hue)
+		void setChromaKey(ws::Hue hue)//losing window control for some reason
 		{
 			addExStyle(WS_EX_LAYERED);
 			SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
 		}
-
-
 		
 		ws::Vec2i toWorld(int x,int y)
 		{
 			return view.toWorld(x,y,getSize());
 		}
 		
-		
 		ws::Vec2i toWorld(ws::Vec2i pos)
 		{
 			return toWorld(pos.x,pos.y);
 		}
-		
 		
 		ws::Vec2i toScreen(int x,int y)
 		{
 			return view.toScreen(x,y,getSize());
 		}
 		
-		
 		ws::Vec2i toScreen(ws::Vec2i pos)
 		{
 			return toScreen(pos.x,pos.y);
 		}
-		
-		
-		
-				
-		
-		
-		
-		bool isOpen()
-		{
-			
-			if(!isRunning || !hwnd)
-				return false;
-				
-	        MSG msg;
-	        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-	            if (msg.message == WM_QUIT) {
-	                isRunning = false;
-	                break;
-	            }
-	            
-	            TranslateMessage(&msg);
-	            DispatchMessage(&msg);
-	            
-	            msgQ.push(msg);
-	            
-	        }
-            
-			return isRunning;
 
+		void addChild(ws::Child &child)
+		{
+			children.push_back(&child);
+			child.init(*this);
 		}
 		
-		
-		
-		
-		
-	
-		
-		
-		
-	    bool pollEvent(MSG &message) {
-	        if (msgQ.empty()) {
-	            return false;
-	        }
-	        
-	        message = msgQ.front();
-	        msgQ.pop();
-	        return true;
-	    }	
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
+		void removeChild(ws::Child &child)
 		{
-			if(!hwnd)
-				return;
-				
-			
-		    // Clean up old resources
-		    if (canvas) {
-		        delete canvas;
-		        canvas = nullptr;
-		    }
-		    //Do the cleanup here or suffer memory overload
-		    if (backBuffer.bitmap) {
-		        delete backBuffer.bitmap;
-		        backBuffer.bitmap = nullptr;
-		    }
-		    backBuffer.create(view.getSize().x,view.getSize().y);
-		    canvas = new Gdiplus::Graphics(backBuffer.bitmap);
-			canvas->Clear(color);
-	    }
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		void draw(Drawable &draw)
-		{
-			if(!canvas || !hwnd) return;
-
-
-
-			
-
-			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
-        	canvas->GetTransform(&originalMatrix);
-			
-			
-			//Apply the transformation
-			view.apply(*canvas);
-			
-			//draw the object in world coords.
-			draw.drawGlobal(canvas);
-			
-			//Restore the original transformation so that the transform can be applied again next time. 
-			//This is because changes occur and need to be transformed too.
-			canvas->SetTransform(&originalMatrix);
-			
+			for(int a=0;a<children.size();a++)
+			{
+				if(&child == children[a])
+				{
+					children.erase(children.begin() + a);
+					break;
+				}
+			}
 		}
 		
-		
-		
-		
-		
-		
-		
-	    void display() 
+		bool hasChild(ws::Child &child)
 		{
-			if(!hwnd)
-		    	return;
-			InvalidateRect(hwnd, NULL, FALSE);
-		    UpdateWindow(hwnd);
-	    }		
-		
-		
-		
-	
-		
-		
-		
-		
+			for(int a=0;a<children.size();a++)
+			{
+				if(&child == children[a])
+				{
+					return true;
+				}
+			}			
+			return false;
+		}		
 		
 		private:
-						
-			
 		
-		
-
-        // Static map to store window instances
-        static std::map<HWND, Window*> windowInstances;		
-
-		
-        static LRESULT CALLBACK StaticWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-        {
-            Window* pWindow = nullptr;
-            
-            if (uMsg == WM_NCCREATE) {
-                CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-                pWindow = reinterpret_cast<Window*>(pCreate->lpCreateParams);
-                SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWindow));
-            } else {
-                pWindow = reinterpret_cast<Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-            }
-            
-            if (pWindow) {
-                return pWindow->WindowProc(hwnd, uMsg, wParam, lParam);
-            }
-            
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
-        }	
-		
-	
-        LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-        {
-
+		LRESULT handleMessage(UINT uMsg,WPARAM wParam,LPARAM lParam)
+		{
 
             switch (uMsg) {
 	            case WM_DESTROY:
-	                PostQuitMessage(0);
-	                isRunning = false;
+					WindowManager::removeWindow(hwnd);
+					isRunning = false;
+					if (WindowManager::windows.empty())
+						PostQuitMessage(0);
 	                return 0;
-	                
+	            
+				case WM_CLOSE:
+					DestroyWindow(hwnd);
+					return 0;
+
+				case WM_COMMAND:
+				{
+					MSG msg = {};
+					msg.hwnd = hwnd;
+					msg.message = WM_COMMAND;
+					msg.wParam = wParam;
+					msg.lParam = lParam;
+					msgQ.push(msg);
+					return 0;
+				}
+				
+				
 	            case WM_PAINT: {
 	            	
 	            	
@@ -5409,6 +5615,7 @@ namespace ws
 				            //SetStretchBltMode(hdc, HALFTONE); //For better quality stretching - Causes blur though! (NOT GOOD FOR CLEAN STRETCHING)
 				            SetBrushOrgEx(hdc, 0, 0, NULL);
 							
+							SetStretchBltMode(hdc, COLORONCOLOR);
 							StretchBlt(hdc,0,0,getSize().x,getSize().y,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
 							
 							
@@ -5430,59 +5637,115 @@ namespace ws
 	                return 0;
 
 	            }
-	            
+				case WM_ERASEBKGND:
+					return 1;
+				case WM_DROPFILES:
+				{
+					MSG msg = {};
+					msg.hwnd = hwnd;
+					msg.message = WM_DROPFILES;
+					msg.wParam = wParam;
+					msg.lParam = lParam;
+					msgQ.push(msg);
+					return 0;
+				}
+				default:
+				{
+					return DefWindowProc(hwnd, uMsg, wParam, lParam);					
+				}
+				
 
-				
-				
-				
-				
 	        }
-	        
-	        
-	        //Secondary message adding because not all messages are received always.
-		    MSG msg;
-		    msg.hwnd = hwnd;
-		    msg.lParam = lParam;
-		    msg.wParam = wParam;
-		    msg.message = uMsg;
-		    msgQ.push(msg);
-            
+			
             
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
         }
-        
-        
-        
-        
-				
 		
 		bool isFullscreen = false;
 		RECT windowedRect; // Stores window position/size when not fullscreen
-    	DWORD windowedStyle; // Stores window style when not fullscreen
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-			
+    	DWORD windowedStyle; // Stores window style when not fullscreen			
 	};
 	
-	// Initialize the static map
-    std::map<HWND, Window*> Window::windowInstances;
-    
-    
-
+	
+	//Window Manager Stuff
+	
+	inline void ws::WindowManager::init()
+	{
+		if(initialized)
+			return;
+		HINSTANCE instance = GetModuleHandle(nullptr);
 		
+		WNDCLASS wc = {};
+		wc.lpfnWndProc = WindowManager::GlobalProc;
+		wc.hInstance = instance;
+		wc.lpszClassName = L"Window";
+		wc.hCursor = LoadCursor(nullptr,IDC_ARROW);
+		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+		
+		if(!RegisterClass(&wc))
+		{
+			std::cerr << "Failed to initialize Window"<<std::endl;
+			exit(-1);
+		}
+		initialized = true;
+	}
+	
+	inline LRESULT CALLBACK ws::WindowManager::GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		
+		if(msg == WM_NCCREATE)
+		{
+			CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+			ws::Window* pWindow = reinterpret_cast<ws::Window*>(pCreate->lpCreateParams);
+			
+			pWindow->hwnd = hwnd; 
+			
+			windows[hwnd] = pWindow;
+			
+			SetWindowLongPtr(hwnd,GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWindow));
+			
+			return DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+		
+		ws::Window* pWindow = reinterpret_cast<ws::Window*>(GetWindowLongPtr(hwnd,GWLP_USERDATA));
+		
+		if(pWindow)
+		{
+			return pWindow->handleMessage(msg,wParam,lParam);
+		}
+		
+		return DefWindowProc(hwnd, msg, wParam, lParam);
+	}
+	
+	
+	inline void ws::WindowManager::addWindow(ws::Window* window)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		windows[window->hwnd] = window;			
+	}
+	inline void ws::WindowManager::removeWindow(HWND hwnd)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		windows.erase(hwnd);//hwnd is a pointer to a location. Therefore, it may be used to point to my ws::Window.
+	}
+	
+	inline ws::Window* ws::WindowManager::GetWindow(HWND hwnd)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		auto it = windows.find(hwnd);
+		if (it != windows.end()) {
+			return it->second;
+		}
+		return nullptr;
+	}		
+	
+	
+	
+	std::map<HWND, ws::Window*> ws::WindowManager::windows;
+	std::mutex ws::WindowManager::windowsMutex;
+    bool ws::WindowManager::initialized = false;	
+
 }
 
 
@@ -5605,6 +5868,11 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		HMENU bar;
+
+		private:
+		ws::Window* windowRef = nullptr;
+
+		public:
 		
 		Menu()
 		{
@@ -5614,12 +5882,16 @@ namespace ws //CHILD WINDOW API
 		void addDropdown(ws::Dropdown &drop)
 		{
 			AppendMenuA(bar, MF_POPUP, (UINT_PTR)drop.getHandle(), ws::TO_LPCSTR(drop.getName()));
-			
+			if(windowRef != nullptr)
+				windowRef->setSize(windowRef->getSize());
 		}
 		
 		void setWindow(ws::Window &window)
 		{
 			SetMenu(window.hwnd, bar);	
+			windowRef = &window;
+			if(windowRef != nullptr)
+				windowRef->setSize(windowRef->getSize());
 		}
 		
 		
@@ -5636,284 +5908,10 @@ namespace ws //CHILD WINDOW API
 	
 	
 	
-	int maxControlID = 0;
 	
 	
 	
-	
-	class Child
-	{
-		public:
-		
-		ws::Window *parentRef = nullptr;
-		HWND hwnd = NULL;
-		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
-		DWORD textStyle = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
-		
 
-		unsigned int controlID = 0;
-		COLORREF backgroundColor = RGB(0,0,0);
-		COLORREF textColor = RGB(255,255,255);
-		COLORREF borderColor = RGB(0,0,0);
-		
-		private:
-		
-		int litX = 0,litY = 0,litWidth = 0,litHeight = 0;
-		std::string text = "";
-		int x = 0,y = 0,width = 100,height = 100;		
-
-		void setPosLit()
-		{
-			SetWindowPos(hwnd, nullptr, litX, litY, litWidth, litHeight, SWP_NOZORDER | SWP_NOACTIVATE);
-		}
-
-		public:
-		
-		Child()
-		{
-			controlID = maxControlID+1;
-			maxControlID++;
-		}
-
-        virtual ~Child()
-        {
-            if (hwnd && IsWindow(hwnd))
-            {
-                DestroyWindow(hwnd);
-            }
-        }				
-		
-		void setPosition(int xPos,int yPos)
-		{
-			x = xPos;
-			y = yPos;
-			
-			update();
-		}		
-		
-		void setPosition(ws::Vec2i pos)
-		{
-			x = pos.x;
-			y = pos.y;
-			update();
-		}
-		
-		ws::Vec2i getPosition()
-		{
-			return {x,y};
-		}
-
-		ws::Vec2i getLiteralPosition()
-		{
-			return {litX,litY};
-		}
-		
-		void setSize(ws::Vec2i size)
-		{
-			width = size.x;
-			height = size.y;
-			update();
-		}
-		
-		void setSize(int w,int h)
-		{
-			width = w;
-			height = h;
-			update();
-		}
-		
-		ws::Vec2i getSize()
-		{
-			return {width,height};
-		}
-
-		ws::Vec2i getLiteralSize()
-		{
-			return {litWidth,litHeight};
-		}
-
-				
-		void addStyle(DWORD addedStyle)
-		{
-            style |= addedStyle;
-			if (hwnd)
-            {
-                SetWindowLong(hwnd, GWL_STYLE, style);
-                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }
-            update();
-		}
-		
-		void removeStyle(DWORD removedStyle)
-		{
-			
-			style &= ~removedStyle;
-			if (hwnd)
-            {
-                SetWindowLong(hwnd, GWL_STYLE, style);
-                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }	
-			update();		
-		}
-		
-        bool hasStyle(DWORD checkStyle)
-        {
-            if (hwnd)
-            {
-                DWORD currentStyle = GetWindowLong(hwnd, GWL_STYLE);
-                return (currentStyle & checkStyle) != 0;
-            }
-            return (style & checkStyle) != 0;
-        }
-		
-		void setText(std::string newText)
-		{
-			update();
-			text = newText;
-			if (hwnd)
-                SetWindowTextA(hwnd, text.c_str());
-            
-		}
-		
-		std::string getText()
-		{
-		    LRESULT textLength = SendMessage(hwnd, WM_GETTEXTLENGTH, 0, 0);
-		
-		    if (textLength <= 0)
-		        return "";
-		    
-		    std::vector<char> buffer(static_cast<size_t>(textLength) + 1);
-		
-		    SendMessage(hwnd, WM_GETTEXT, static_cast<WPARAM>(buffer.size()), reinterpret_cast<LPARAM>(buffer.data()));
-		
-		    return std::string(buffer.data());		    
-		    
-		}
-		
-		
-		
-		bool contains(ws::Vec2i point)
-		{
-			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
-		}
-		
-		
-		
-		void update(MSG *getMsg = nullptr)
-		{
-			
-			if(!parentRef)
-				return;
-			if(!hwnd)
-				return;
-
-
-		    ws::Vec2i windowSize = parentRef->getSize(); 
-		    int windowWidth = windowSize.x;
-		    int windowHeight = windowSize.y;
-
-		    ws::Vec2i originalSize = parentRef->view.getSize();
-		    
-		    
-		    
-		    if (originalSize.x <= 0 || originalSize.y <= 0) 
-		        return;
-		        
-		    if (windowWidth <= 0 || windowHeight <= 0) 
-		        return;
-		        
-
-			
-		    float wScale = static_cast<float>(windowWidth) / originalSize.x;
-		    float hScale = static_cast<float>(windowHeight) / originalSize.y;
-			
-			
-			litX = static_cast<int>(x * wScale);
-			litY = static_cast<int>(y * hScale);
-			litWidth = static_cast<int>(width * wScale);
-			litHeight = static_cast<int>(height * hScale);
-			
-			setPosLit();
-			
-			
-			
-			
-			
-//			
-//			if(getMsg != nullptr)
-//			{
-//				MSG &msg = *getMsg;
-//			
-//				if(msg.message == WM_DRAWITEM)
-//				{
-//				    LPDRAWITEMSTRUCT pDrawItem = (LPDRAWITEMSTRUCT)msg.lParam;
-//				    
-//				    if (pDrawItem->CtlID == controlID)
-//				    {
-//				        HDC hdc = pDrawItem->hDC;
-//				        RECT rc = pDrawItem->rcItem;
-//				        
-//				        // Draw background
-//				        HBRUSH hBrush = CreateSolidBrush(backgroundColor);
-//				        FillRect(hdc, &rc, hBrush);
-//				        DeleteObject(hBrush);
-//				        
-//				        // Draw border
-//				        if (pDrawItem->itemState & ODS_SELECTED)
-//				        {
-//				            DrawEdge(hdc, &rc, BDR_SUNKENOUTER, BF_RECT);
-//				        }
-//				        else
-//				        {
-//				            DrawEdge(hdc, &rc, BDR_RAISEDINNER, BF_RECT);
-//				        }
-//				        
-//				        // Draw text
-//				        SetBkMode(hdc, TRANSPARENT);
-//				        SetTextColor(hdc, textColor);
-//				        
-//				        DrawTextA(hdc, getText().c_str(), -1, &rc, 
-//				                 textStyle);
-//				        
-//				        InvalidateRect(hwnd, NULL, TRUE);
-//				    }
-//				}	
-//			
-//						
-//			}
-				
-			
-		}
-		
-		
-		void setFillColor(COLORREF color)
-	    {
-	        backgroundColor = color;
-	        if (hwnd)
-	            InvalidateRect(hwnd, NULL, TRUE);
-	    }
-	    
-	    void setTextColor(COLORREF color)
-	    {
-	        textColor = color;
-	        if (hwnd)
-	            InvalidateRect(hwnd, NULL, TRUE);
-	    }
-		
-		void setBorderColor(COLORREF color)
-		{
-			borderColor = color;
-			if (hwnd)
-			    InvalidateRect(hwnd, NULL, TRUE);
-		}
-		
-		
-		
-		
-	};
-	
 
 
 
@@ -5977,7 +5975,7 @@ namespace ws //CHILD WINDOW API
 		{
 			if(parentRef == nullptr)
 			{
-				std::cerr << "Attempted to show a ClickMenu without referencing a parent window! Use Init().\n";
+				MessageBoxA(NULL,"Attempted to show a ClickMenu without referencing a parent window! Use Init().","Failed init!",MB_OK | MB_ICONINFORMATION);
 				return false;
 			}
 			HMENU hMenu = CreatePopupMenu();
@@ -5986,7 +5984,7 @@ namespace ws //CHILD WINDOW API
 			
 			for(int a=0;a<list.size();a++)
 			{
-				AppendMenu(hMenu, MF_STRING, 1+a, TO_LPCWSTR(list[a]));
+				AppendMenu(hMenu, MF_STRING, 1+a, ws::WIDE(list[a]).c_str());
             }
             
 
@@ -6070,6 +6068,7 @@ namespace ws //CHILD WINDOW API
 	    
 	    bool open(ws::Window *parent = nullptr)
 	    {
+			
 	        std::wstring wtitle = ws::WIDE(title);
 	        std::wstring wfileName = ws::WIDE(fileName);
 	        
@@ -6108,6 +6107,8 @@ namespace ws //CHILD WINDOW API
 	            MSG m;
 	            while(parent->pollEvent(m)) {}
 	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
 	        
 	        if(GetOpenFileNameW(&ofn))
 	        {
@@ -6161,6 +6162,9 @@ namespace ws //CHILD WINDOW API
 	            MSG m;
 	            while(parent->pollEvent(m)) {}
 	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
 	        
 	        if(GetSaveFileNameW(&ofn))
 	        {
@@ -6257,6 +6261,9 @@ namespace ws //CHILD WINDOW API
 	            MSG m;
 	            while(parent->pollEvent(m)) {}
 	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
 	        
 	        LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
 	        if (pidl != nullptr) {
@@ -6302,12 +6309,14 @@ namespace ws //CHILD WINDOW API
 
 	class ComboBox : public Child
 	{
+		private:
+		std::vector<std::string> pendingItems;
 	    public:
 	    ComboBox()
 	    {
 	    }
 	    
-	    bool init(ws::Window &parent)
+	    virtual bool init(ws::Window &parent) override
 	    {
 	        if(!parent.hwnd)
 	        {
@@ -6315,8 +6324,7 @@ namespace ws //CHILD WINDOW API
 	            return false;
 	        }
 	        
-	        parentRef = &parent;
-	        
+			
 	        // Add combo box specific styles
 	        addStyle(CBS_DROPDOWN);
 	        addStyle(WS_VSCROLL);
@@ -6341,8 +6349,21 @@ namespace ws //CHILD WINDOW API
 	            return false;
 	        }
 	        
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+			
 	        // Set extended UI for better appearance
 	        SendMessage(hwnd, CB_SETEXTENDEDUI, (WPARAM)TRUE, 0);
+
+			for (const auto& item : pendingItems)
+			{
+				addItem(item);
+			}
+			pendingItems.clear();
+
 	        
 	        ShowWindow(hwnd, SW_SHOW);
 	        UpdateWindow(hwnd);
@@ -6350,52 +6371,54 @@ namespace ws //CHILD WINDOW API
 	        return true;
 	    }
 	    
-	    // Add an item to the dropdown
 	    void addItem(const std::string& item)
 	    {
-	        if (!hwnd) return;
+			if (!hwnd) {
+				// store for later if hwnd doesn't exist yet
+				pendingItems.push_back(item);
+				return;
+			}
 	        SendMessageA(hwnd, CB_ADDSTRING, 0, (LPARAM)item.c_str());
 	    }
 	    
-	    // Add multiple items
 	    void addItems(const std::vector<std::string>& items)
 	    {
-	        if (!hwnd) return;
+			if (!hwnd) {
+				// store for later if hwnd doesn't exist yet
+				for(int a=0;a<items.size();a++)
+					pendingItems.push_back(items[a]);
+				return;
+			}
 	        for (const auto& item : items)
 	        {
 	            addItem(item);
 	        }
 	    }
 	    
-	    // Remove an item by index
 	    void removeItem(int index)
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_DELETESTRING, (WPARAM)index, 0);
 	    }
 	    
-	    // Clear all items
 	    void clear()
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
 	    }
 	    
-	    // Get selected index
 	    int getSelectedIndex()
 	    {
 	        if (!hwnd) return -1;
 	        return (int)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
 	    }
 	    
-	    // Set selected index
 	    void setSelectedIndex(int index)
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_SETCURSEL, (WPARAM)index, 0);
 	    }
 	    
-	    // Get selected text
 	    std::string getSelectedText()
 	    {
 	        if (!hwnd) return "";
@@ -6412,14 +6435,12 @@ namespace ws //CHILD WINDOW API
 	        return std::string(buffer.data());
 	    }
 	    
-	    // Get item count
 	    int getItemCount()
 	    {
 	        if (!hwnd) return 0;
 	        return (int)SendMessage(hwnd, CB_GETCOUNT, 0, 0);
 	    }
 	    
-	    // Get item text at index
 	    std::string getItemText(int index)
 	    {
 	        if (!hwnd || index < 0) return "";
@@ -6433,7 +6454,6 @@ namespace ws //CHILD WINDOW API
 	        return std::string(buffer.data());
 	    }
 	    
-	    // Check if selection changed in a message
 	    bool selectionChanged(MSG &msg)
 	    {
 	        if (msg.message == WM_COMMAND && HIWORD(msg.wParam) == CBN_SELCHANGE)
@@ -6446,7 +6466,6 @@ namespace ws //CHILD WINDOW API
 	        return false;
 	    }
 	    
-	    // Set dropdown style (CBS_DROPDOWN or CBS_DROPDOWNLIST)
 	    void setDropdownStyle(bool allowEdit = true)
 	    {
 	        if (!hwnd) return;
@@ -6468,7 +6487,6 @@ namespace ws //CHILD WINDOW API
 	                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 	    }
 	    
-	    // Get text from edit control (when using CBS_DROPDOWN)
 	    std::string getEditText()
 	    {
 	        if (!hwnd) return "";
@@ -6484,7 +6502,6 @@ namespace ws //CHILD WINDOW API
 	        return std::string(buffer.data());
 	    }
 	    
-	    // Set edit text (when using CBS_DROPDOWN)
 	    void setEditText(const std::string& text)
 	    {
 	        if (!hwnd) return;
@@ -6505,7 +6522,7 @@ namespace ws //CHILD WINDOW API
 		}
 		
 		
-		bool init(ws::Window &parent)
+		virtual bool init(ws::Window &parent) override
 		{
 			
 			if(!parent.hwnd)
@@ -6514,7 +6531,6 @@ namespace ws //CHILD WINDOW API
 				return false;
 			}
 			
-			parentRef = &parent;
 			
 			
 			
@@ -6522,7 +6538,7 @@ namespace ws //CHILD WINDOW API
 			hwnd = CreateWindowEx(
 			0,
 			L"BUTTON",
-			ws::TO_LPCWSTR(getText()),
+			ws::WIDE(getText()).c_str(),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6538,6 +6554,12 @@ namespace ws //CHILD WINDOW API
 	            std::cerr << "Child Error: Failed to create Button!\n";
 	            return false;
 	        }	
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
 		
 			ShowWindow(hwnd,SW_SHOW);
 			UpdateWindow(hwnd);
@@ -6576,7 +6598,7 @@ namespace ws //CHILD WINDOW API
 		}
 		
 		
-		bool init(ws::Window &parent)
+		virtual bool init(ws::Window &parent) override
 		{
 			
 			if(!parent.hwnd)
@@ -6585,7 +6607,6 @@ namespace ws //CHILD WINDOW API
 				return false;
 			}
 			
-			parentRef = &parent;
 			
 			addStyle(TBS_HORZ);
 			addStyle(TBS_AUTOTICKS);
@@ -6594,7 +6615,7 @@ namespace ws //CHILD WINDOW API
 			hwnd = CreateWindowEx(
 			0,
 			TRACKBAR_CLASS,
-			ws::TO_LPCWSTR(getText()),
+			ws::WIDE(getText()).c_str(),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6610,6 +6631,13 @@ namespace ws //CHILD WINDOW API
 	            std::cerr << "Child Error: Failed to create Slider!\n";
 	            return false;
 	        }	
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+
 		
 			ShowWindow(hwnd,SW_SHOW);
 			UpdateWindow(hwnd);
@@ -6638,14 +6666,12 @@ namespace ws //CHILD WINDOW API
 	    {
 	    	removeStyle(TBS_VERT);
 	    	addStyle(TBS_HORZ);
-	    	update();
 		}
 		
 		void setVertical()
 		{
 	    	removeStyle(TBS_HORZ);
-	    	addStyle(TBS_VERT);	
-			update();		
+	    	addStyle(TBS_VERT);
 		}
 		
         
@@ -6678,7 +6704,7 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		
-		bool init(ws::Window &parent)
+		virtual bool init(ws::Window &parent) override
 		{
 			
 			if(!parent.hwnd)
@@ -6687,7 +6713,6 @@ namespace ws //CHILD WINDOW API
 				return false;
 			}
 			
-			parentRef = &parent;
 			
 			
 			addStyle(ES_AUTOVSCROLL);
@@ -6698,7 +6723,7 @@ namespace ws //CHILD WINDOW API
 			hwnd = CreateWindowEx(
 			WS_EX_CLIENTEDGE,
 			TEXT("EDIT"),
-			ws::TO_LPCWSTR(getText()),
+			ws::WIDE(getText()).c_str(),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6714,6 +6739,15 @@ namespace ws //CHILD WINDOW API
 	            std::cerr << "Child Error: Failed to create Textbox!\n";
 	            return false;
 	        }	
+
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+		
+			SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)char_limit, 0);
 		
 			ShowWindow(hwnd,SW_SHOW);
 			UpdateWindow(hwnd);
@@ -6721,6 +6755,14 @@ namespace ws //CHILD WINDOW API
 		
 			return true;		
 		}		
+		int char_limit = 0;
+		void setCharacterLimit(int max_chars = 0)//0 is infinite
+		{
+			if(!hwnd)
+				char_limit = max_chars;
+			else
+				SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)max_chars, 0);			
+		}
 		
 		
 		bool getFocus()
@@ -6744,7 +6786,7 @@ namespace ws //CHILD WINDOW API
 			
 		}
 		
-		bool init(ws::Window &parent)
+		virtual bool init(ws::Window &parent) override
 		{
 			
 			if(!parent.hwnd)
@@ -6756,13 +6798,12 @@ namespace ws //CHILD WINDOW API
 			addStyle(SS_NOTIFY);
 			addStyle(SS_LEFT);
 			
-			parentRef = &parent;
 			
 			
 			hwnd = CreateWindowEx(
 			0,
 			TEXT("STATIC"),
-			ws::TO_LPCWSTR(getText()),
+			ws::WIDE(getText()).c_str(),
 			style,
 			getPosition().x,
 			getPosition().y,
@@ -6778,6 +6819,12 @@ namespace ws //CHILD WINDOW API
 	            std::cerr << "Child Error: Failed to create Label!\n";
 	            return false;
 	        }	
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
 		
 			ShowWindow(hwnd,SW_SHOW);
 			UpdateWindow(hwnd);

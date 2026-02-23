@@ -15,9 +15,9 @@ int main()
 	
 	
 	
-	//Winsimple method - Is it better??? I don't know.
-    ws::Menu menu;
+	ws::Menu menu;    
     menu.setWindow(window);
+    
 	
 	ws::Dropdown fileMenu(1000, "File");
     
@@ -25,11 +25,9 @@ int main()
     fileMenu.addItem(1002,MF_STRING, "Open");
     fileMenu.addItem(0   ,MF_SEPARATOR, "");
     fileMenu.addItem(1004,MF_STRING, "Exit");
-    
+
+  
     menu.addDropdown(fileMenu);
-    
-    
-    
     
 	//WINAPI method
     

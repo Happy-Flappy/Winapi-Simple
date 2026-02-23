@@ -1709,7 +1709,7 @@ namespace ws
 			updateMatrix();
 		    
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeNone);
+		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
 		    graphics.SetTransform(&matrix);
 		}
@@ -2653,8 +2653,9 @@ namespace ws
 		    
 	        
 	        
-	        graphics->SetTransform(&transform);
-	        
+	        //graphics->SetTransform(&transform);
+	        graphics->MultiplyTransform(&transform, Gdiplus::MatrixOrderPrepend);
+			
 	        // Draw the actual content
 	        draw(graphics);
 	        
@@ -4063,7 +4064,7 @@ namespace ws
 		{
 			return text;
 		}
-		std::vector<std::string> getFiles()
+		std::vector<std::string>& getFiles()
 		{
 			return files;
 		}
@@ -4682,7 +4683,9 @@ namespace ws
 		public:
 		Mover()
 		{
-			
+			if(!initialized)
+				OleInitialize(NULL);
+			initialized = true;
 		}
 		~Mover()
 		{
@@ -4693,9 +4696,7 @@ namespace ws
 		ClipData get(MSG &m)
 		{
 			
-			if(!initialized)
-				OleInitialize(NULL);
-			initialized = true;
+
 			
 			ClipData data;
 			
@@ -4710,7 +4711,6 @@ namespace ws
 				
 				for (UINT i = 0; i < count; i++)
 				{
-					std::cerr << i << "\n";
 					wchar_t szFile[MAX_PATH] = {0};
 					UINT charsCopied = DragQueryFileW(hDrop, i, szFile, MAX_PATH);
 					if(charsCopied > 0)
@@ -5050,7 +5050,7 @@ namespace ws
 		
 		INITCOMMONCONTROLSEX icex;
 		
-				
+		
 		public:		
 		
 		
@@ -5488,35 +5488,39 @@ namespace ws
 			return ws::Vec2i(clientRect.left,clientRect.top);			
 		}
 
-	    void setFullscreen(bool fullscreen) 
+		void setFullscreen(bool fullscreen = true) 
 		{
-	        if (fullscreen == isFullscreen) return;
-	        
-	        if (fullscreen) 
+			if (fullscreen == isFullscreen) return;
+			
+			if (fullscreen) 
 			{
-	            windowedStyle = getExStyle();
-	            
+				//save the style
+				windowedStyle = getStyle();
 				GetWindowRect(hwnd, &windowedRect);
-	            
-	            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-	            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-	            
-	            
-	            removeStyle(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
-	            addStyle(WS_POPUP | WS_VISIBLE);
-	            setSize(screenWidth,screenHeight);
-	            
-	            isFullscreen = true;
-	        } else {
-	            setAllStyle(windowedStyle);
-	            
-	            setPosition(windowedRect.left,windowedRect.top);
-	            setSize(windowedRect.right - windowedRect.left,
-	            windowedRect.bottom - windowedRect.top);
-	            
-	            isFullscreen = false;
-	        }
-	    }
+				
+				int screenWidth  = GetSystemMetrics(SM_CXSCREEN);
+				int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+				
+				removeStyle(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+				addStyle(WS_POPUP | WS_VISIBLE);
+				
+				SetWindowPos(hwnd, HWND_TOP, 0, 0, screenWidth, screenHeight,SWP_FRAMECHANGED | SWP_NOACTIVATE);
+				
+				isFullscreen = true;
+			} 
+			else 
+			{
+				setAllStyle(windowedStyle);
+				
+				SetWindowPos(hwnd, HWND_TOP,
+				windowedRect.left, windowedRect.top,
+				windowedRect.right  - windowedRect.left,
+				windowedRect.bottom - windowedRect.top,
+				SWP_FRAMECHANGED | SWP_NOACTIVATE);
+				
+				isFullscreen = false;
+			}
+		}
 	    
 	    bool getFullscreen() const {
 	        return isFullscreen;
@@ -5655,6 +5659,16 @@ namespace ws
 	            }
 				case WM_ERASEBKGND:
 					return 1;
+				case WM_DROPFILES:
+				{
+					MSG msg = {};
+					msg.hwnd = hwnd;
+					msg.message = WM_DROPFILES;
+					msg.wParam = wParam;
+					msg.lParam = lParam;
+					msgQ.push(msg);
+					return 0;
+				}
 				default:
 				{
 					return DefWindowProc(hwnd, uMsg, wParam, lParam);					
@@ -5874,6 +5888,11 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		HMENU bar;
+
+		private:
+		ws::Window* windowRef = nullptr;
+
+		public:
 		
 		Menu()
 		{
@@ -5883,12 +5902,16 @@ namespace ws //CHILD WINDOW API
 		void addDropdown(ws::Dropdown &drop)
 		{
 			AppendMenuA(bar, MF_POPUP, (UINT_PTR)drop.getHandle(), ws::TO_LPCSTR(drop.getName()));
-			
+			if(windowRef != nullptr)
+				windowRef->setSize(windowRef->getSize());
 		}
 		
 		void setWindow(ws::Window &window)
 		{
 			SetMenu(window.hwnd, bar);	
+			windowRef = &window;
+			if(windowRef != nullptr)
+				windowRef->setSize(windowRef->getSize());
 		}
 		
 		
@@ -5972,7 +5995,7 @@ namespace ws //CHILD WINDOW API
 		{
 			if(parentRef == nullptr)
 			{
-				std::cerr << "Attempted to show a ClickMenu without referencing a parent window! Use Init().\n";
+				MessageBoxA(NULL,"Attempted to show a ClickMenu without referencing a parent window! Use Init().","Failed init!",MB_OK | MB_ICONINFORMATION);
 				return false;
 			}
 			HMENU hMenu = CreatePopupMenu();
@@ -5981,7 +6004,7 @@ namespace ws //CHILD WINDOW API
 			
 			for(int a=0;a<list.size();a++)
 			{
-				AppendMenu(hMenu, MF_STRING, 1+a, TO_LPCWSTR(list[a]));
+				AppendMenu(hMenu, MF_STRING, 1+a, ws::WIDE(list[a]).c_str());
             }
             
 
@@ -6065,6 +6088,7 @@ namespace ws //CHILD WINDOW API
 	    
 	    bool open(ws::Window *parent = nullptr)
 	    {
+			
 	        std::wstring wtitle = ws::WIDE(title);
 	        std::wstring wfileName = ws::WIDE(fileName);
 	        
@@ -6103,6 +6127,8 @@ namespace ws //CHILD WINDOW API
 	            MSG m;
 	            while(parent->pollEvent(m)) {}
 	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
 	        
 	        if(GetOpenFileNameW(&ofn))
 	        {
@@ -6156,6 +6182,9 @@ namespace ws //CHILD WINDOW API
 	            MSG m;
 	            while(parent->pollEvent(m)) {}
 	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
 	        
 	        if(GetSaveFileNameW(&ofn))
 	        {
@@ -6252,6 +6281,9 @@ namespace ws //CHILD WINDOW API
 	            MSG m;
 	            while(parent->pollEvent(m)) {}
 	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
 	        
 	        LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
 	        if (pidl != nullptr) {

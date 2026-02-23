@@ -193,6 +193,19 @@
 
 * Fixed ws::Window to allow creation of many windows and window polls.
 
+* Fixed ws::View...again.
+
+* Fixed Many Child object bugs.
+
+* Added a few functions to ws::Window such as addChild(), removeChild(), and hasChild().
+
+* Turned Winsimple into UNICODE so that it also works with visual studio.
+
+* Fixed ws::Menu so that it displays immediately upon adding first dropdown.
+
+
+
+
 
 # New major features to be added. 
 
