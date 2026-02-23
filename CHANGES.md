@@ -203,7 +203,7 @@
 
 * Fixed ws::Menu so that it displays immediately upon adding first dropdown.
 
-
+* Fixed ws::View transformations so that when zooming in, the viewport does not change. 
 
 
 

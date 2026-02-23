@@ -1696,6 +1696,9 @@ namespace ws
 		{
 			updateMatrix();
 		    
+			graphics.SetClip(Gdiplus::Rect(port.left, port.top, port.width, port.height));
+
+			
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
@@ -5220,6 +5223,10 @@ namespace ws
 
 			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
         	canvas->GetTransform(&originalMatrix);
+
+			// save clip region
+			Gdiplus::Region originalClip;
+			canvas->GetClip(&originalClip);
 			
 			//Apply the transformation
 			view.apply(*canvas);
@@ -5230,6 +5237,7 @@ namespace ws
 			//Restore the original transformation so that the transform can be applied again next time. 
 			//This is because changes occur and need to be transformed too.
 			canvas->SetTransform(&originalMatrix);
+			canvas->SetClip(&originalClip);//restore the original clip boundary.
 		}
 		
 	    void display() 

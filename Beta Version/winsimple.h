@@ -1570,69 +1570,57 @@ namespace ws
 		
 		
 		
-	    [[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos,ws::Vec2i screenSize) 
-	    {
-		    
+		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
+		{
+			// First account for window stretching
+			ws::Vec2i stretchedPos;
+			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
+											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
+			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
+											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
 			
-			    
-	        // First account for window stretching
-	        ws::Vec2i stretchedPos;
-	        stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
-	                                         (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
-	        stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
-	                                         (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
-	        
-	        
-	        // Now apply the transformation (scaled by zoom)
-	        float zoomFactor = std::pow(2.0f, zoom);
-	        
-	        // Calculate the visible world center
-	        float visibleWorldCenterX = world.left + world.width / 2.0f;
-	        float visibleWorldCenterY = world.top + world.height / 2.0f;
-	        
-	        // Calculate the port center
-	        float portCenterX = port.left + port.width / 2.0f;
-	        float portCenterY = port.top + port.height / 2.0f;
-	        
-	        // Calculate scale to fit visible world into port
-	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-	        
-	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-	        
-	        // Apply inverse transformation
-	        float worldX = static_cast<float>(stretchedPos.x);
-	        float worldY = static_cast<float>(stretchedPos.y);
-	        
-	        // Reverse the transformation steps
-	        // 1. Translate from port center to origin
-	        worldX -= portCenterX;
-	        worldY -= portCenterY;
-	        
-	        // 2. Reverse rotation
-	        if (rotation != 0) {
-	            Gdiplus::Matrix rotMatrix;
-	            rotMatrix.Rotate(-rotation);
-	            Gdiplus::PointF point(worldX, worldY);
-	            rotMatrix.TransformPoints(&point, 1);
-	            worldX = point.X;
-	            worldY = point.Y;
-	        }
-	        
-	        // 3. Reverse scale
-	        worldX /= scaleX;
-	        worldY /= scaleY;
-	        
-	        // 4. Translate back to world center
-	        worldX += visibleWorldCenterX;
-	        worldY += visibleWorldCenterY;
-	        
-	        
-	        
-	        
-	        return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
-	    }       
+			// Calculate the visible world center
+			float visibleWorldCenterX = world.left + world.width / 2.0f;
+			float visibleWorldCenterY = world.top + world.height / 2.0f;
+			
+			// Calculate the port center
+			float portCenterX = port.left + port.width / 2.0f;
+			float portCenterY = port.top + port.height / 2.0f;
+			
+			// Calculate scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Apply inverse transformation
+			float worldX = static_cast<float>(stretchedPos.x);
+			float worldY = static_cast<float>(stretchedPos.y);
+			
+			// Reverse transformations in opposite order
+			worldX -= portCenterX;
+			worldY -= portCenterY;
+			
+			if (rotation != 0) {
+				Gdiplus::Matrix rotMatrix;
+				rotMatrix.Rotate(-rotation);
+				Gdiplus::PointF point(worldX, worldY);
+				rotMatrix.TransformPoints(&point, 1);
+				worldX = point.X;
+				worldY = point.Y;
+			}
+			
+			worldX /= scaleX;
+			worldY /= scaleY;
+			
+			worldX += visibleWorldCenterX;
+			worldY += visibleWorldCenterY;
+			
+			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
+		}
 	    
 	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
 	    {
@@ -1708,6 +1696,9 @@ namespace ws
 		{
 			updateMatrix();
 		    
+			graphics.SetClip(Gdiplus::Rect(port.left, port.top, port.width, port.height));
+
+			
 		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
@@ -1719,42 +1710,34 @@ namespace ws
 			
 		void updateMatrix()			
 		{
-		    matrix.Reset();
-		    
-		    float zoomFactor = std::pow(2.0f, zoom);
-		    
-		    // The VISIBLE portion of the world (after zoom)
-		    float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-		    float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-		    
-		    // We assume we're viewing the CENTER of the world
-		    float visibleWorldCenterX = static_cast<float>(world.left) + static_cast<float>(world.width) / 2.0f;
-		    float visibleWorldCenterY = static_cast<float>(world.top) + static_cast<float>(world.height) / 2.0f;
-		    
-		    // But the visible rectangle should be centered at this point
-		    float visibleWorldLeft = visibleWorldCenterX - visibleWorldWidth / 2.0f;
-		    float visibleWorldTop = visibleWorldCenterY - visibleWorldHeight / 2.0f;
-		    
-		    // Calculate scale to fit visible world into port
-		    float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-		    float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-		    
-		    float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-		    float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-		    
-		    // Transform from visible world to port
-		    matrix.Translate(portCenterX, portCenterY);
-		    
-		    if (rotation != 0) {
-		        matrix.Rotate(rotation);
-		    }
-		    
-		    matrix.Scale(scaleX, scaleY);
-		    matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);			
-
-
-
-
+			matrix.Reset();
+			
+			// Port center
+			float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+			float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+			
+			// Visible world uses full world dimensions (zoom doesn't change visible area)
+			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
+			
+			// Scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom as a direct multiplier
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Transform
+			matrix.Translate(portCenterX, portCenterY);
+			
+			if (rotation != 0) {
+				matrix.Rotate(rotation);
+			}
+			
+			matrix.Scale(scaleX, scaleY);
+			matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
 		}
 			
 			
@@ -5240,6 +5223,10 @@ namespace ws
 
 			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
         	canvas->GetTransform(&originalMatrix);
+
+			// save clip region
+			Gdiplus::Region originalClip;
+			canvas->GetClip(&originalClip);
 			
 			//Apply the transformation
 			view.apply(*canvas);
@@ -5250,6 +5237,7 @@ namespace ws
 			//Restore the original transformation so that the transform can be applied again next time. 
 			//This is because changes occur and need to be transformed too.
 			canvas->SetTransform(&originalMatrix);
+			canvas->SetClip(&originalClip);//restore the original clip boundary.
 		}
 		
 	    void display() 
