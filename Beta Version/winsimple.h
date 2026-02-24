@@ -49,6 +49,7 @@
 #include <filesystem>
 #include <cwchar>
 #include <algorithm>
+#include <functional>
 
 
 // Define missing Windows types BEFORE including GDI+
@@ -76,6 +77,15 @@ typedef unsigned long PROPID;
 #include <utility>
 #include <mutex>
 //
+
+
+//Defines for a couple cursors.
+#ifndef IDC_PIN
+#define IDC_PIN MAKEINTRESOURCE(32671)   // available since Windows 7
+#endif
+#ifndef IDC_PERSON
+#define IDC_PERSON MAKEINTRESOURCE(32672) // available since Windows 8
+#endif
 
 
 
@@ -1303,6 +1313,16 @@ namespace ws
 
 	class View
 	{
+		private:
+		
+		float rotation = 0.0f;
+		ws::IntRect port = {0,0,0,0}; //Port is always in screen coordinates.
+		ws::IntRect world = {0,0,0,0}; //World is the world coordinate section of the world that is sent to the view.
+		ws::Vec2i portOrigin = {0,0};//This is the point of rotation. It does NOT effect the view position.
+		Gdiplus::Matrix matrix;
+		float zoom = 0;		
+
+
 		public:
 		
 		
@@ -1313,24 +1333,24 @@ namespace ws
 		
 		
 		//Matrix does not have normal copy constructor so the view class has to do this in a custom way so that View can be copied to another view like view = v;
-	    View(const View& other) : 
-	        world(other.world), 
-	        port(other.port), 
-	        rotation(other.rotation),
-	        portOrigin(other.portOrigin),
-	        matrix(),
-	        zoom(other.zoom)
-	    {
-	        setTransform(other.matrix);
-	    }	
+		View(const View& other) : 
+			rotation(other.rotation),
+			port(other.port),
+			world(other.world),
+			portOrigin(other.portOrigin),
+			matrix(),
+			zoom(other.zoom)
+		{
+			setTransform(other.matrix);
+		}
 	    
 	  
 		//move constructor
 		
 		View(View&& other) noexcept :
-	        world(std::move(other.world)),
-	        port(std::move(other.port)),
 	        rotation(other.rotation),
+	        port(std::move(other.port)),
+	        world(std::move(other.world)),
 	        portOrigin(std::move(other.portOrigin)),
 	        matrix(),
 	        zoom(other.zoom)
@@ -1742,12 +1762,7 @@ namespace ws
 			
 			
 			
-		float rotation = 0;
-		ws::IntRect port; //Port is always in screen coordinates.
-		ws::IntRect world; //World is the world coordinate section of the world that is sent to the view.
-		ws::Vec2i portOrigin;//This is the point of rotation. It does NOT effect the view position.
-		Gdiplus::Matrix matrix;
-		float zoom = 0;
+
 		
 		
 		
@@ -1798,7 +1813,7 @@ namespace ws
 
 		//move
 	    Texture(Texture&& other) noexcept
-	        : bitmap(other.bitmap), width(other.width), height(other.height)
+	        : width(other.width), height(other.height),bitmap(other.bitmap)
 	    {
 	        other.bitmap = NULL;
 	        other.width = 0;
@@ -1806,7 +1821,7 @@ namespace ws
 	    }
 
 		//copy
-	    Texture(const Texture& other) : bitmap(nullptr), width(0), height(0)
+	    Texture(const Texture& other) : width(0), height(0), bitmap(nullptr)
 	    {
 	        if (other.bitmap && other.width > 0 && other.height > 0) {
 	            bitmap = other.bitmap->Clone(0, 0, other.width, other.height, PixelFormat32bppARGB);
@@ -2154,7 +2169,6 @@ namespace ws
 			
 			
 	        UINT dimensions = 0;
-	        GUID dimensionID = Gdiplus::FrameDimensionTime;
 	        dimensions = gif->GetFrameDimensionsCount();
 			
 			if(dimensions == 0)
@@ -2258,7 +2272,7 @@ namespace ws
 		
 		ws::Texture* getFrame(int index)
 		{
-			if(index < 0 || index > textures.size())
+			if(index < 0 || index > int(textures.size()))
 			{
 				std::cerr << "Invalid texture frame ID requested in getFrame() from ws::Animate! Returned Invalid!...\n";
 				return nullptr;
@@ -2270,7 +2284,7 @@ namespace ws
 		
 		double getFrameDelay(int index)
 		{
-			if(index <= 0 || index > textures.size())
+			if(index <= 0 || index > int(textures.size()))
 			{
 				std::cerr << "Invalid texture frame ID requested in getFrameDelay() from ws::Animate! Returned 0...\n";
 				return 0;
@@ -2281,14 +2295,14 @@ namespace ws
 		
 		bool setFrameDelay(int index,double newDelay)
 		{	
-			if(index <= 0 || index > textures.size())
+			if(index <= 0 || index > int(textures.size()))
 				return false;
 			delays[index] = newDelay;		
 		}
 		
 		bool setFrame(int index,ws::Texture &newTexture)
 		{
-			if(index <= 0 || index > textures.size())
+			if(index <= 0 || index > int(textures.size()))
 				return false;
 			textures[index] = newTexture;
 			return true;
@@ -2372,7 +2386,7 @@ namespace ws
 						status = "stopped";
 				}
 				
-				if(currentFrame < delays.size() && currentFrame < textures.size() && timer.getMilliSeconds() > delays[currentFrame])
+				if(currentFrame < int(delays.size()) && currentFrame < int(textures.size()) && timer.getMilliSeconds() > delays[currentFrame])
 				{	
 					currentTexture = textures[currentFrame];	
 					currentFrame++;
@@ -2448,7 +2462,7 @@ namespace ws
 				
 			shift.currentframe++;
 				
-			if(shift.currentframe >= shift.rect.size())
+			if(shift.currentframe >= int(shift.rect.size()))
 			{
 				shift.currentframe=0;
 				shift.ended = true;
@@ -3373,7 +3387,7 @@ namespace ws
 	        return textureRef;
 	    }
 	    
-	    void setUV(int vertexIndex, float u, float v)
+	    void setUV(size_t vertexIndex, float u, float v)
 	    {
 	        if(vertexIndex >= 0 && vertexIndex < vertices.size())
 	        {
@@ -4603,7 +4617,7 @@ namespace ws
 		
 		public:
 	    
-		/*
+		
 
 	    bool hasFiles()
 	    {
@@ -4637,7 +4651,7 @@ namespace ws
 	        return hasImage;
 	    }
 	    
-		*/
+		
 		
 	    bool clear() 
 	    {
@@ -4653,73 +4667,6 @@ namespace ws
 		
 		
 	}clipboard;
-	
-
-
-
-	class Mover //Drag-N-Drop
-	{
-		
-		private:
-		bool initialized = false;
-		
-		public:
-		Mover()
-		{
-			if(!initialized)
-				OleInitialize(NULL);
-			initialized = true;
-		}
-		~Mover()
-		{
-			if(initialized)
-				OleUninitialize();
-		}		
-		
-		ClipData get(MSG &m)
-		{
-			
-
-			
-			ClipData data;
-			
-			if(m.message == WM_DROPFILES)
-			{
-				
-				HDROP hDrop = (HDROP)m.wParam;
-				UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
-				
-				
-				std::vector<std::string> f;
-				
-				for (UINT i = 0; i < count; i++)
-				{
-					wchar_t szFile[MAX_PATH] = {0};
-					UINT charsCopied = DragQueryFileW(hDrop, i, szFile, MAX_PATH);
-					if(charsCopied > 0)
-					{
-						std::wstring wfile(szFile);
-						f.push_back(ws::SHORT(wfile));
-					}
-				}
-				data.setFiles(f);
-				
-				DragFinish(hDrop);
-				
-			}
-
-			return data;
-
-		}
-		
-		
-		
-		
-		
-	}mover;
-
-
-	
 	
 	
 	
@@ -4752,7 +4699,10 @@ namespace ws
 			//Startup winsock as V2.2
 			//if(WSAStartup(version, &data) != 0)
 		    //	std::cerr << "Failed to initialize Networking!" << std::endl;
-						
+
+
+			//IDropTarget
+			OleInitialize(nullptr);							
 		}
 		
 		~InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
@@ -4762,6 +4712,9 @@ namespace ws
 			
 			//Network
 			//WSACleanup();
+			
+			//IDropTarget
+			OleUninitialize();
 		}
 		
 	}initializerandreallyreallylongnamesothatitwontcauseanamingconflict;//Nobody should be messing with this class anyways...
@@ -5014,7 +4967,253 @@ namespace ws
 	};
 
 
-	
+	class Cursor
+	{
+		private:
+		HCURSOR handle = nullptr;
+		
+		public:
+		
+		enum class Type
+		{
+			// Standard system cursors (IDC_*)
+			Arrow,          // IDC_ARROW
+			IBeam,          // IDC_IBEAM
+			Wait,           // IDC_WAIT
+			Cross,          // IDC_CROSS
+			UpArrow,        // IDC_UPARROW
+			SizeNWSE,       // IDC_SIZENWSE
+			SizeNESW,       // IDC_SIZENESW
+			SizeWE,         // IDC_SIZEWE
+			SizeNS,         // IDC_SIZENS
+			SizeAll,        // IDC_SIZEALL
+			No,             // IDC_NO
+			Hand,           // IDC_HAND
+			AppStarting,    // IDC_APPSTARTING
+			Help,           // IDC_HELP
+			Pin,            // IDC_PIN (Windows 7+)
+			Person,         // IDC_PERSON (Windows 8+)
+
+			// OLE drag‑and‑drop cursors (from ole32.dll)
+			Copy,           // resource ID 2
+			Move,           // resource ID 3
+			Link            // resource ID 4
+		};
+		
+		HCURSOR getHandle()
+		{
+			return handle;
+		}
+
+		
+		Cursor()
+		{}
+		
+		Cursor(Type type)
+		{
+			loadAs(type);
+		}
+		
+		void loadAs(Type type)
+		{
+			if (handle)
+				DestroyCursor(handle);  
+
+			switch (type)
+			{
+				case Type::Arrow:        handle = LoadCursor(nullptr, IDC_ARROW); break;
+				case Type::IBeam:        handle = LoadCursor(nullptr, IDC_IBEAM); break;
+				case Type::Wait:         handle = LoadCursor(nullptr, IDC_WAIT); break;
+				case Type::Cross:        handle = LoadCursor(nullptr, IDC_CROSS); break;
+				case Type::UpArrow:      handle = LoadCursor(nullptr, IDC_UPARROW); break;
+				case Type::SizeNWSE:     handle = LoadCursor(nullptr, IDC_SIZENWSE); break;
+				case Type::SizeNESW:     handle = LoadCursor(nullptr, IDC_SIZENESW); break;
+				case Type::SizeWE:       handle = LoadCursor(nullptr, IDC_SIZEWE); break;
+				case Type::SizeNS:       handle = LoadCursor(nullptr, IDC_SIZENS); break;
+				case Type::SizeAll:      handle = LoadCursor(nullptr, IDC_SIZEALL); break;
+				case Type::No:           handle = LoadCursor(nullptr, IDC_NO); break;
+				case Type::Hand:         handle = LoadCursor(nullptr, IDC_HAND); break;
+				case Type::AppStarting:  handle = LoadCursor(nullptr, IDC_APPSTARTING); break;
+				case Type::Help:         handle = LoadCursor(nullptr, IDC_HELP); break;
+				case Type::Pin:          handle = LoadCursor(nullptr, IDC_PIN); break;
+				case Type::Person:       handle = LoadCursor(nullptr, IDC_PERSON); break;
+
+				// OLE drag‑and‑drop cursors – requires loading from ole32.dll
+				case Type::Copy:
+				{
+					HMODULE ole = GetModuleHandle(L"ole32.dll");
+					if (ole)
+						handle = (HCURSOR)LoadImage(ole, MAKEINTRESOURCE(2), IMAGE_CURSOR, 0, 0, LR_DEFAULTCOLOR);
+					if (!handle)
+						handle = LoadCursor(nullptr, IDC_HAND);  // fallback
+					break;
+				}
+				case Type::Move:
+				{
+					HMODULE ole = GetModuleHandle(L"ole32.dll");
+					if (ole)
+						handle = (HCURSOR)LoadImage(ole, MAKEINTRESOURCE(3), IMAGE_CURSOR, 0, 0, LR_DEFAULTCOLOR);
+					if (!handle)
+						handle = LoadCursor(nullptr, IDC_ARROW);  // fallback
+					break;
+				}
+				case Type::Link:
+				{
+					HMODULE ole = GetModuleHandle(L"ole32.dll");
+					if (ole)
+						handle = (HCURSOR)LoadImage(ole, MAKEINTRESOURCE(4), IMAGE_CURSOR, 0, 0, LR_DEFAULTCOLOR);
+					if (!handle)
+						handle = LoadCursor(nullptr, IDC_HAND);   // fallback
+					break;
+				}
+			}
+		}
+
+		bool loadFromTexture(const ws::Texture& texture, int hotSpotX = 0, int hotSpotY = 0)
+		{
+			if (!texture.isValid()) return false;
+
+			Gdiplus::Bitmap* gdipBitmap = texture.bitmap;
+			UINT width = gdipBitmap->GetWidth();
+			UINT height = gdipBitmap->GetHeight();
+
+			// <><><> 32‑bpp colour DIB section 
+			BITMAPINFO bmi = {};
+			bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth       = width;
+			bmi.bmiHeader.biHeight      = -(LONG)height;          // top‑down
+			bmi.bmiHeader.biPlanes      = 1;
+			bmi.bmiHeader.biBitCount    = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+
+			void* colourBits = nullptr;
+			HBITMAP hbmColor = CreateDIBSection(nullptr, &bmi, DIB_RGB_COLORS, &colourBits, nullptr, 0);
+			if (!hbmColor) return false;
+
+			Gdiplus::BitmapData data;
+			Gdiplus::Rect rect(0, 0, width, height);
+			if (gdipBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &data) != Gdiplus::Ok)
+			{
+				DeleteObject(hbmColor);
+				return false;
+			}
+			memcpy(colourBits, data.Scan0, width * height * 4);
+			gdipBitmap->UnlockBits(&data);
+
+			// <><><> 1‑bpp mask DIB section
+			size_t maskStride = ((width + 31) / 32) * 4;               // DWORD‑aligned stride in bytes
+			size_t maskBufferSize = maskStride * height;
+			std::vector<BYTE> maskBits(maskBufferSize, 0xFF);          // all bits = 1 (opaque mask)
+
+			BITMAPINFO maskBmi = {};
+			maskBmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+			maskBmi.bmiHeader.biWidth       = width;
+			maskBmi.bmiHeader.biHeight      = -(LONG)height;
+			maskBmi.bmiHeader.biPlanes      = 1;
+			maskBmi.bmiHeader.biBitCount    = 1;
+			maskBmi.bmiHeader.biCompression = BI_RGB;
+			maskBmi.bmiHeader.biSizeImage   = (DWORD)maskBufferSize;
+
+			void* maskBitsPtr = nullptr;
+			HBITMAP hbmMask = CreateDIBSection(nullptr, &maskBmi, DIB_RGB_COLORS, &maskBitsPtr, nullptr, 0);
+			if (!hbmMask)
+			{
+				DeleteObject(hbmColor);
+				return false;
+			}
+			memcpy(maskBitsPtr, maskBits.data(), maskBufferSize);
+
+			//<><> Create the cursor
+			ICONINFO iconInfo = {};
+			iconInfo.fIcon    = FALSE;          // cursor, not icon
+			iconInfo.xHotspot = hotSpotX;
+			iconInfo.yHotspot = hotSpotY;
+			iconInfo.hbmMask  = hbmMask;
+			iconInfo.hbmColor = hbmColor;
+
+			HCURSOR newCursor = CreateIconIndirect(&iconInfo);
+
+			// Clean up the temporary bitmaps
+			DeleteObject(hbmColor);
+			DeleteObject(hbmMask);
+
+			if (newCursor)
+			{
+				if (handle) DestroyCursor(handle);
+				handle = newCursor;
+				return true;
+			}
+			else
+				return false;
+			return true;
+		}
+
+		bool loadFromFile(const std::string& filename, bool isAnimated = false) 
+		{
+			if (handle) 
+			{
+				DestroyCursor(handle);
+				handle = nullptr;
+			}
+
+			std::wstring wfilename = ws::WIDE(filename);
+
+			if (!isAnimated) {
+				handle = (HCURSOR)LoadImageW(
+					nullptr,                 
+					wfilename.c_str(),        
+					IMAGE_CURSOR,             
+					0, 0,                     
+					LR_LOADFROMFILE | LR_DEFAULTSIZE
+				);
+			} else {
+				handle = LoadCursorFromFileW(wfilename.c_str());
+			}
+
+			if (!handle) {
+				std::cerr << "Failed to load cursor from file: " << filename << std::endl;
+				return false;
+			}
+			return true;
+		}
+
+
+		~Cursor()
+		{
+			if (handle)
+				DestroyCursor(handle);
+		}
+
+		//copy constructor
+		Cursor(const Cursor& other) {
+			if (other.handle) 
+			{
+				handle = (HCURSOR)CopyIcon((HICON)other.handle);
+			}
+		}
+		
+		//copy assignment
+		Cursor& operator=(const Cursor& other) {
+			if (this != &other) 
+			{
+				if (handle) DestroyCursor(handle);
+				handle = other.handle ? (HCURSOR)CopyIcon((HICON)other.handle) : nullptr;
+			}
+			return *this;
+		}
+
+		Cursor(Cursor&& other) noexcept : handle(other.handle) { other.handle = nullptr; }
+		Cursor& operator=(Cursor&& other) noexcept
+		{
+			if (this != &other)
+			{
+				if (handle) DestroyCursor(handle);
+				handle = other.handle;
+				other.handle = nullptr;
+			}
+			return *this;
+		}
+	};
 	
 	
 	class Window
@@ -5033,6 +5232,8 @@ namespace ws
 		
 		INITCOMMONCONTROLSEX icex;
 		
+		ws::Cursor cursor; 
+		
 		
 		public:		
 		
@@ -5041,7 +5242,6 @@ namespace ws
 		std::vector<ws::Child*> children;
 		ws::Texture backBuffer;
 	    Gdiplus::Graphics* canvas;
-
 		
 		Window()
 		{
@@ -5061,6 +5261,7 @@ namespace ws
 
 		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
+
 			
 			//Check if manager is initialized and init if so.
 			WindowManager::init();
@@ -5112,12 +5313,27 @@ namespace ws
 			isRunning = true;
 			setVisible(true);
 			UpdateWindow(hwnd);
-			setFocus();						
+			setFocus();
+
+
+
+
+			// Required for WM_DROPFILES to be delivered at all
+			DragAcceptFiles(hwnd, TRUE);
+
+			// Required on 64-bit: UAC blocks WM_DROPFILES by default
+			ChangeWindowMessageFilterEx(hwnd, WM_DROPFILES,    MSGFLT_ALLOW, nullptr);
+			ChangeWindowMessageFilterEx(hwnd, WM_COPYDATA,     MSGFLT_ALLOW, nullptr);
+			ChangeWindowMessageFilterEx(hwnd, 0x0049,          MSGFLT_ALLOW, nullptr); // WM_COPYGLOBALDATA (internal)
+			
 		}
 
         ~Window()
         {
-		    if (canvas) {
+			RevokeDragDrop(hwnd);
+					
+			
+			if (canvas) {
 		        delete canvas;
 		        canvas = nullptr;
 		    }
@@ -5127,7 +5343,8 @@ namespace ws
 		    }
 			if (hwnd && IsWindow(hwnd)) {
 				DestroyWindow(hwnd);
-			}			
+			}	
+				
         }
 		
 		
@@ -5548,7 +5765,7 @@ namespace ws
 		
 		void removeChild(ws::Child &child)
 		{
-			for(int a=0;a<children.size();a++)
+			for(size_t a=0;a<children.size();a++)
 			{
 				if(&child == children[a])
 				{
@@ -5560,7 +5777,7 @@ namespace ws
 		
 		bool hasChild(ws::Child &child)
 		{
-			for(int a=0;a<children.size();a++)
+			for(size_t a=0;a<children.size();a++)
 			{
 				if(&child == children[a])
 				{
@@ -5569,6 +5786,16 @@ namespace ws
 			}			
 			return false;
 		}		
+		
+		
+		void setCursor(ws::Cursor newcursor)
+		{
+			cursor = newcursor;
+		}
+		ws::Cursor getCursor()
+		{
+			return cursor;
+		}
 		
 		private:
 		
@@ -5597,7 +5824,17 @@ namespace ws
 					msgQ.push(msg);
 					return 0;
 				}
-				
+
+				case WM_SETCURSOR:
+				{
+					if (LOWORD(lParam) == HTCLIENT)
+					{
+						SetClassLongPtr(hwnd, GCLP_HCURSOR, 
+							(LONG_PTR)(cursor.getHandle() ? cursor.getHandle() : LoadCursor(nullptr, IDC_ARROW)));
+
+					}
+					return DefWindowProc(hwnd, uMsg, wParam, lParam);
+				}				
 				
 	            case WM_PAINT: {
 	            	
@@ -5687,7 +5924,7 @@ namespace ws
 		wc.lpfnWndProc = WindowManager::GlobalProc;
 		wc.hInstance = instance;
 		wc.lpszClassName = L"Window";
-		wc.hCursor = LoadCursor(nullptr,IDC_ARROW);
+		wc.hCursor = NULL;
 		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		
 		if(!RegisterClass(&wc))
@@ -5754,6 +5991,486 @@ namespace ws
 	std::mutex ws::WindowManager::windowsMutex;
     bool ws::WindowManager::initialized = false;	
 
+
+
+    enum class DropEffect {
+        None = DROPEFFECT_NONE,
+        Copy = DROPEFFECT_COPY,
+        Move = DROPEFFECT_MOVE,
+        Link = DROPEFFECT_LINK
+    };
+
+	class DropTarget : public IDropTarget
+	{
+		
+		private:
+		
+		ws::Window *windowRef = nullptr;
+		DWORD m_lastEffect = DROPEFFECT_NONE;
+
+		enum class AcceptedType { None, Files, Images, Text };
+		AcceptedType m_acceptedType = AcceptedType::None;
+		
+		struct TypeSetting 
+		{
+			bool enabled = false;
+			DWORD effect = DROPEFFECT_COPY;
+			std::function<bool()> condition;
+		} m_files, m_text, m_images;
+		
+		std::queue<std::pair<ws::ClipData, DWORD>> m_dropQueue;
+		
+
+		bool hasFiles(IDataObject* pData) const {
+			if (!pData) return false;
+			FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			return SUCCEEDED(pData->QueryGetData(&fmt));
+		}
+
+		bool hasText(IDataObject* pData) const {
+			if (!pData) return false;
+			FORMATETC fmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			return SUCCEEDED(pData->QueryGetData(&fmt));
+		}
+
+		bool hasImage(IDataObject* pData) const 
+		{
+			if (!pData) return false;
+
+			//standard image formats
+			FORMATETC fmt = { CF_DIB, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			if (SUCCEEDED(pData->QueryGetData(&fmt))) return true;
+
+			fmt.cfFormat = CF_DIBV5;
+			if (SUCCEEDED(pData->QueryGetData(&fmt))) return true;
+
+			static CLIPFORMAT pngFormat = (CLIPFORMAT)RegisterClipboardFormatW(L"PNG");
+			if (pngFormat) {
+				fmt.cfFormat = pngFormat;
+				if (SUCCEEDED(pData->QueryGetData(&fmt))) return true;
+			}
+
+			//Web drag: FileGroupDescriptorW (browser image drag)
+			static CLIPFORMAT fileGroupDescW = (CLIPFORMAT)RegisterClipboardFormatW(L"FileGroupDescriptorW");
+			if (fileGroupDescW) {
+				fmt.cfFormat = fileGroupDescW;
+				if (SUCCEEDED(pData->QueryGetData(&fmt))) {
+					return true;
+				}
+			}
+
+			// File system drag: CF_HDROP with image extension
+			fmt.cfFormat = CF_HDROP;
+			fmt.tymed = TYMED_HGLOBAL;
+			if (SUCCEEDED(pData->QueryGetData(&fmt))) {
+				STGMEDIUM stg = {};
+				if (SUCCEEDED(pData->GetData(&fmt, &stg))) {
+					HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal);
+					if (hDrop) {
+						// Check the first file's extension
+						wchar_t file[MAX_PATH] = {};
+						if (DragQueryFileW(hDrop, 0, file, MAX_PATH) > 0) {
+							std::wstring ext = std::wcsrchr(file, L'.') ? std::wcsrchr(file, L'.') : L"";
+							// Common image extensions
+							static const std::vector<std::wstring> imageExts = {
+								L".png", L".jpg", L".jpeg", L".gif", L".bmp",
+								L".tif", L".tiff", L".webp", L".ico",
+							};
+							for (const auto& e : imageExts) {
+								if (_wcsicmp(ext.c_str(), e.c_str()) == 0) {
+									GlobalUnlock(stg.hGlobal);
+									ReleaseStgMedium(&stg);
+									return true;
+								}
+							}
+						}
+						GlobalUnlock(stg.hGlobal);
+					}
+					ReleaseStgMedium(&stg);
+				}
+			}
+
+			return false;
+		}	
+
+		public:
+		
+		
+		void acceptType(std::string type,ws::DropEffect effect = ws::DropEffect::Copy)
+		{
+			DWORD dwEffect = static_cast<DWORD>(effect); 
+			if (type == "images")
+			{
+				m_images.enabled = true;
+				m_images.effect = dwEffect;
+				m_images.condition = nullptr;
+			}
+			if (type == "text")
+			{
+				m_text.enabled = true;
+				m_text.effect = dwEffect;
+				m_text.condition = nullptr;
+			}
+			if (type == "files")
+			{
+				m_files.enabled = true;
+				m_files.effect = dwEffect;
+				m_files.condition = nullptr;
+			}		
+		}
+
+		void rejectType(std::string type)
+		{
+			if(type == "images")
+				m_images.enabled = false;
+			if(type == "text")
+				m_text.enabled = false;			
+			if(type == "files")
+				m_files.enabled = false;							
+		}
+		
+		void rejectAll()
+		{
+			m_files.enabled = m_text.enabled = m_images.enabled = false;
+			m_files.effect = m_text.effect = m_images.effect = static_cast<DWORD>(ws::DropEffect::Copy);
+		}
+
+		void onlyAcceptIf(std::string droptype,std::function<bool()> function)
+		{
+			if (droptype == "images")
+			{
+				m_images.enabled = true;   // still need to accept the type
+				m_images.condition = function;
+			}
+			if(droptype == "text")
+			{
+				m_text.enabled = true;
+				m_text.condition = function;
+			}
+			if(droptype == "files")
+			{
+				m_files.enabled = true;
+				m_files.condition = function;
+			}
+		}
+
+
+
+
+		bool pollDrop(ws::ClipData& outData, DropEffect& outEffect) 
+		{
+			if(!windowRef)return false;
+			if (m_dropQueue.empty()) 
+				return false;
+			auto& front = m_dropQueue.front();
+			outData = std::move(front.first);
+			outEffect = static_cast<DropEffect>(front.second);
+			m_dropQueue.pop();
+			return true;
+		}
+
+		
+
+		// IUnknown
+		HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override
+		{
+			if(!windowRef)return S_OK;
+			if (riid == IID_IUnknown || riid == IID_IDropTarget)
+			{ 
+				*ppv = this; 
+				AddRef(); return S_OK; 
+			}
+			*ppv = nullptr; 
+			return E_NOINTERFACE;
+		}
+		ULONG STDMETHODCALLTYPE AddRef()  override { return 1; }
+		ULONG STDMETHODCALLTYPE Release() override { return 1; }
+
+		// IDropTarget
+		HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState,POINTL pt, DWORD* pdwEffect) override 
+		{ 
+			if(!windowRef)return S_OK;
+			m_lastEffect = DROPEFFECT_NONE;
+			m_acceptedType = AcceptedType::None;
+
+			if (m_files.enabled && hasFiles(pDataObj))
+			{
+				m_acceptedType = AcceptedType::Files;  // always record the type
+				if (!m_files.condition || m_files.condition())
+					m_lastEffect = m_files.effect;
+			}
+			else if (m_images.enabled && hasImage(pDataObj))
+			{
+				m_acceptedType = AcceptedType::Images; // always record the type
+				if (!m_images.condition || m_images.condition())
+					m_lastEffect = m_images.effect;
+			}
+			else if (m_text.enabled && hasText(pDataObj))
+			{
+				m_acceptedType = AcceptedType::Text;   // always record the type
+				if (!m_text.condition || m_text.condition())
+					m_lastEffect = m_text.effect;
+			}
+
+			*pdwEffect = m_lastEffect;
+
+			ws::Cursor c;
+			
+
+			if (m_lastEffect & DROPEFFECT_COPY)
+				c.loadAs(ws::Cursor::Type::Copy);
+			else if (m_lastEffect & DROPEFFECT_MOVE)
+				c.loadAs(ws::Cursor::Type::Move);
+			else
+				c.loadAs(ws::Cursor::Type::Arrow);
+			
+			windowRef->setCursor(c);
+			
+			return S_OK;
+		}
+		
+		HRESULT STDMETHODCALLTYPE DragOver (DWORD grfKeyState, POINTL pt,DWORD* pdwEffect) override 
+		{ 
+			if(!windowRef)return S_OK;
+			DWORD newEffect = DROPEFFECT_NONE;
+
+			switch (m_acceptedType)
+			{
+				case AcceptedType::Files:
+					if (!m_files.condition || m_files.condition())
+						newEffect = m_files.effect;
+					break;
+				case AcceptedType::Images:
+					if (!m_images.condition || m_images.condition())
+						newEffect = m_images.effect;
+					break;
+				case AcceptedType::Text:
+					if (!m_text.condition || m_text.condition())
+						newEffect = m_text.effect;
+					break;
+				default:
+					break;
+			}
+
+			*pdwEffect = newEffect;
+			m_lastEffect = newEffect;
+			
+			ws::Cursor c;
+			
+			if (m_lastEffect & DROPEFFECT_COPY)
+				c.loadAs(ws::Cursor::Type::Copy);
+			else if (m_lastEffect & DROPEFFECT_MOVE)
+				c.loadAs(ws::Cursor::Type::Move);
+			else
+				c.loadAs(ws::Cursor::Type::Arrow);
+			
+			windowRef->setCursor(c);
+			
+			return S_OK;
+		}
+		HRESULT STDMETHODCALLTYPE DragLeave() override 
+		{ 
+			if(!windowRef)return S_OK;
+			m_acceptedType = AcceptedType::None;
+			ws::Cursor c;
+			c.loadAs(ws::Cursor::Type::Arrow);
+			windowRef->setCursor(c);
+			return S_OK;
+		}
+
+
+		HRESULT STDMETHODCALLTYPE Drop(IDataObject* obj, DWORD, POINTL, DWORD* e) override
+		{
+			if(!windowRef)return S_OK;
+			*e = static_cast<DWORD>(m_lastEffect);
+
+
+			// 1. FileGroupDescriptorW + FileContents  — browser files/images - does not support image links.
+			// 2. CF_HDROP                             — explorer files
+			// 3. CF_DIBV5 / CF_DIB                   — bitmap from image editors
+			// 4. PNG (RegisterClipboardFormat)        — lossless with alpha
+			// 5. CF_UNICODETEXT                       — plain text fallback
+			// 6. UniformResourceLocatorW             — URL only drag			
+
+
+
+			ws::ClipData data;
+
+			// ---- 1. CF_HDROP (Explorer file drag) ----
+			FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			STGMEDIUM stg = {};
+			if (SUCCEEDED(obj->GetData(&fmt, &stg)))
+			{
+				HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal);
+				UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+				std::vector<std::string> files;
+				for (UINT i = 0; i < count; i++)
+				{
+					wchar_t path[MAX_PATH] = {};
+					DragQueryFileW(hDrop, i, path, MAX_PATH);
+					files.push_back(ws::SHORT(path));
+				}
+				data.setFiles(files);
+				GlobalUnlock(stg.hGlobal);
+				ReleaseStgMedium(&stg);
+			}
+
+			// ---- 2. FileGroupDescriptorW + FileContents (browser image/file drag) ----
+			FORMATETC descFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"FileGroupDescriptorW"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			STGMEDIUM descStg = {};
+			if (SUCCEEDED(obj->GetData(&descFmt, &descStg)))
+			{
+				FILEGROUPDESCRIPTORW* fgd = (FILEGROUPDESCRIPTORW*)GlobalLock(descStg.hGlobal);
+				if (fgd && fgd->cItems > 0)
+				{
+					GlobalUnlock(descStg.hGlobal);
+					ReleaseStgMedium(&descStg);
+
+					// try IStream first
+					FORMATETC contentFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"FileContents"), nullptr, DVASPECT_CONTENT, 0, TYMED_ISTREAM };
+					STGMEDIUM contentStg = {};
+					if (SUCCEEDED(obj->GetData(&contentFmt, &contentStg)))
+					{
+						std::vector<BYTE> bytes;
+						BYTE buf[4096];
+						ULONG bytesRead = 0;
+						while (SUCCEEDED(contentStg.pstm->Read(buf, sizeof(buf), &bytesRead)) && bytesRead > 0)
+							bytes.insert(bytes.end(), buf, buf + bytesRead);
+						if (!bytes.empty())
+						{
+							ws::Texture tex;
+							if (tex.loadFromMemory(bytes.data(), bytes.size()))
+								data.setTexture(tex);
+						}
+						ReleaseStgMedium(&contentStg);
+					}
+					else
+					{
+						// fallback to HGLOBAL
+						contentFmt.tymed = TYMED_HGLOBAL;
+						if (SUCCEEDED(obj->GetData(&contentFmt, &contentStg)))
+						{
+							LPVOID pData = GlobalLock(contentStg.hGlobal);
+							SIZE_T size  = GlobalSize(contentStg.hGlobal);
+							if (pData && size > 0)
+							{
+								ws::Texture tex;
+								if (tex.loadFromMemory(pData, size))
+									data.setTexture(tex);
+							}
+							GlobalUnlock(contentStg.hGlobal);
+							ReleaseStgMedium(&contentStg);
+						}
+					}
+				}
+				else
+				{
+					GlobalUnlock(descStg.hGlobal);
+					ReleaseStgMedium(&descStg);
+				}
+			}
+
+
+			// ---- 3. PNG custom format (alpha-transparent images from many apps) ----
+			if (!data.getTexture().isValid())
+			{
+				FORMATETC pngFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"PNG"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+				STGMEDIUM pngStg = {};
+				if (SUCCEEDED(obj->GetData(&pngFmt, &pngStg)))
+				{
+					LPVOID pData = GlobalLock(pngStg.hGlobal);
+					SIZE_T size  = GlobalSize(pngStg.hGlobal);
+					if (pData && size > 0)
+					{
+						ws::Texture tex;
+						if (tex.loadFromMemory(pData, size))
+							data.setTexture(tex);
+					}
+					GlobalUnlock(pngStg.hGlobal);
+					ReleaseStgMedium(&pngStg);
+				}
+			}
+
+			// ---- 4. CF_DIBV5 then CF_DIB (Paint, Photoshop, screenshot tools) ----
+			if (!data.getTexture().isValid())
+			{
+				CLIPFORMAT dibFormats[] = { CF_DIBV5, CF_DIB };
+				for (CLIPFORMAT cf : dibFormats)
+				{
+					FORMATETC dibFmt = { cf, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+					STGMEDIUM dibStg = {};
+					if (SUCCEEDED(obj->GetData(&dibFmt, &dibStg)))
+					{
+						LPVOID pData = GlobalLock(dibStg.hGlobal);
+						if (pData)
+						{
+							BITMAPINFOHEADER* bih = (BITMAPINFOHEADER*)pData;
+							int w      = bih->biWidth;
+							int h      = abs(bih->biHeight);
+							bool topDown = (bih->biHeight < 0);
+							int stride = ((w * bih->biBitCount + 31) / 32) * 4;
+							LPBYTE pPixels = (LPBYTE)pData + bih->biSize;
+
+							Gdiplus::Bitmap* src = topDown
+								? new Gdiplus::Bitmap(w, h,  stride, PixelFormat32bppRGB, pPixels)
+								: new Gdiplus::Bitmap(w, h, -stride, PixelFormat32bppRGB, pPixels + (h - 1) * stride);
+
+							if (src && src->GetLastStatus() == Gdiplus::Ok)
+							{
+								ws::Texture tex;
+								tex.loadFromBitmapPlus(*src);
+								data.setTexture(tex);
+							}
+							delete src;
+							GlobalUnlock(dibStg.hGlobal);
+						}
+						ReleaseStgMedium(&dibStg);
+						if (data.getTexture().isValid()) break;
+					}
+				}
+			}
+
+			// ---- 5. CF_UNICODETEXT (plain text from anywhere) ----
+			FORMATETC textFmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			STGMEDIUM textStg = {};
+			if (SUCCEEDED(obj->GetData(&textFmt, &textStg)))
+			{
+				LPCWSTR p = (LPCWSTR)GlobalLock(textStg.hGlobal);
+				if (p) data.setText(ws::SHORT(p));
+				GlobalUnlock(textStg.hGlobal);
+				ReleaseStgMedium(&textStg);
+			}
+
+			// ---- 6. UniformResourceLocatorW (URL-only drags) ----
+			if (data.getText().empty())
+			{
+				FORMATETC urlFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"UniformResourceLocatorW"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+				STGMEDIUM urlStg = {};
+				if (SUCCEEDED(obj->GetData(&urlFmt, &urlStg)))
+				{
+					LPCWSTR p = (LPCWSTR)GlobalLock(urlStg.hGlobal);
+					if (p) data.setText(ws::SHORT(p));
+					GlobalUnlock(urlStg.hGlobal);
+					ReleaseStgMedium(&urlStg);
+				}
+			}
+
+			m_dropQueue.push({ std::move(data), m_lastEffect });
+
+			return S_OK;
+		}
+		
+		void setWindow(ws::Window &window)
+		{
+			RegisterDragDrop(window.hwnd, this);	
+			windowRef = &window;
+		}
+		
+		
+		
+	};
+
+
 }
 
 
@@ -5794,7 +6511,7 @@ namespace ws //GLOBAL INPUT
 		
 		bool getMouseButton(int vmButton)
 		{
-			if (GetAsyncKeyState(vmButton) & 0x8000)
+			if ((GetAsyncKeyState(vmButton) & 0x8000) != 0)
 				return true;
 			
 			return false;	
@@ -5802,7 +6519,7 @@ namespace ws //GLOBAL INPUT
 		
 		bool getKey(char vmKey)
 		{
-			if (GetAsyncKeyState(vmKey))
+			if ((GetAsyncKeyState(vmKey)  & 0x8000) != 0)
 			{
 				return true;
 			}
@@ -5958,7 +6675,7 @@ namespace ws //CHILD WINDOW API
 		
 		void removeItem(std::string item)
 		{	
-			for(int a=0;a<list.size();a++)
+			for(size_t a=0;a<list.size();a++)
 			{
 				if(list[a] == item)
 				{
@@ -5990,7 +6707,7 @@ namespace ws //CHILD WINDOW API
 			if(!hMenu)
 				return false;
 			
-			for(int a=0;a<list.size();a++)
+			for(size_t a=0;a<list.size();a++)
 			{
 				AppendMenu(hMenu, MF_STRING, 1+a, ws::WIDE(list[a]).c_str());
             }
@@ -6393,7 +7110,7 @@ namespace ws //CHILD WINDOW API
 	    {
 			if (!hwnd) {
 				// store for later if hwnd doesn't exist yet
-				for(int a=0;a<items.size();a++)
+				for(size_t a=0;a<items.size();a++)
 					pendingItems.push_back(items[a]);
 				return;
 			}

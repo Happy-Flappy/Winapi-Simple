@@ -205,6 +205,11 @@
 
 * Fixed ws::View transformations so that when zooming in, the viewport does not change. 
 
+* Added Cursor class
+
+* Added ws::DropTarget class
+
+* Added ws::DropEffect for ws::DropTarget enums.
 
 
 # New major features to be added. 

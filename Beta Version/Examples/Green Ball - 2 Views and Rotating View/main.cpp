@@ -149,7 +149,7 @@ int main()
 	
 	
 	ws::Window window(960,540,"window");
-	//window.setFullscreen(true);
+	window.setFullscreen(true);
 	
 	
 	ws::Texture texture;
@@ -253,10 +253,13 @@ int main()
 			
 			view.setPortRotatePointCenter();
 			view.setRotation(view.getRotation() + 2);
-			view.setZoom(1.5);
-			static float zoom = 0;
-			zoom += 0.001;
-			view2.setZoom(zoom);
+			//view.setZoom(1.5);
+			static float zoomDir = 0.5;
+			if(view.getZoom() > 1)
+				zoomDir = -0.05;
+			if(view.getZoom() < 0.1)
+				zoomDir = 0.05;
+			view.setZoom(view.getZoom() + zoomDir);
 			
 			circle.setPosition(circle.getPosition().x + 1,circle.getPosition().y + direction);
 			view.setCenter(circle.getPosition());

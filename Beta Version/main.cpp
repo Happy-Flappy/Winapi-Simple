@@ -3,49 +3,33 @@
 
 
 
-
 int main()
 {
 	ws::Window window(960,540,"");
-	window.setFullscreen();
-	window.addStyle(CS_DBLCLKS);
-	
+
 	ws::Texture texture;
-	texture.loadFromFile("quakka2.png");
 	ws::Sprite sprite;
-	sprite.setTexture(texture);
+	
+	ws::DropTarget target;
+	target.acceptType("images");
+	target.acceptType("text");
+	target.acceptType("files");
 	
 	
-	ws::ClickMenu clickMenu;
-	clickMenu.setList({"Option 1","Copy to file","Load into Memory","Option 4","Another option in this list menu but this one is long."});
-	clickMenu.init(window);
-	
-	
-	ws::Menu menu;
-	menu.setWindow(window);
-	
-	
-	ws::Dropdown drop(1000,"File");
-	drop.addItem(1001,MF_STRING,"Item 1");
-	drop.addItem(1002,MF_STRING,"Item 2");
-	drop.addItem(1003,MF_STRING,"Item 3");
-	drop.addItem(1004,MF_STRING,"Item 4");
-	
-	
-	menu.addDropdown(drop);
-	
+	ws::ClipData data;
+	ws::DropEffect effect;
 	
 	while(window.isOpen())
 	{
-		MSG m;
-		while(window.pollEvent(m))
+		while(target.pollDrop(data,effect))
 		{
-			if(m.message == WM_LBUTTONDOWN)
+			if(data.getTexture().isValid())
 			{
-				clickMenu.show(ws::Global::getMousePos(window));
+				texture = data.getTexture();
+				sprite.setTexture(texture,true);
 			}
 		}
-		window.clear(ws::Hue(37,37,37));
+		window.clear();
 		window.draw(sprite);
 		window.display();
 	}
