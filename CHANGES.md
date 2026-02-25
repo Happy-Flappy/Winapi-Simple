@@ -137,7 +137,7 @@
 
 
 
-# V1.5 - BETA 
+# V1.5
 
 * Made View class much more functional by using GDI+ Transformations.
 
@@ -171,6 +171,7 @@
 * Added toWorld,toScreen functions to window class so that window can auto-input the screenSize parameter of the View::toWorld(ws::Vec2i point,ws::Vec2i screenSize) function.
 
 * Renamed ws::Animate to ws::GIF since it only handled GIF animations for the most part.
+
 * Added ws::ShiftData class for handling spritesheet animations.
 
 * Added GDI+ ws::Font class and ws::Text class.
@@ -220,13 +221,4 @@
 
 * Texture stretching into polygonal shapes.
 
-* Mesh3D
-
-* Transformation functions at a drawables level (rotate,scale,color functions,etc.)
-
-* More child classes and features for them.(right click menu)
-
-* (Figure out how to fix random flicker that happens to child objects)
-
-* Add more available types to Clipboard class.
-
+* Networking

@@ -1,5 +1,0 @@
-ws::Global::getKey() does not work for VK_LCONTROL.
-
-ws::TargetDrop does not effect cursor when in different stages of dragging.
-
-ws::Cursor does not support animated cursors.
