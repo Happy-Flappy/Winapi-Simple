@@ -1,0 +1,7792 @@
+#ifndef WINAPI_SIMPLE_GRAPHICS
+#define WINAPI_SIMPLE_GRAPHICS
+
+
+
+//-lgdi32 -luser32 -lole32 -lmsimg32 -lkernel32 -lwinmm -lcomctl32 -lgdiplus -lshlwapi -lcomdlg32 -luuid
+
+
+
+#ifndef UNICODE
+#define UNICODE
+#endif
+#ifndef _UNICODE
+#define _UNICODE
+#endif
+
+
+
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif        
+#ifndef STRICT
+#define STRICT
+#endif          
+//#ifndef WIN32_LEAN_AND_MEAN
+//#define WIN32_LEAN_AND_MEAN
+//#endif
+
+//Network
+//#include <winsock2.h>
+//#include <ws2tcpip.h>
+//#include <stdio.h>
+// 
+#include <windows.h>  
+#include <windowsx.h>  
+#include <commctrl.h>  
+#include <commdlg.h>
+#include <iostream>
+#include <string>
+#include <cstdlib>      
+#include <map>
+
+#include <queue>
+#include <iomanip>
+#include <cmath>
+
+#include <mmsystem.h>
+#include <filesystem>
+#include <cwchar>
+#include <algorithm>
+#include <functional>
+
+
+// Define missing Windows types BEFORE including GDI+
+#ifndef SHORT
+typedef short SHORT;
+#endif
+
+#ifndef PROPID
+typedef unsigned long PROPID;
+#endif
+
+
+#include <gdiplus.h>
+#include <shlwapi.h>
+#include <objbase.h>
+//Save/Open dialog
+#include <Shlobj.h>
+#include <shellapi.h>
+//PI
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+//Data Types
+#include <type_traits>
+#include <utility>
+#include <mutex>
+//
+
+
+//Defines for a couple cursors.
+#ifndef IDC_PIN
+#define IDC_PIN MAKEINTRESOURCE(32671)   // available since Windows 7
+#endif
+#ifndef IDC_PERSON
+#define IDC_PERSON MAKEINTRESOURCE(32672) // available since Windows 8
+#endif
+
+
+
+// ========== CORE UTILITIES ==========
+namespace ws
+{
+	class Timer
+	{
+		public:
+		
+		
+		
+		Timer()
+		{
+			LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            frequency = static_cast<double>(freq.QuadPart);
+			restart();
+		}
+		
+		~Timer()
+		{
+		}
+		
+		double restart()
+		{
+	        double seconds = getSeconds();
+            LARGE_INTEGER counter;
+            QueryPerformanceCounter(&counter);
+            startTime = counter.QuadPart;
+            
+            return seconds;
+		}
+		
+		
+	    double getSeconds() const
+	    {
+	        LARGE_INTEGER currentTime;
+	        QueryPerformanceCounter(&currentTime);
+	        return static_cast<double>(currentTime.QuadPart - startTime) / frequency;
+	      
+	    }
+	    
+	    double getMilliSeconds() const
+	    {
+	        return getSeconds() * 1000.0;
+	    }
+	    
+	    double getMicroSeconds() const
+	    {
+	        return getMilliSeconds() * 1000.0;
+	    }
+	
+		private:
+		    LONGLONG startTime = 0;
+		    double frequency = 1.0;	
+		
+			
+	};
+	
+	
+	
+	bool ResolveRelativePath(std::string path)
+	{
+		// Convert to absolute path to ensure proper resolution
+	    std::filesystem::path filePath(path);
+	    if (filePath.is_relative()) {
+	        // Get executable directory and resolve relative path
+	        char exePath[MAX_PATH];
+	        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+	        filePath = exeDir / filePath;
+	    }
+	    
+//	    if (!std::filesystem::exists(filePath)) {
+//	        std::cerr << "File not found at: " << filePath.string() << std::endl;
+//	        return false;
+//	    }
+	    path = filePath.string();
+	    return true;
+	}
+
+
+	std::wstring WIDE(std::string str)
+	{
+	    // Try UTF-8 first
+	    int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.c_str(), -1, nullptr, 0);
+	    if (GetLastError() == ERROR_NO_UNICODE_TRANSLATION) {
+	        // Fallback to ANSI (system default code page)
+	        size = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, nullptr, 0);
+	    }
+	    
+	    std::wstring wstr(size, 0);
+	    if (size > 0) {
+	        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
+	    }
+	    return wstr;
+	}
+
+	
+	std::string SHORT(const std::wstring& wstr) {
+	    // Determine the size of the required buffer
+	    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
+	    if (bufferSize == 0) {
+	        return "";
+	    }
+	
+	    // Create the string and perform the conversion
+	    std::string str(bufferSize - 1, '\0'); // Subtract 1 for the null terminator
+	    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, str.data(), bufferSize, NULL, NULL);
+	
+	    return str;
+	}
+	
+	
+	
+	
+	LPCSTR TO_LPCSTR(std::string str)
+	{
+		return LPCSTR(str.c_str());
+	}
+	
+	LPCWSTR TO_LPCWSTR(std::string str)
+	{
+	    return WIDE(str).c_str();
+	}	
+	
+
+
+
+	std::wstring GetShortPathNameSafe(const std::wstring& longPath) 
+	{
+	    // Pass NULL for the buffer to get the required size.
+	    DWORD bufferSize = GetShortPathNameW(longPath.c_str(), NULL, 0);
+	    if (bufferSize == 0) {
+	        return L""; // Return empty on failure
+	    }
+	
+	    // Allocate the buffer
+	    std::wstring shortPath(bufferSize, L'\0');
+	
+	    // Call again with the allocated buffer
+	    bufferSize = GetShortPathNameW(longPath.c_str(), shortPath.data(), bufferSize);
+	    if (bufferSize == 0) {
+	        return L""; // Return empty on failure
+	    }
+	    
+	    // Resize to the actual length and return
+	    shortPath.resize(bufferSize);
+	    return shortPath;
+	}
+
+
+	//A microsoft function that I just copied. It is required for the saving of images to file.
+	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+	{
+	    UINT  num = 0;          // number of image encoders
+	    UINT  size = 0;         // size of the image encoder array in bytes
+	
+	    Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
+	
+	    Gdiplus::GetImageEncodersSize(&num, &size);
+	    if(size == 0)
+	        return -1;  // Failure
+	
+	    pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+	    if(pImageCodecInfo == NULL)
+	        return -1;  // Failure
+	
+	    Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
+	
+	    for(UINT j = 0; j < num; ++j)
+	    {
+	        if( wcscmp(pImageCodecInfo[j].MimeType, format) == 0 )
+	        {
+	            *pClsid = pImageCodecInfo[j].Clsid;
+	            free(pImageCodecInfo);
+	            return j;  // Success
+	        }    
+	    }
+	
+	    free(pImageCodecInfo);
+	    return -1;  // Failure
+	}
+
+
+		
+}
+
+
+
+
+
+// ========== DATA TYPES ==========
+namespace ws
+{
+
+	// I MUST ADMIT! I did use AI to make these data types support template construction. 
+	// When it comes to templates and type constructors, these are not my strongsuits. 
+	// I just don't know it well enough to do it on my own. 
+	// I did not use AI for anything else in the library. Only for adding comments and for doing repetitive tasks such as replacing POINT with ws::Vec2f. 
+	
+
+	
+	// ==================== TYPE TRAITS ====================
+	
+	// Vector type traits
+	template<typename T, typename = void>
+	struct has_xy_members : std::false_type {};
+	
+	template<typename T>
+	struct has_xy_members<T, std::void_t<
+	    decltype(std::declval<T>().x), 
+	    decltype(std::declval<T>().y)>>
+	    : std::true_type {};
+	
+	template<typename T, typename = void>
+	struct has_xyz_members : std::false_type {};
+	
+	template<typename T>
+	struct has_xyz_members<T, std::void_t<
+	    decltype(std::declval<T>().x), 
+	    decltype(std::declval<T>().y),
+	    decltype(std::declval<T>().z)>>
+	    : std::true_type {};
+	
+	// Rect type traits
+	template<typename T, typename = void>
+	struct has_width_height_style : std::false_type {};
+	
+	template<typename T>
+	struct has_width_height_style<T, std::void_t<
+	    decltype(std::declval<T>().left), 
+	    decltype(std::declval<T>().top),
+	    decltype(std::declval<T>().width),
+	    decltype(std::declval<T>().height)>> 
+	    : std::true_type {};
+	
+	template<typename T, typename = void>
+	struct has_right_bottom_style : std::false_type {};
+	
+	template<typename T>
+	struct has_right_bottom_style<T, std::void_t<
+	    decltype(std::declval<T>().left), 
+	    decltype(std::declval<T>().top),
+	    decltype(std::declval<T>().right),
+	    decltype(std::declval<T>().bottom)>>
+	    : std::true_type {};
+	
+	template<typename T>
+	struct is_rect_like : std::integral_constant<bool, 
+	    has_width_height_style<T>::value || has_right_bottom_style<T>::value> {};
+	
+	// ==================== VEC2I ====================
+	
+	struct Vec2i {
+	    int x, y;
+	    
+	    Vec2i() = default;
+	    
+	    // Constructor for any two arithmetic types
+	    template<typename T, typename U,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U>>>
+	    Vec2i(T x_val, U y_val) 
+	        : x(static_cast<int>(x_val)), 
+	          y(static_cast<int>(y_val)) {}
+	    
+	    // Constructor for any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    Vec2i(const T& other) 
+	        : x(static_cast<int>(other.x)), 
+	          y(static_cast<int>(other.y)) {}
+	    
+	    // Conversion operator to any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        return result;
+	    }
+	    
+	    // Special POINT pointer conversions (only if layout matches!)
+	    operator POINT*() { 
+	        return reinterpret_cast<POINT*>(this); 
+	    }
+	    
+	    operator const POINT*() const { 
+	        return reinterpret_cast<const POINT*>(this); 
+	    }
+	};
+	
+	// ==================== VEC2F ====================
+	
+	struct Vec2f {
+	    float x, y;
+	    
+	    Vec2f() = default;
+	    
+	    // Constructor for any two arithmetic types
+	    template<typename T, typename U,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U>>>
+	    Vec2f(T x_val, U y_val) 
+	        : x(static_cast<float>(x_val)), 
+	          y(static_cast<float>(y_val)) {}
+	    
+	    // Constructor for any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    Vec2f(const T& other) 
+	        : x(static_cast<float>(other.x)), 
+	          y(static_cast<float>(other.y)) {}
+	    
+	    // Conversion operator to any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        return result;
+	    }
+	    
+	    // Special POINT pointer conversions
+	    operator POINT*() { 
+	        return reinterpret_cast<POINT*>(this); 
+	    }
+	    
+	    operator const POINT*() const { 
+	        return reinterpret_cast<const POINT*>(this); 
+	    }
+	};
+	
+	// ==================== VEC2D ====================
+	
+	struct Vec2d {
+	    double x, y;
+	    
+	    Vec2d() = default;
+	    
+	    // Constructor for any two arithmetic types
+	    template<typename T, typename U,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U>>>
+	    Vec2d(T x_val, U y_val) 
+	        : x(static_cast<double>(x_val)), 
+	          y(static_cast<double>(y_val)) {}
+	    
+	    // Constructor for any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    Vec2d(const T& other) 
+	        : x(static_cast<double>(other.x)), 
+	          y(static_cast<double>(other.y)) {}
+	    
+	    // Conversion operator to any type with .x and .y members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xy_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        return result;
+	    }
+	    
+	    // Special POINT pointer conversions
+	    operator POINT*() { 
+	        return reinterpret_cast<POINT*>(this); 
+	    }
+	    
+	    operator const POINT*() const { 
+	        return reinterpret_cast<const POINT*>(this); 
+	    }
+	};
+	
+	// ==================== VEC3I ====================
+	
+	struct Vec3i {
+	    int x, y, z;
+	    
+	    Vec3i() = default;
+	    
+	    // Constructor for any three arithmetic types
+	    template<typename T, typename U, typename V,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U> &&
+	                                         std::is_arithmetic_v<V>>>
+	    Vec3i(T x_val, U y_val, V z_val) 
+	        : x(static_cast<int>(x_val)), 
+	          y(static_cast<int>(y_val)), 
+	          z(static_cast<int>(z_val)) {}
+	    
+	    // Constructor for any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    Vec3i(const T& other) 
+	        : x(static_cast<int>(other.x)), 
+	          y(static_cast<int>(other.y)), 
+	          z(static_cast<int>(other.z)) {}
+	    
+	    // Conversion operator to any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        result.z = static_cast<decltype(T::z)>(z);
+	        return result;
+	    }
+	};
+	
+	// ==================== VEC3F ====================
+	
+	struct Vec3f {
+	    float x, y, z;
+	    
+	    Vec3f() = default;
+	    
+	    // Constructor for any three arithmetic types
+	    template<typename T, typename U, typename V,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U> &&
+	                                         std::is_arithmetic_v<V>>>
+	    Vec3f(T x_val, U y_val, V z_val) 
+	        : x(static_cast<float>(x_val)), 
+	          y(static_cast<float>(y_val)), 
+	          z(static_cast<float>(z_val)) {}
+	    
+	    // Constructor for any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    Vec3f(const T& other) 
+	        : x(static_cast<float>(other.x)), 
+	          y(static_cast<float>(other.y)), 
+	          z(static_cast<float>(other.z)) {}
+	    
+	    // Conversion operator to any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        result.z = static_cast<decltype(T::z)>(z);
+	        return result;
+	    }
+	};
+	
+	// ==================== VEC3D ====================
+	
+	struct Vec3d {
+	    double x, y, z;
+	    
+	    Vec3d() = default;
+	    
+	    // Constructor for any three arithmetic types
+	    template<typename T, typename U, typename V,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
+	                                         std::is_arithmetic_v<U> &&
+	                                         std::is_arithmetic_v<V>>>
+	    Vec3d(T x_val, U y_val, V z_val) 
+	        : x(static_cast<double>(x_val)), 
+	          y(static_cast<double>(y_val)), 
+	          z(static_cast<double>(z_val)) {}
+	    
+	    // Constructor for any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    Vec3d(const T& other) 
+	        : x(static_cast<double>(other.x)), 
+	          y(static_cast<double>(other.y)), 
+	          z(static_cast<double>(other.z)) {}
+	    
+	    // Conversion operator to any type with .x, .y and .z members
+	    template<typename T,
+	             typename = std::enable_if_t<has_xyz_members<T>::value>>
+	    operator T() const {
+	        T result;
+	        result.x = static_cast<decltype(T::x)>(x);
+	        result.y = static_cast<decltype(T::y)>(y);
+	        result.z = static_cast<decltype(T::z)>(z);
+	        return result;
+	    }
+	};
+	
+	// ==================== INTRECT ====================
+	
+	struct IntRect {
+	    int left, top, width, height;
+	    
+	    IntRect() = default;
+	    
+	    // Constructor for any four arithmetic types
+	    template<typename T1, typename T2, typename T3, typename T4,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
+	                                         std::is_arithmetic_v<T2> &&
+	                                         std::is_arithmetic_v<T3> &&
+	                                         std::is_arithmetic_v<T4>>>
+	    IntRect(T1 l, T2 t, T3 w, T4 h) 
+	        : left(static_cast<int>(l)), 
+	          top(static_cast<int>(t)),
+	          width(static_cast<int>(w)), 
+	          height(static_cast<int>(h)) {}
+	    
+	    // Constructor for any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    IntRect(const T& other) {
+	        if constexpr (has_width_height_style<T>::value) {
+	            // Width/height style (e.g., sf::IntRect, your own rect types)
+	            left = static_cast<int>(other.left);
+	            top = static_cast<int>(other.top);
+	            width = static_cast<int>(other.width);
+	            height = static_cast<int>(other.height);
+	        } else {
+	            // Right/bottom style (e.g., RECT)
+	            left = static_cast<int>(other.left);
+	            top = static_cast<int>(other.top);
+	            width = static_cast<int>(other.right - other.left);
+	            height = static_cast<int>(other.bottom - other.top);
+	        }
+	    }
+	    
+	    // Conversion operator to any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    operator T() const {
+	        T result;
+	        
+	        if constexpr (has_width_height_style<T>::value) {
+	            // Convert to width/height style
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.width = static_cast<decltype(T::width)>(width);
+	            result.height = static_cast<decltype(T::height)>(height);
+	        } else {
+	            // Convert to right/bottom style
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.right = static_cast<decltype(T::right)>(left + width);
+	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
+	        }
+	        
+	        return result;
+	    }
+	};
+	
+	// ==================== FLOATRECT ====================
+	
+	struct FloatRect {
+	    float left, top, width, height;
+	    
+	    FloatRect() = default;
+	    
+	    // Constructor for any four arithmetic types
+	    template<typename T1, typename T2, typename T3, typename T4,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
+	                                         std::is_arithmetic_v<T2> &&
+	                                         std::is_arithmetic_v<T3> &&
+	                                         std::is_arithmetic_v<T4>>>
+	    FloatRect(T1 l, T2 t, T3 w, T4 h) 
+	        : left(static_cast<float>(l)), 
+	          top(static_cast<float>(t)),
+	          width(static_cast<float>(w)), 
+	          height(static_cast<float>(h)) {}
+	    
+	    // Constructor for any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    FloatRect(const T& other) {
+	        if constexpr (has_width_height_style<T>::value) {
+	            left = static_cast<float>(other.left);
+	            top = static_cast<float>(other.top);
+	            width = static_cast<float>(other.width);
+	            height = static_cast<float>(other.height);
+	        } else {
+	            left = static_cast<float>(other.left);
+	            top = static_cast<float>(other.top);
+	            width = static_cast<float>(other.right - other.left);
+	            height = static_cast<float>(other.bottom - other.top);
+	        }
+	    }
+	    
+	    // Conversion operator to any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    operator T() const {
+	        T result;
+	        
+	        if constexpr (has_width_height_style<T>::value) {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.width = static_cast<decltype(T::width)>(width);
+	            result.height = static_cast<decltype(T::height)>(height);
+	        } else {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.right = static_cast<decltype(T::right)>(left + width);
+	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
+	        }
+	        
+	        return result;
+	    }
+	};
+	
+	// ==================== DOUBLERECT ====================
+	
+	struct DoubleRect {
+	    double left, top, width, height;
+	    
+	    DoubleRect() = default;
+	    
+	    // Constructor for any four arithmetic types
+	    template<typename T1, typename T2, typename T3, typename T4,
+	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
+	                                         std::is_arithmetic_v<T2> &&
+	                                         std::is_arithmetic_v<T3> &&
+	                                         std::is_arithmetic_v<T4>>>
+	    DoubleRect(T1 l, T2 t, T3 w, T4 h) 
+	        : left(static_cast<double>(l)), 
+	          top(static_cast<double>(t)),
+	          width(static_cast<double>(w)), 
+	          height(static_cast<double>(h)) {}
+	    
+	    // Constructor for any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    DoubleRect(const T& other) {
+	        if constexpr (has_width_height_style<T>::value) {
+	            left = static_cast<double>(other.left);
+	            top = static_cast<double>(other.top);
+	            width = static_cast<double>(other.width);
+	            height = static_cast<double>(other.height);
+	        } else {
+	            left = static_cast<double>(other.left);
+	            top = static_cast<double>(other.top);
+	            width = static_cast<double>(other.right - other.left);
+	            height = static_cast<double>(other.bottom - other.top);
+	        }
+	    }
+	    
+	    // Conversion operator to any rect-like type
+	    template<typename T,
+	             typename = std::enable_if_t<is_rect_like<T>::value>>
+	    operator T() const {
+	        T result;
+	        
+	        if constexpr (has_width_height_style<T>::value) {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.width = static_cast<decltype(T::width)>(width);
+	            result.height = static_cast<decltype(T::height)>(height);
+	        } else {
+	            result.left = static_cast<decltype(T::left)>(left);
+	            result.top = static_cast<decltype(T::top)>(top);
+	            result.right = static_cast<decltype(T::right)>(left + width);
+	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
+	        }
+	        
+	        return result;
+	    }
+	};
+	
+	
+	
+	
+	
+	
+	
+	
+	class Hue
+	{
+		public:
+		int r=0,g=0,b=0,a=255;
+		
+	    static const Hue red;
+	    static const Hue green;
+	    static const Hue blue;
+	    static const Hue orange;
+	    static const Hue brown;
+	    static const Hue yellow;
+	    static const Hue cyan;
+	    static const Hue purple;
+	    static const Hue pink;
+	    static const Hue grey;
+	    static const Hue black;
+	    static const Hue white;
+		
+		
+		
+		Hue() = default;
+		
+		Hue(Gdiplus::Color &color)
+		{
+			r = color.GetR();
+			g = color.GetG();
+			b = color.GetB();
+			a = color.GetA();
+		}
+
+	    Hue(COLORREF color)
+	    {
+	        r = GetRValue(color);
+	        g = GetGValue(color);
+	        b = GetBValue(color);
+	        a = 255;  // COLORREF doesn't have alpha
+	    }
+		
+		Hue(int r1,int g1,int b1,int a1=255)
+		{
+			r = r1;
+			g = g1;
+			b = b1;
+			a = a1;
+		}
+		
+		
+		operator Gdiplus::Color() const
+		{
+			return Gdiplus::Color(a,r,g,b); 
+		}
+		
+		operator COLORREF() const
+		{
+			return RGB(r,g,b);
+		}
+		
+		
+	};
+	
+	const Hue Hue::red = Hue(255, 0, 0, 255);
+	const Hue Hue::green = Hue(0, 255, 0, 255);
+	const Hue Hue::blue = Hue(0, 0, 255, 255);
+	const Hue Hue::orange = Hue(255, 150, 0, 255);
+	const Hue Hue::brown = Hue(150,100, 50, 255);
+	const Hue Hue::yellow = Hue(255, 255, 0, 255);
+	const Hue Hue::cyan = Hue(0, 255, 255, 255);
+	const Hue Hue::purple = Hue(140, 0, 255, 255);
+	const Hue Hue::pink = Hue(255, 0, 255, 255);
+	const Hue Hue::grey = Hue(150, 150, 150, 255);
+	const Hue Hue::black = Hue(0, 0, 0, 255);
+	const Hue Hue::white = Hue(255, 255, 255, 255);
+	
+}
+
+
+
+
+
+// ========== SOUND & VIDEO ==========
+namespace ws 
+{
+	
+	class Wav
+	{
+		public:
+			
+			
+		std::string path;
+		int channel = 0;
+		bool blocking = true;
+		std::string ID = "";
+		std::string extension = "none";
+			
+			
+			
+		~Wav()
+		{
+		    // Clean up
+		    if(!ID.empty())
+		    {
+		        std::string status = getChannelStatus(channel);
+		        if (status != "error") {
+		            std::string command = "close " + ID;
+		            mciSendStringA(command.c_str(), NULL, 0, NULL);
+		        }
+			}
+		}
+
+		Wav(std::string path = "",int channel = 0,bool blocking = true)
+		{
+			this->path = path;
+			this->channel = channel;
+			this->blocking = blocking;
+		}
+
+
+
+
+		private:
+		
+		static bool mciSimple(std::string command,bool sendError = true)
+		{
+			MCIERROR err = mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
+		    if (err) 
+			{
+		        if(sendError)
+				{
+					char errorBuf[128];
+			        mciGetErrorStringA(err, errorBuf, sizeof(errorBuf));
+			        std::cerr << "Sound Error of type MCI error: " << errorBuf << " - Command: " << command << "\n";
+		        }
+				return false;
+		    }	
+			return true;		
+		}
+		
+		
+		
+		
+		
+		static void isSupported(std::string m_path)
+		{
+			std::filesystem::path p(m_path);
+			std::string ext = p.extension().string();
+			
+			if(ext == ".wav" || ext == ".mid" || ext == ".midi")
+			{
+				//always supported
+				return;
+			}
+			if(ext == ".mp3" || ext == ".wma")
+			{
+				//supported by most modern windows
+				return;
+			}
+			if(ext == ".au" || ext == ".aif" || ext == ".aiff" || ext == ".snd")
+			{
+				std::cerr << "Warning! "<<ext << " is less commonly supported and might not work on some computers! Safest options are: (wav,mid,midi,mp3,wma).\n";
+				return;
+			}
+			
+			std::cerr << "Warning! "<< ext << " probably wont be supported on most computers! Safest options are: (wav,mid,midi,mp3,wma).\n ";
+		}
+		
+		public:
+
+
+		static int getFreeChannel()
+		{
+			int channel = -1;
+			for(int a=0;a<100;a++)
+			{
+				if(getChannelStatus(a) != "playing" && getChannelStatus(a) != "paused")
+				{
+					if(a != -1)
+					{
+						channel = a;
+						break;
+					}
+				} 
+			}
+			if(channel == -1)
+			{
+				std::cerr << "A sound channel could not be auto detected! \nThis means that either the maximum number of device\n sound contexts have been created OR that the range of channel\n ID's from 0 to 100 are all in use.\n Try using a number below or above the minimum and maximum attempted values.\n";
+			}
+			
+			return channel;
+		}
+
+
+		static std::string getChannelStatus(int m_channel)
+		{
+			
+			std::string m_ID = std::to_string(m_channel);
+			
+			
+			
+		    char returnBuffer[128]; // Buffer to store the status string
+		    std::string command = "status " + m_ID + " mode";
+		    
+		     memset(returnBuffer, 0, sizeof(returnBuffer));
+		   
+		    
+		    // Send the command and check for errors
+		    if (mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL) == 0) {
+		        return returnBuffer; // Returns "playing", "stopped", etc.
+		    } else {
+		        return "error";
+		    }
+		    return "error";
+		}
+		
+
+		
+		static bool PlayFree(std::string m_path,int m_channel,bool m_blocking = false)
+		{
+			
+			isSupported(m_path);
+			
+			
+			
+			std::string m_ID = std::to_string(m_channel);
+			
+			if (!std::filesystem::exists(m_path)) {
+	            std::cerr << "Sound file not found: " << m_path << "\n";
+	            return false;
+	        }
+			
+
+
+			//Get shortened path name because mciSendStringA does not support long paths.
+			std::wstring wpath = GetShortPathNameSafe(WIDE(m_path));
+			if(!wpath.empty())
+				m_path = SHORT(wpath);
+			
+			
+			std::string command;
+			//Make command to close this old channel if it was already open
+			command = "close " + m_ID;
+			mciSimple(command,false);
+			
+			
+			//open the file and give it an alias - users do not have to see this. All they have to remember is the channel ID since this is technically different device context channels.
+			command = "open "+ m_path + " alias "+m_ID;
+			if(!mciSimple(command))
+				return false;
+			
+			
+			//Make command for playing the file.
+			command = "play "+m_ID;
+			
+			//play the file
+			if(!mciSimple(command))
+				return false;
+			
+			return true;
+		}
+		
+		
+		
+		
+		
+		
+		bool open(std::string m_path,int m_channel,bool m_blocking = true)
+		{
+			isSupported(m_path);
+			
+			std::filesystem::path p(m_path);
+			extension = p.extension().string();
+			
+			if (!std::filesystem::exists(m_path)) {
+	            std::cerr << "Sound file not found: " << m_path << "\n";
+	            return false;
+	        }
+			this->path = m_path;
+			this->channel = m_channel;
+			this->blocking = m_blocking;
+			this->ID = std::to_string(m_channel);
+			
+			
+			
+			//close it no matter what
+	        std::string command = "close " + ID;
+	        mciSimple(command,false);//close channel without error report.			
+			
+			
+
+			//Get shortened path name because mciSendStringA does not support long paths.
+			std::wstring wpath = GetShortPathNameSafe(WIDE(path));
+			if(!wpath.empty())
+				path = SHORT(wpath);
+			
+			
+			
+			//open channel
+			command = "open "+ path + " alias "+ID;
+			if(!mciSimple(command))
+				return false;
+			
+			
+
+			// Set time format to milliseconds for better control
+	        command = "set " + ID + " time format milliseconds";
+	        if(!mciSimple(command))
+				return false;			
+			
+			
+			
+			return true;
+		}
+		
+		void play()
+		{
+
+			if(getChannelStatus(channel) == "error")
+			{
+				std::cerr<<"Sound attempted to play but was not initialized! Use open() before play().\n";
+				return;
+			}
+			
+			
+			if(getChannelStatus(channel) == "playing" && blocking)
+				return;
+			
+			std::string command = "";
+			
+	        // Start playback
+	        command = "play " + ID;
+	        
+	        if(!mciSimple(command))
+				return;
+			
+						
+		}
+		
+		
+		
+		static void stop(int m_channel)
+		{
+			std::string m_ID = std::to_string(m_channel);
+			
+			std::string command = "pause "+ m_ID;
+			
+			mciSimple(command);
+		}
+		
+		void stop()
+		{
+			std::string command = "pause "+ ID;
+			
+			mciSimple(command);
+		}
+		
+		
+		
+		
+	    bool setVolume(int percent)
+	    {
+	    	
+	    	if(getChannelStatus(channel) == "error")
+	    	{
+	    		std::cerr << "Unsupported Audio Action: setVolume cannot be used before using open()\n";
+	    		return false;
+			}
+			
+			if(extension == ".mid" || extension == ".midi")
+			{
+				std::cerr << "Unsupported Audio Action: An attempt was made to set the volume of a midi file!\n";
+			}
+				    	
+	    	
+	        // Convert percentage back to MCI volume (0-1000)
+	        int volume = (percent * 1000) / 100;
+	        
+	        if(getChannelStatus(channel) == "error") return false;
+	        
+	        // Clamp volume to valid range
+	        volume = std::max(0, std::min(1000, volume));
+	        
+	        // Try different MCI volume commands in order
+	        std::string commands[] = {
+	            "set " + ID + " audio volume to " + std::to_string(volume),
+	            "setaudio " + ID + " volume to " + std::to_string(volume), 
+	            "set " + ID + " volume " + std::to_string(volume)
+	        };
+	        
+	        for (const auto& cmd : commands) {
+	            if (mciSimple(cmd, false)) {  
+	                return true;
+	            }
+	        }
+	        
+	        std::cerr << "Volume control not supported on this system\n";
+	        return false;
+	    }
+	    
+	    int getVolume()
+	    {
+
+	    	if(getChannelStatus(channel) == "error")
+	    	{
+	    		std::cerr << "Unsupported Audio Action: getVolume cannot be used before using open()\n";
+	    		return false;
+			}
+	    	
+			if(extension == ".mid" || extension == ".midi")
+			{
+				std::cerr << "Unsupported Action: An attempt was made to get the volume of a midi file!\n";
+			}
+			
+	        if(getChannelStatus(channel) == "error") return 0;
+	        
+	        char returnBuffer[128];
+	        memset(returnBuffer, 0, sizeof(returnBuffer));
+	        
+	        std::string command = "status " + ID + " volume";
+	        MCIERROR err = mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL);
+	        
+	        if(err)
+	        	return 0;
+	        	
+	        int volume = atoi(returnBuffer);			
+			
+			
+			
+	        if(volume == 0)
+	        	return 0;
+	        // MCI volume range is 0 - 1000 but this returns percentage of that.
+	        return (volume * 100) / 1000;
+	    }
+		
+		
+		bool setProgress(long seconds)
+		{
+			std::string status = getChannelStatus(channel);
+	    	if(status == "error")
+	    	{
+	    		std::cerr << "Unsupported Audio Action: setProgress cannot be used before using open()\n";
+	    		return false;
+			}
+						
+		    std::string command;
+		    if (status == "playing") {
+		        command = "play " + ID + " from " + std::to_string(seconds * 1000);
+		    } else {
+		        command = "seek " + ID + " to " + std::to_string(seconds * 1000);
+		    }
+		    
+			return mciSimple(command);
+		}
+		
+		
+		long getProgress()
+		{
+	    	if(getChannelStatus(channel) == "error")
+	    	{
+	    		std::cerr << "Unsupported Audio Action: getProgress cannot be used before using open()\n";
+	    		return false;
+			}
+						
+			char returnBuffer[128];
+			memset(returnBuffer, 0, sizeof(returnBuffer));
+			
+			std::string command = "status "+ ID + " position";
+			
+			MCIERROR err = mciSendStringA(TO_LPCSTR(command), returnBuffer, sizeof(returnBuffer), NULL);
+	        if (err) 
+			{
+				char errorBuf[128];
+		        mciGetErrorStringA(err, errorBuf, sizeof(errorBuf));
+		        std::cerr << "Sound Error of type MCI error: " << errorBuf << " - Command: " << command << "\n";
+	            
+				return 0;
+	        }			
+	        
+		    // Convert string to long
+		    char *end_ptr;
+		    long result = std::strtol(returnBuffer, &end_ptr, 10);
+		    
+		    // Check if conversion was successful
+		    if (returnBuffer == end_ptr) {
+		        return 0; // conversion error
+		    }
+	        	
+	        return result / 1000;//return in seconds
+		}	
+		
+		
+		
+		long getLength()
+		{
+	    	if(getChannelStatus(channel) == "error")
+	    	{
+	    		std::cerr << "Unsupported Audio Action: getLength() cannot be used before using open()\n";
+	    		return 0;
+			}
+		    
+		    char returnBuffer[128];
+		    memset(returnBuffer, 0, sizeof(returnBuffer));
+		    
+		    std::string command = "status " + ID + " length";
+		    MCIERROR err = mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL);
+			
+			if(err)
+			{
+				return 0;
+			}
+			return (atol(returnBuffer) - 10)/1000; // return in seconds
+		    
+		}
+		
+		
+		
+		bool isFinished()
+		{
+			if(getChannelStatus(channel) == "error")
+	    	{
+	    		std::cerr << "Unsupported Audio Action: isFinished() cannot be used before using open()\n";
+	    		return false;
+			}
+			return (getProgress() >= getLength());
+		}
+		
+		
+		
+		
+		
+		
+		
+	};
+	
+	
+	
+	
+	
+	
+		
+}
+
+
+
+
+
+// ========== GRAPHICS ==========
+namespace ws 
+{
+
+
+
+	class View
+	{
+		private:
+		
+		float rotation = 0.0f;
+		ws::IntRect port = {0,0,0,0}; //Port is always in screen coordinates.
+		ws::IntRect world = {0,0,0,0}; //World is the world coordinate section of the world that is sent to the view.
+		ws::Vec2i portOrigin = {0,0};//This is the point of rotation. It does NOT effect the view position.
+		Gdiplus::Matrix matrix;
+		float zoom = 0;		
+
+
+		public:
+		
+		
+		View()
+		{
+			
+		}
+		
+		
+		//Matrix does not have normal copy constructor so the view class has to do this in a custom way so that View can be copied to another view like view = v;
+		View(const View& other) : 
+			rotation(other.rotation),
+			port(other.port),
+			world(other.world),
+			portOrigin(other.portOrigin),
+			matrix(),
+			zoom(other.zoom)
+		{
+			setTransform(other.matrix);
+		}
+	    
+	  
+		//move constructor
+		
+		View(View&& other) noexcept :
+	        rotation(other.rotation),
+	        port(std::move(other.port)),
+	        world(std::move(other.world)),
+	        portOrigin(std::move(other.portOrigin)),
+	        matrix(),
+	        zoom(other.zoom)
+	    {
+	    	setTransform(other.matrix);
+	        other.rotation = 0.0f;
+	        other.zoom = 0.0f;
+	    }	  
+	  
+	  
+	    
+		View& operator=(const View& other)
+		{
+		    if (this != &other) {
+		        world = other.world;
+		        port = other.port;
+		        rotation = other.rotation;
+		        portOrigin = other.portOrigin;
+		        zoom = other.zoom;
+		        setTransform(other.matrix);
+		    }
+		    return *this;
+		}
+		
+		
+	    View& operator=(View&& other) noexcept
+	    {
+	        if (this != &other) {
+	            world = std::move(other.world);
+	            port = std::move(other.port);
+	            rotation = other.rotation;
+	            portOrigin = std::move(other.portOrigin);
+	            setTransform(other.matrix);
+	            zoom = other.zoom;
+	            
+	            other.rotation = 0.0f;
+	            other.zoom = 0.0f;
+	        }
+	        return *this;
+	    }		
+		
+		
+		~View() = default;
+		
+		
+
+		void init(int portLeft,int portTop,int portWidth,int portHeight)
+		{
+			port.left = portLeft;
+			port.top = portTop;
+			port.width = portWidth;
+			port.height = portHeight;
+			
+			world = port;
+		}
+		
+
+		void init(ws::IntRect rect)
+		{	
+			init(rect.left,rect.top,rect.width,rect.height);
+		}
+		
+		
+		
+		[[nodiscard]] ws::IntRect getRect()
+		{
+			return world;
+		}
+		
+		void setRect(ws::IntRect rect)
+		{
+			world = rect;
+		}
+
+		void setRect(int left,int top,int width,int height)
+		{
+			setRect(ws::IntRect(left,top,width,height));
+		}
+		
+		
+		[[nodiscard]] ws::IntRect getPortRect()
+		{
+			return port;
+		}
+		
+		void setPortRect(ws::IntRect rect)
+		{
+			port = rect;
+		}
+		
+		void setPortRect(int left,int top,int width,int height)
+		{
+			setPortRect(ws::IntRect(left,top,width,height));
+		}
+		
+		
+		void setSize(ws::Vec2i size)
+		{
+			world.width = size.x;
+			world.height = size.y;
+		}
+		
+		[[nodiscard]] ws::Vec2i getSize()
+		{
+			return ws::Vec2i(world.width,world.height);
+		}
+		
+		void setPortSize(ws::Vec2i size)
+		{
+			port.width = size.x;
+			port.height = size.y;
+		}
+		
+		[[nodiscard]] ws::Vec2i getPortSize()
+		{
+			return ws::Vec2i(port.width,port.height);
+		}
+		
+		
+		
+		[[nodiscard]] ws::Vec2i getCenter()
+		{
+			return ws::Vec2i(world.left + (world.width/2),world.top + (world.height/2));
+		}
+
+		void setCenter(int cx,int cy)
+		{
+			world.left = cx - (world.width/2);
+			world.top = cy - (world.height/2);
+		}
+
+		void setCenter(ws::Vec2i pos)
+		{
+			setCenter(pos.x,pos.y);
+		}
+
+
+		
+		[[nodiscard]] ws::Vec2i getPortCenter()
+		{
+			return ws::Vec2i(port.left + (port.width/2),port.top + (port.height/2));
+		}
+
+		void setPortCenter(int cx,int cy)
+		{
+			ws::Vec2i pos = ws::Vec2i(cx - (port.width/2),cy - (port.height/2));
+			port.left = pos.x;
+			port.top = pos.y;
+		}
+
+
+		void setPortCenter(ws::Vec2i pos)
+		{
+			setPortCenter(pos.x,pos.y);
+		}
+		
+		
+		
+		void setPortRotatePoint(int ox,int oy)
+		{
+			portOrigin.x = ox;
+			portOrigin.y = oy;
+		}
+		
+		void setPortRotatePoint(ws::Vec2i pos)
+		{
+			setPortRotatePoint(pos.x,pos.y);
+		}
+		
+		
+		void setPortRotatePointCenter()
+		{
+			portOrigin = ws::Vec2i(port.left + (port.width/2), port.top + (port.height/2));
+		}
+		
+		
+		
+		[[nodiscard]] float getRotation() 
+		{
+		    return rotation;
+		}
+		
+		
+		void setRotation(float angle) 
+		{
+		    rotation = angle;
+		}
+		
+		
+		
+		void setZoom(float val)
+		{
+			zoom = val;
+		}
+		
+		
+		[[nodiscard]] float getZoom()
+		{
+			return zoom;
+		}
+		
+		
+		void move(float dx,float dy)
+		{
+			world.left += dx;
+			world.top += dy;
+		}
+		
+		void move(ws::Vec2f dir)
+		{
+			move(dir.x,dir.y);
+		}
+
+		void move(int dx,int dy)
+		{
+			world.left += dx;
+			world.top += dy;
+		}		
+		
+	    void getTransform(Gdiplus::Matrix &m) const
+	    {
+	        Gdiplus::REAL elements[6];
+	        matrix.GetElements(elements);
+	        m.SetElements(elements[0], elements[1], elements[2], 
+	                     elements[3], elements[4], elements[5]);
+	    }
+		
+		void setTransform(const Gdiplus::Matrix &m)
+	    {
+	        Gdiplus::REAL elements[6];
+	        m.GetElements(elements);
+	        matrix.SetElements(elements[0], elements[1], elements[2], 
+	                          elements[3], elements[4], elements[5]);
+	        
+	    }
+		
+		
+		
+		
+		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
+		{
+			// First account for window stretching
+			ws::Vec2i stretchedPos;
+			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
+											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
+			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
+											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
+			
+			// Calculate the visible world center
+			float visibleWorldCenterX = world.left + world.width / 2.0f;
+			float visibleWorldCenterY = world.top + world.height / 2.0f;
+			
+			// Calculate the port center
+			float portCenterX = port.left + port.width / 2.0f;
+			float portCenterY = port.top + port.height / 2.0f;
+			
+			// Calculate scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Apply inverse transformation
+			float worldX = static_cast<float>(stretchedPos.x);
+			float worldY = static_cast<float>(stretchedPos.y);
+			
+			// Reverse transformations in opposite order
+			worldX -= portCenterX;
+			worldY -= portCenterY;
+			
+			if (rotation != 0) {
+				Gdiplus::Matrix rotMatrix;
+				rotMatrix.Rotate(-rotation);
+				Gdiplus::PointF point(worldX, worldY);
+				rotMatrix.TransformPoints(&point, 1);
+				worldX = point.X;
+				worldY = point.Y;
+			}
+			
+			worldX /= scaleX;
+			worldY /= scaleY;
+			
+			worldX += visibleWorldCenterX;
+			worldY += visibleWorldCenterY;
+			
+			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
+		}
+	    
+	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
+	    {
+	        return toWorld(ws::Vec2i(x,y),screenSize);
+	    }
+	    
+	
+	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
+	    {
+		        
+	        // Apply the transformation (scaled by zoom)
+	        float zoomFactor = std::pow(2.0f, zoom);
+	        
+	        // Calculate the visible world center
+	        float visibleWorldCenterX = world.left + world.width / 2.0f;
+	        float visibleWorldCenterY = world.top + world.height / 2.0f;
+	        
+	        // Calculate the port center
+	        float portCenterX = port.left + port.width / 2.0f;
+	        float portCenterY = port.top + port.height / 2.0f;
+	        
+	        // Calculate scale to fit visible world into port
+	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
+	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
+	        
+	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
+	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
+	        
+	        // Apply transformation
+	        float screenX = static_cast<float>(worldPos.x);
+	        float screenY = static_cast<float>(worldPos.y);
+	        
+	        // 1. Translate world center to origin
+	        screenX -= visibleWorldCenterX;
+	        screenY -= visibleWorldCenterY;
+	        
+	        // 2. Apply scale
+	        screenX *= scaleX;
+	        screenY *= scaleY;
+	        
+	        // 3. Apply rotation
+	        if (rotation != 0) {
+	            Gdiplus::Matrix rotMatrix;
+	            rotMatrix.Rotate(rotation);
+	            Gdiplus::PointF point(screenX, screenY);
+	            rotMatrix.TransformPoints(&point, 1);
+	            screenX = point.X;
+	            screenY = point.Y;
+	        }
+	        
+	        // 4. Translate to port center
+	        screenX += portCenterX;
+	        screenY += portCenterY;
+	        
+	        // Now account for window stretching
+	        screenX *= (static_cast<float>(screenSize.x) / static_cast<float>(world.width));
+	        screenY *= (static_cast<float>(screenSize.y) / static_cast<float>(world.height));
+	        
+	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
+	    }
+	
+	    
+	    [[nodiscard]] ws::Vec2i toScreen(int x,int y,ws::Vec2i screenSize) 
+	    {
+	        return toScreen(ws::Vec2i(x,y),screenSize);
+	    }       		
+
+
+
+		
+		
+		void apply(Gdiplus::Graphics &graphics)
+		{
+			updateMatrix();
+		    
+			graphics.SetClip(Gdiplus::Rect(port.left, port.top, port.width, port.height));
+
+			
+		    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+		    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+		    graphics.SetTransform(&matrix);
+		}
+			
+		private:
+			
+			
+		void updateMatrix()			
+		{
+			matrix.Reset();
+			
+			// Port center
+			float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+			float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+			
+			// Visible world uses full world dimensions (zoom doesn't change visible area)
+			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
+			
+			// Scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom as a direct multiplier
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Transform
+			matrix.Translate(portCenterX, portCenterY);
+			
+			if (rotation != 0) {
+				matrix.Rotate(rotation);
+			}
+			
+			matrix.Scale(scaleX, scaleY);
+			matrix.Translate(-visibleWorldCenterX, -visibleWorldCenterY);
+		}
+			
+			
+			
+
+		
+		
+		
+		 	
+	};
+
+
+
+
+	
+	
+	class Texture
+	{
+		private:
+		int width = 0;
+		int height = 0;
+
+		private:
+			HDC     m_hdcMem  = nullptr;
+			HBITMAP m_hDIB    = nullptr;
+			HBITMAP m_hOldBmp = nullptr;
+			void*   m_dibBits = nullptr;
+			bool    m_isFast  = false;
+
+		public:
+
+		
+		Gdiplus::Bitmap* bitmap;
+		
+		
+		Texture() : bitmap(nullptr) {}
+		
+		
+		Texture(std::string path)
+		{
+			loadFromFile(path);
+		}
+
+		private:
+
+		//this function destroys the DIB before destroying any GDI variables it references. If the DIB is not referencing a GDI regular memory section then this function will not remove the DIB section and normal cleanup will occur in the destructor.
+		void destroyDIB()
+		{
+			if (bitmap && m_isFast) {
+				delete bitmap;
+				bitmap = nullptr;
+			}
+
+			if (m_hOldBmp && m_hdcMem) {
+				SelectObject(m_hdcMem, m_hOldBmp);
+				m_hOldBmp = nullptr;
+			}
+
+			if (m_hDIB) {
+				DeleteObject(m_hDIB);
+				m_hDIB    = nullptr;
+				m_dibBits = nullptr;
+			}
+
+			if (m_hdcMem) {
+				DeleteDC(m_hdcMem);
+				m_hdcMem = nullptr;
+			}
+
+			m_isFast = false;
+		}		
+
+		void copyFrom(const Texture& other)
+		{
+			if(!other.bitmap || other.width <= 0 || other.height <= 0)
+				return;
+
+			if(other.m_isFast)
+			{
+				if(!create(other.width, other.height))
+					return;
+
+				if(m_dibBits && other.m_dibBits)
+				{
+					memcpy(m_dibBits, other.m_dibBits, other.width * other.height * 4);
+				}
+			}
+			else
+			{
+				bitmap = other.bitmap->Clone(
+					0, 0, other.width, other.height,
+					PixelFormat32bppARGB
+				);
+				if(bitmap && bitmap->GetLastStatus() == Gdiplus::Ok)
+				{
+					width  = other.width;
+					height = other.height;
+				}
+				else
+				{
+					delete bitmap;
+					bitmap = nullptr;
+					width  = height = 0;
+				}
+			}
+		}
+
+		public:
+		
+	    ~Texture()
+	    {
+			destroyDIB();
+			
+			//this will only cleanup if destroyDIB hasn't already cleanedup and made bitmap null.
+			if (bitmap) {
+				delete bitmap;
+				bitmap = nullptr;
+			}
+
+			width  = 0;
+			height = 0;
+	    }		
+		
+
+
+
+
+		// Copy constructor
+		Texture(const Texture& other)
+			: width(0), height(0), bitmap(nullptr),
+			  m_hdcMem(nullptr), m_hDIB(nullptr),
+			  m_hOldBmp(nullptr), m_dibBits(nullptr),
+			  m_isFast(false)
+		{
+			copyFrom(other);
+		}
+
+		// Copy assignment
+		Texture& operator=(const Texture& other)
+		{
+			if (this != &other)
+			{
+				destroyDIB();
+				if (bitmap) { delete bitmap; bitmap = nullptr; }
+				width  = 0;
+				height = 0;
+				copyFrom(other);
+			}
+			return *this;
+		}
+
+		
+		//move construct
+		Texture(Texture&& other) noexcept
+			: width(other.width),
+			  height(other.height),
+			  bitmap(other.bitmap),
+			  m_hdcMem(other.m_hdcMem),
+			  m_hDIB(other.m_hDIB),
+			  m_hOldBmp(other.m_hOldBmp),
+			  m_dibBits(other.m_dibBits),
+			  m_isFast(other.m_isFast)
+		{
+			// Null out the source so its destructor does nothing
+			other.bitmap    = nullptr;
+			other.m_hdcMem  = nullptr;
+			other.m_hDIB    = nullptr;
+			other.m_hOldBmp = nullptr;
+			other.m_dibBits = nullptr;
+			other.m_isFast  = false;
+			other.width     = 0;
+			other.height    = 0;
+		}
+
+		// Move assign
+		Texture& operator=(Texture&& other) noexcept
+		{
+			if (this != &other)
+			{
+				destroyDIB();
+				if (bitmap) { delete bitmap; bitmap = nullptr; }
+
+				width       = other.width;
+				height      = other.height;
+				bitmap      = other.bitmap;
+				m_hdcMem    = other.m_hdcMem;
+				m_hDIB      = other.m_hDIB;
+				m_hOldBmp   = other.m_hOldBmp;
+				m_dibBits   = other.m_dibBits;
+				m_isFast    = other.m_isFast;
+
+				// null out the source
+				other.bitmap    = nullptr;
+				other.m_hdcMem  = nullptr;
+				other.m_hDIB    = nullptr;
+				other.m_hOldBmp = nullptr;
+				other.m_dibBits = nullptr;
+				other.m_isFast  = false;
+				other.width     = 0;
+				other.height    = 0;
+			}
+			return *this;
+		}
+		
+
+		//create a dibsection so that the GDI+ bitmap actually points to that dib section. With a dibsection as the memory basis, ws::Textures can be BitBlt using GDI.
+		bool create(int w, int h, Gdiplus::Color color = Gdiplus::Color(0,0,0,0))
+		{
+			destroyDIB();
+			if (bitmap) { delete bitmap; bitmap = nullptr; }
+
+			width  = w;
+			height = h;
+
+			BITMAPINFO bmi              = {};
+			bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth       =  w;
+			bmi.bmiHeader.biHeight      = -h;
+			bmi.bmiHeader.biPlanes      = 1;
+			bmi.bmiHeader.biBitCount    = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+
+			HDC hdcScreen = GetDC(nullptr);
+			m_hDIB = CreateDIBSection(hdcScreen, &bmi, DIB_RGB_COLORS, &m_dibBits, nullptr, 0);
+			ReleaseDC(nullptr, hdcScreen);
+
+			if (!m_hDIB) {
+				std::cerr << "Texture::create failed to create DIBSection\n";
+				return false;
+			}
+
+			m_hdcMem  = CreateCompatibleDC(nullptr);
+			m_hOldBmp = (HBITMAP)SelectObject(m_hdcMem, m_hDIB);
+
+			bitmap = new Gdiplus::Bitmap(w, h, w * 4, PixelFormat32bppARGB, (BYTE*)m_dibBits);
+
+			if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
+				std::cerr << "Texture::create failed to create GDI+ wrapper\n";
+				destroyDIB();
+				return false;
+			}
+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.Clear(color);
+
+			m_isFast = true;
+			return true;
+		}
+	
+	
+	
+		Gdiplus::Bitmap* getHandle()
+		{
+			return bitmap;
+		}
+		
+		HDC getHDC() const
+		{
+			return m_hdcMem;
+		}
+		
+		HBITMAP getDIB() const
+		{
+			return m_hDIB;
+		}
+		
+		HBITMAP getOldBMP() const
+		{
+			return m_hOldBmp;
+		}
+		
+		void* getBITS() const
+		{
+			return m_dibBits;
+		}
+		
+		bool isFastDIB() const
+		{
+			return m_isFast;
+		}	
+		
+		
+		bool loadFromFile(std::string path)
+		{
+			if (!ResolveRelativePath(path))
+				return false;
+
+			// Load into a temporary GDI+ bitmap
+			std::wstring wpath = WIDE(path);
+			Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromFile(wpath.c_str());
+
+			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
+			{
+				std::cerr << "Failed to load image at " << std::quoted(path) << ".\n";
+				if (temp) { delete temp; }
+				return false;
+			}
+
+			int w = temp->GetWidth();
+			int h = temp->GetHeight();
+
+			// Create DIBSection of the same size
+			if (!create(w, h))
+			{
+				delete temp;
+				return false;
+			}
+
+			// Draw temp into the DIBSection via GDI+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.DrawImage(temp, 0, 0, w, h);
+
+			delete temp;
+			return true;
+		}
+
+
+		bool loadFromMemory(const void* buffer, size_t bufferSize)
+		{
+			// Copy buffer into global memory for IStream
+			HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
+			if (!hGlobal) return false;
+
+			void* pData = GlobalLock(hGlobal);
+			if (!pData) { GlobalFree(hGlobal); return false; }
+			memcpy(pData, buffer, bufferSize);
+			GlobalUnlock(hGlobal);
+
+			IStream* pStream = nullptr;
+			HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pStream);
+			if (FAILED(hr)) { GlobalFree(hGlobal); return false; }
+
+			// Load into a temporary GDI+ bitmap
+			Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromStream(pStream);
+			pStream->Release();
+
+			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
+			{
+				if (temp) { delete temp; }
+				return false;
+			}
+
+			int w = temp->GetWidth();
+			int h = temp->GetHeight();
+
+			// Create DIBSection of the same size
+			if (!create(w, h))
+			{
+				delete temp;
+				return false;
+			}
+
+			// Draw temp into the DIBSection via GDI+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.DrawImage(temp, 0, 0, w, h);
+
+			delete temp;
+			return true;
+		}
+
+
+		bool loadFromBitmapPlus(Gdiplus::Bitmap& src)
+		{
+			int w = src.GetWidth();
+			int h = src.GetHeight();
+
+			if (w <= 0 || h <= 0) return false;
+
+			// Create DIBSection of the same size
+			if (!create(w, h))
+				return false;
+
+			// Draw source bitmap into the DIBSection via GDI+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.DrawImage(&src, 0, 0, w, h);
+
+			return true;
+		}
+		
+		
+		
+		
+		
+
+
+		
+	    bool isValid() const
+	    {
+	        return bitmap != nullptr;
+	    }		
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+	    
+		void setPixel(int index, Gdiplus::Color color)
+		{
+			int x = index % width;
+			int y = index / width;
+			setPixel(x, y, color);
+		}
+
+		void setPixel(int xIndex, int yIndex, Gdiplus::Color color)
+		{
+			if (xIndex < 0 || xIndex >= width || yIndex < 0 || yIndex >= height)
+				return;
+
+			if (m_isFast && m_dibBits)
+			{
+				// direct DIB access. the pixel format is 32bit BGRA
+				BYTE* pixel = static_cast<BYTE*>(m_dibBits) + (yIndex * width + xIndex) * 4;
+				pixel[0] = color.GetB(); // Blue
+				pixel[1] = color.GetG(); // Green
+				pixel[2] = color.GetR(); // Red
+				pixel[3] = color.GetA(); // Alpha
+			}
+			else if (bitmap)
+			{
+				// fallback to GDI+ if this texture does not use the GDI regular DIB method.
+				bitmap->SetPixel(xIndex, yIndex, color);
+			}
+		}
+	    
+	    
+		Gdiplus::Color getPixel(int index)
+		{
+			int x = index % width;
+			int y = index / width;
+			return getPixel(x, y);
+		}
+
+		Gdiplus::Color getPixel(int xIndex, int yIndex)
+		{
+			if (xIndex < 0 || xIndex >= width || yIndex < 0 || yIndex >= height)
+				return Gdiplus::Color(0, 0, 0, 0);   // return transparent black
+
+			if (m_isFast && m_dibBits)
+			{
+				BYTE* pixel = static_cast<BYTE*>(m_dibBits) + (yIndex * width + xIndex) * 4;
+				return Gdiplus::Color(pixel[3],   // Alpha
+									  pixel[2],   // Red
+									  pixel[1],   // Green
+									  pixel[0]);  // Blue
+			}
+			else if (bitmap)
+			{
+				//fallback if not a fast DIB.
+				Gdiplus::Color color;
+				bitmap->GetPixel(xIndex, yIndex, &color);
+				return color;
+			}
+
+			return Gdiplus::Color(0, 0, 0, 0);
+		}
+	    
+	    
+	    
+	    
+	    ws::Vec2i getSize()
+		{
+			return ws::Vec2i(width,height); 
+		}
+		
+		
+		bool saveToFile(std::string path)
+		{
+		    if (!bitmap || width <= 0 || height <= 0)
+		    {
+		        std::cerr << "Cannot save: Invalid bitmap\n";
+		        return false;
+		    }
+		
+		    if (!ResolveRelativePath(path))
+		    {
+		        std::cerr << "Failed to resolve path: " << path << "\n";
+		        return false;
+		    }
+		    
+		    
+		
+		    
+		    // determine the encoder based on the file extension
+		    CLSID encoderClsid;
+		    std::string ext = path.substr(path.find_last_of(".") + 1);
+		    
+		    // lowercase extension for compare
+		    std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
+		    
+		    // Get encoder CLSID based on file extension
+		    if (ext == "png")
+		    {
+		        GetEncoderClsid(L"image/png", &encoderClsid);
+		    }
+		    else if (ext == "jpg" || ext == "jpeg")
+		    {
+		        GetEncoderClsid(L"image/jpeg", &encoderClsid);
+		    }
+		    else if (ext == "bmp")
+		    {
+		        GetEncoderClsid(L"image/bmp", &encoderClsid);
+		    }
+		    else if (ext == "gif")
+		    {
+		        GetEncoderClsid(L"image/gif", &encoderClsid);
+		    }
+		    else if (ext == "tiff")
+		    {
+		        GetEncoderClsid(L"image/tiff", &encoderClsid);
+		    }
+		    else
+		    {
+		        // default to PNG if extension not recognized
+		        std::cerr << "Unsupported format. Using PNG.\n";
+		        GetEncoderClsid(L"image/png", &encoderClsid);
+		        path += ".png"; // Add extension
+		    }
+		
+		    // save the image
+		    Gdiplus::Status status = bitmap->Save(ws::WIDE(path).c_str(), &encoderClsid, NULL);
+		    
+		    if (status != Gdiplus::Ok)
+		    {
+			    std::cerr << "Failed to save image to: " << path << "\n";
+				return false;
+			}
+			return true;
+		}
+		
+	    	
+	};
+	
+		
+
+
+	class GIF
+	{
+		public:
+		
+		
+		int width = 0;
+		int height = 0;
+		
+		
+		
+		
+		
+		GIF()
+		{
+			
+		}
+		
+		~GIF() {
+		    textures.clear();
+		    delays.clear();
+		}
+		
+		
+		
+		bool loadFromFile(std::string path)
+		{
+			
+			
+	        Gdiplus::Image* gif = Gdiplus::Image::FromFile(ws::WIDE(path).c_str(), FALSE);
+			
+			
+			if(!gif || gif->GetLastStatus() != Gdiplus::Ok) 
+				return false;
+			
+			
+	        UINT dimensions = 0;
+	        dimensions = gif->GetFrameDimensionsCount();
+			
+			if(dimensions == 0)
+			{
+				delete gif;
+				return false;
+			}
+			
+	        std::vector<GUID> dims(dimensions);
+	        gif->GetFrameDimensionsList(dims.data(), dimensions);
+	        
+	        totalFrames = static_cast<int>(gif->GetFrameCount(&dims[0]));
+			
+			
+			if(totalFrames <= 0)
+			{
+				delete gif;
+				return false;
+			}
+			
+			
+	        int width = gif->GetWidth();
+	        int height = gif->GetHeight();			
+			
+			
+		    textures.clear();
+		    delays.clear();
+		    textures.reserve(totalFrames);
+		    delays.reserve(totalFrames);
+		    
+		    
+		    std::unique_ptr<Gdiplus::PropertyItem> pItem;
+		    
+		    
+		    
+		    
+	        UINT totalBufferSize = gif->GetPropertyItemSize(PropertyTagFrameDelay);
+	        if (totalBufferSize > 0)
+	        {
+	            pItem.reset(static_cast<Gdiplus::PropertyItem*>(std::malloc(totalBufferSize)));
+	            if (pItem && gif->GetPropertyItem(PropertyTagFrameDelay, totalBufferSize, pItem.get()) == Gdiplus::Ok)
+	            {
+	                UINT* uintDelays = static_cast<UINT*>(pItem->value);
+	                for (int a = 0; a < totalFrames; a++)
+	                {
+	                    delays.push_back(static_cast<double>(uintDelays[a] * 10));// Was in 100ths of a second. Now is in milliseconds.
+	                }
+	            }
+	        }		    
+	        
+	        //Load the frames into textures.
+	        for (int a = 0; a < totalFrames; a++)
+	        {
+	            GUID pageID = Gdiplus::FrameDimensionTime;
+	            gif->SelectActiveFrame(&pageID, a);
+	            
+	            ws::Texture newtex;
+	            if (!newtex.create(width, height))
+	                return false;
+	            
+	            // Draw frame to the bitmap
+	            Gdiplus::Graphics graphics(newtex.bitmap);
+	            
+				graphics.DrawImage(gif,0, 0, width, height);
+	            
+	            textures.push_back(std::move(newtex));
+	        }
+	        
+	        delete gif;
+	        
+	        
+	        currentFrame = 0;
+			currentTexture = textures[0];
+			return true;
+		}
+		
+		
+		
+		void addFrame(ws::Texture &newFrame,double millisecondDelay)
+		{
+			
+			if(newFrame.getSize().x > width)
+				width = newFrame.getSize().x;
+			if(newFrame.getSize().y > height)
+				height = newFrame.getSize().y;
+			
+			textures.push_back(std::move(newFrame));
+			delays.push_back(millisecondDelay);
+				
+			totalFrames++;
+		}
+		
+		
+		
+		
+		ws::Texture& getTexture()
+		{
+			return currentTexture;
+		}
+		
+		
+		ws::Texture* getFrame(int index)
+		{
+			if(index < 0 || index > int(textures.size()))
+			{
+				std::cerr << "Invalid texture frame ID requested in getFrame() from ws::Animate! Returned Invalid!...\n";
+				return nullptr;
+			}
+			
+			return &textures[index];
+		}
+		
+		
+		double getFrameDelay(int index)
+		{
+			if(index <= 0 || index > int(textures.size()))
+			{
+				std::cerr << "Invalid texture frame ID requested in getFrameDelay() from ws::Animate! Returned 0...\n";
+				return 0;
+			}
+			return delays[index];
+		}
+		
+		
+		bool setFrameDelay(int index,double newDelay)
+		{	
+			if(index <= 0 || index > int(textures.size()))
+				return false;
+			delays[index] = newDelay;		
+		}
+		
+		bool setFrame(int index,ws::Texture &newTexture)
+		{
+			if(index <= 0 || index > int(textures.size()))
+				return false;
+			textures[index] = newTexture;
+			return true;
+		}
+		
+		
+		
+		bool getLoop()
+		{
+			return loop;
+		}
+		
+		void setLoop(bool trueFalse = true)
+		{
+			loop = trueFalse;
+		}
+		
+		
+		int getFrameCount()
+		{
+			return totalFrames;
+		}
+		
+		int getCurrentFrame()
+		{
+			return currentFrame;
+		}
+		
+		
+		void play()
+		{
+			if(status == "stopped")
+			{
+				timer.restart();
+				currentFrame = 0;
+				status = "playing";
+			}
+			if(status == "paused")
+			{
+				status = "playing";
+			}
+			
+		}
+		
+		
+		void pause()
+		{
+			status = "paused";
+		}
+		
+		
+		void stop()
+		{
+			currentFrame = 0;
+			status = "stopped";
+		}
+		
+		
+		std::string getStatus()
+		{
+			return status;
+		}
+		
+		
+		
+		
+		ws::Texture& update()
+		{
+			
+			if(status == "playing")
+			{
+			
+				if(currentFrame >= totalFrames)
+				{
+					if(loop)
+					{
+						timer.restart();
+						currentFrame = 0;
+					}
+					else
+						status = "stopped";
+				}
+				
+				if(currentFrame < int(delays.size()) && currentFrame < int(textures.size()) && timer.getMilliSeconds() > delays[currentFrame])
+				{	
+					currentTexture = textures[currentFrame];	
+					currentFrame++;
+					timer.restart();
+				}	
+				
+			}
+			return currentTexture;
+		}
+		
+		
+		
+		
+		
+		private:
+	    std::vector<ws::Texture> textures;
+	    ws::Texture currentTexture;
+	    std::vector<double> delays;  
+		std::string status = "stopped";
+		
+		int currentFrame = 0;
+		int totalFrames = 0;
+	    bool loop = false;
+		ws::Timer timer;
+				
+		
+	};
+
+	
+
+
+
+
+	//SHIFT ANIMATOR 
+
+	class ShiftData
+	{
+	
+	
+		public:
+		int currentframe=0;
+		float delay = 0.15;
+		bool ended = false;
+		bool start = true;//To make sure that timer is 0 when starting.
+		std::vector <ws::IntRect> rect;
+		ws::Timer timer;
+		
+		void add(int left,int top,int width,int height)
+		{
+			rect.push_back({left,top,width,height});
+		}
+		
+		void add(ws::IntRect rect)
+		{
+			add(rect.left,rect.top,rect.width,rect.height);
+		}
+		
+	};
+	
+	
+	ws::IntRect Shift(ShiftData &shift) 
+	{
+		if(shift.start && !shift.ended)
+		{
+			shift.timer.restart();
+			shift.start = false;
+		}
+		
+		if(shift.timer.getSeconds() >= shift.delay)
+		{
+		
+		
+				
+			shift.currentframe++;
+				
+			if(shift.currentframe >= int(shift.rect.size()))
+			{
+				shift.currentframe=0;
+				shift.ended = true;
+				shift.start = true;
+			}
+			shift.timer.restart();
+		
+		}
+		
+		return shift.rect[shift.currentframe];
+		
+	}
+	
+	//////////////////	
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+	
+	
+	class Drawable
+	{
+	public:
+	    //Coordinates and sizes are Local 
+		
+		int x = 0, y = 0, z = 0;
+	    int width = 1, height = 1;
+	    ws::Vec2f scale = {1, 1};
+	    ws::Vec2i origin = {0, 0};
+	    //Degrees
+	    float rotation = 0.0f;
+	    
+
+
+
+	    ws::Vec2i getSize() {return ws::Vec2i(width,height);}
+	    ws::Vec2i getPosition() {return ws::Vec2i(x,y);}
+	    ws::Vec2f getScale() { return scale; }
+	    ws::Vec2i getOrigin() { return origin; }
+	    float getRotation() { return rotation; }
+			    
+	    
+	    void setSize(ws::Vec2i size) {width = size.x;height = size.y;}
+	    void setSize(int w,int h) {width = w;height = h;}
+	    void setPosition(ws::Vec2i pos) {x = pos.x;y = pos.y;}
+	    void setPosition(int xpos,int ypos) {x = xpos;y = ypos;}
+	    void setScale(ws::Vec2f s) { scale = s; }
+	    void setScale(float sx, float sy) { scale.x = sx; scale.y = sy; }
+	    void setOrigin(ws::Vec2i pos) { origin = pos; }
+	    void setOrigin(int posx, int posy) { origin.x = posx; origin.y = posy; }
+	    void setRotation(float degrees) { rotation = degrees; }
+	    
+	    int getVisualWidth() const {
+	        return static_cast<int>(std::abs(width * scale.x));
+	    }
+	    
+	    int getVisualHeight() const {
+	        return static_cast<int>(std::abs(height * scale.y));
+	    }
+	    
+	    //Visual bounds
+	    void getBounds(int& left, int& top, int& right, int& bottom) const
+	    {
+	    	
+	        float corners[4][2] = {
+	            {static_cast<float>(-origin.x), static_cast<float>(-origin.y)},
+	            {static_cast<float>(width - origin.x), static_cast<float>(-origin.y)},
+	            {static_cast<float>(width - origin.x), static_cast<float>(height - origin.y)},
+	            {static_cast<float>(-origin.x), static_cast<float>(height - origin.y)}
+	        };
+	        
+	        // Apply scale
+	        for (int i = 0; i < 4; i++) {
+	            corners[i][0] *= scale.x;
+	            corners[i][1] *= scale.y;
+	        }
+	        
+	        // Apply rotation 
+	        if (rotation != 0.0f) {
+	            float rad = rotation * M_PI / 180.0f;
+	            float cosA = std::cos(rad);
+	            float sinA = std::sin(rad);
+	            
+	            for (int i = 0; i < 4; i++) {
+	                float x = corners[i][0];
+	                float y = corners[i][1];
+	                corners[i][0] = x * cosA - y * sinA;
+	                corners[i][1] = x * sinA + y * cosA;
+	            }
+	        }
+	        
+	        // Apply translation to world position and find bounds
+	        float minX = corners[0][0] + x;
+	        float maxX = corners[0][0] + x;
+	        float minY = corners[0][1] + y;
+	        float maxY = corners[0][1] + y;
+	        
+	        for (int i = 1; i < 4; i++) {
+	            float wx = corners[i][0] + x;
+	            float wy = corners[i][1] + y;
+	            
+	            if (wx < minX) minX = wx;
+	            if (wx > maxX) maxX = wx;
+	            if (wy < minY) minY = wy;
+	            if (wy > maxY) maxY = wy;
+	        }
+	        
+	        left = static_cast<int>(minX);
+	        top = static_cast<int>(minY);
+	        right = static_cast<int>(maxX);
+	        bottom = static_cast<int>(maxY);
+	    }
+	    
+	    //Visually contains
+		virtual bool contains(ws::Vec2i point)
+	    {
+	        int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+	        if (point.x < left || point.x > right || point.y < top || point.y > bottom)
+	            return false;
+	            
+	        if (rotation == 0.0f) {
+	            float localX = (point.x - x) / scale.x + origin.x;
+	            float localY = (point.y - y) / scale.y + origin.y;
+	            return (localX >= 0 && localX < width && 
+	                    localY >= 0 && localY < height);
+	        }
+	        
+	        // For rotated objects, do proper transform
+	        float localX = static_cast<float>(point.x - x);
+	        float localY = static_cast<float>(point.y - y);
+	        
+	        // Reverse rotation
+	        float rad = -rotation * M_PI / 180.0f;
+	        float cosA = std::cos(rad);
+	        float sinA = std::sin(rad);
+	        float rotX = localX * cosA - localY * sinA;
+	        float rotY = localX * sinA + localY * cosA;
+	        
+	        // Reverse scale and adjust for origin
+	        rotX = rotX / scale.x + origin.x;
+	        rotY = rotY / scale.y + origin.y;
+	        
+	        return (rotX >= 0 && rotX < width && 
+	                rotY >= 0 && rotY < height);
+	    }
+	    
+	    
+		virtual void drawGlobal(Gdiplus::Graphics* graphics)
+	    {
+	        // Save current state
+	        Gdiplus::GraphicsState state = graphics->Save();
+	        
+	        Gdiplus::Matrix transform;
+	        
+
+			//move to world position.
+			transform.Translate(
+				static_cast<Gdiplus::REAL>(x),
+				static_cast<Gdiplus::REAL>(y)
+			);
+
+			//rotate around (0,0) which is now the origin point
+			if (rotation != 0.0f) {
+				transform.Rotate(rotation);
+			}
+
+			//scale in local space
+			if (scale.x != 1.0f || scale.y != 1.0f) {
+				transform.Scale(scale.x, scale.y);
+			}
+
+			transform.Translate(
+				static_cast<Gdiplus::REAL>(-origin.x),
+				static_cast<Gdiplus::REAL>(-origin.y)
+			);			
+
+	        
+	        //graphics->SetTransform(&transform);
+	        graphics->MultiplyTransform(&transform, Gdiplus::MatrixOrderPrepend);
+			
+	        // Draw the actual content
+	        draw(graphics);
+	        
+	        
+	        graphics->Restore(state);
+	    }
+	    
+	    // Pure virtual - draw the content in local space
+	    virtual void draw(Gdiplus::Graphics* graphics) = 0;
+	    
+	    virtual ~Drawable() = default;
+	};
+	
+	
+	
+	
+	class Sprite : public Drawable
+	{
+		
+		
+		private:
+			
+	    ws::Texture* textureRef = nullptr;
+	    int texLeft = 0, texTop = 0;  // Texture coordinates
+	    int texWidth = 0, texHeight = 0;  // Texture dimensions			
+		
+		
+		public:
+		
+		
+		
+		Sprite()
+		{
+			
+		}
+		
+		
+		Sprite(ws::Texture &texture)
+		{
+			textureRef = &texture;
+			setTextureRect({0,0,texture.getSize().x,texture.getSize().y});
+		}
+		
+		
+	    virtual bool contains(ws::Vec2i pos) override
+	    {
+	        int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+	        return (pos.x >= left && pos.x < right &&
+	                pos.y >= top && pos.y < bottom);
+	    }
+	    virtual void draw(Gdiplus::Graphics* graphics) override
+	    {
+	        if (!textureRef || !textureRef->isValid()) 
+	            return;
+	        
+	        Gdiplus::Rect destRect(0,0, width, height);
+	        Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+	        
+	        graphics->DrawImage(textureRef->bitmap, destRect,
+	                           srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+	                           Gdiplus::UnitPixel);
+	    }	    
+
+		
+		
+	    void setTexture(ws::Texture& texture,bool resize = true) {
+	        textureRef = &texture;
+	        if(resize)
+	        	setTextureRect({0,0,texture.getSize().x,texture.getSize().y});
+	    }
+	    
+	    void setTextureRect(ws::IntRect rect) {
+	        // Assuming rect.left, rect.top are coordinates
+	        // rect.right is width, rect.bottom is height
+	        texLeft = rect.left;
+	        texTop = rect.top;
+	        texWidth = rect.width;
+	        texHeight = rect.height;
+	        
+	        // Set Drawable dimensions to match texture rectangle
+	        width = texWidth;
+	        height = texHeight;
+	    }
+	    
+	    ws::IntRect getTextureRect() const {
+	        return {texLeft, texTop, texWidth, texHeight};
+	    }
+		
+		Texture &getTexture()
+		{
+			return *textureRef;
+		}
+		
+		
+	    const Texture* getTexture() const
+	    {
+	        return textureRef;
+	    }		
+		
+		
+	    bool hasTexture() const
+	    {
+	        return textureRef != nullptr;
+	    }		
+		
+		
+
+		
+		
+		public:
+			friend class Window;
+		
+		
+		
+					
+	};
+	
+	
+	
+
+
+
+
+
+
+
+
+	class Line : public ws::Drawable 
+	{
+	
+		public:
+		
+		ws::Vec2i start;
+		ws::Vec2i end;
+		Gdiplus::Color color = {255,0,0,255};
+		
+	    
+	    
+	    
+	    Line(ws::Vec2i start = {0,0},ws::Vec2i end = {0,0},int thewidth = 2,Gdiplus::Color color = {255,0,0,255})
+	    {
+	    	this->start = start;
+	    	this->end = end;
+	    	width = thewidth;
+	    	this->color = color;
+		}
+	    
+	    
+		virtual void draw(Gdiplus::Graphics* canvas) override 
+		{
+	    	Gdiplus::Pen pen(color);
+			canvas->DrawLine(&pen,start.x,start.y,end.x,end.y);
+	    }
+	    
+	    
+	    private:
+	    virtual bool contains(ws::Vec2i pos) override
+	    { 
+	    	return false;
+		}
+		
+		
+		public:
+			
+		bool onSegment(ws::Vec2i p, ws::Vec2i q, ws::Vec2i r)
+	    {
+	        if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
+	            q.y <= std::max(p.y, r.y) && q.y >= std::min(p.y, r.y))
+	            return true;
+	        return false;
+	    }
+		
+		// Returns: 0 = collinear, 1 = clockwise, 2 = counterclockwise
+	    int orientation(ws::Vec2i p, ws::Vec2i q, ws::Vec2i r)
+	    {
+	        long long val = (long long)(q.y - p.y) * (r.x - q.x) - 
+	                       (long long)(q.x - p.x) * (r.y - q.y);
+	        
+	        if (val == 0) return 0;  // Collinear
+	        return (val > 0) ? 1 : 2; // Clockwise or counterclockwise
+	    }			
+		
+	    bool intersects(Line &otherLine)
+	    {
+	        ws::Vec2i p1 = this->start;
+	        ws::Vec2i p2 = this->end;
+	        ws::Vec2i p3 = otherLine.start;
+	        ws::Vec2i p4 = otherLine.end;
+	        
+	        // Calculate orientation values
+	        int o1 = orientation(p1, p2, p3);
+	        int o2 = orientation(p1, p2, p4);
+	        int o3 = orientation(p3, p4, p1);
+	        int o4 = orientation(p3, p4, p2);
+	        
+	        // General case: lines intersect if orientations are different
+	        if (o1 != o2 && o3 != o4)
+	            return true;
+	        
+	        // Special cases: check if points are collinear and lie on segments
+	        if (o1 == 0 && onSegment(p1, p3, p2)) return true;
+	        if (o2 == 0 && onSegment(p1, p4, p2)) return true;
+	        if (o3 == 0 && onSegment(p3, p1, p4)) return true;
+	        if (o4 == 0 && onSegment(p3, p2, p4)) return true;
+	        
+	        return false;
+	    }
+	    
+	};
+
+
+
+
+	
+	
+	class Font
+	{
+
+		
+		public:
+		
+		
+		
+		
+		Font()
+		{
+			family = std::make_unique<Gdiplus::FontFamily>(L"Arial");
+			fontCollection = std::make_unique<Gdiplus::PrivateFontCollection>();
+			loadFromSystem("Arial");
+		}
+		
+		~Font()
+		{
+			gdiFont.reset();
+		    family.reset();
+		    fontCollection.reset();
+		}
+		
+		
+		
+		Gdiplus::Font* getFontHandle()
+		{ return gdiFont.get(); }
+		
+		Gdiplus::FontFamily* getFamilyHandle()
+		{ return family.get(); }
+		
+
+		
+		
+		bool isSystemFont()
+		{ return isCustomFont; }
+		
+		std::string getFilePath()
+		{ return fontFilePath; }
+		
+		
+		std::string getName()
+		{ return fontName; }
+		
+		
+
+		
+		bool loadFromSystem(std::string name)
+		{
+			fontFilePath.clear();
+			isCustomFont = false;
+			
+			fontCollection.reset(new Gdiplus::PrivateFontCollection());
+			
+			fontName = name;
+			
+			return update();
+			
+		}
+		
+		
+		bool loadFromFile(std::string path)
+		{	
+			//reset the font collection to be empty and then add a single font.
+			fontFilePath = path;
+	        fontCollection.reset(new Gdiplus::PrivateFontCollection());
+	        Gdiplus::Status status = fontCollection->AddFontFile(ws::WIDE(fontFilePath).c_str());
+	        
+	        if(status != Gdiplus::Ok)
+	        	return false;
+	        
+	        //check if the family exists(a family is a font but it is called a family because a font has different versions(bold,italic,etc.))
+			int familyCount = fontCollection->GetFamilyCount();	
+	        
+			if(familyCount <= 0)//Means the family failed to be created.
+				return false;
+			
+			
+			//Get the first font family from the collection. (The only one since this is a collection per ws::Font object now).
+			foundFamily = 0;
+			fontCollection->GetFamilies(1,family.get(),&foundFamily);
+			
+			
+			if(foundFamily == 0)
+				return false;
+			
+			//Get the overall font name. Ignore subnames like (Arial-Bold,Arial-Italic,etc.)
+			wchar_t familyName[LF_FACESIZE]; //LF_FACESIZE == 32
+			
+			if(family->GetFamilyName(familyName) != Gdiplus::Ok)
+				return false;
+			
+			
+			std::string name = ws::SHORT(familyName);	
+			
+			//Remove /0 null terminator from name
+			if (!name.empty() && name.back() == '\0')
+	        {
+	            name.pop_back();
+	        }
+			
+			//Store the font name
+			fontName = name;
+			fontFilePath = path;
+			isCustomFont = true;
+			
+			//initial update
+			return update();
+		}
+		
+		
+		
+		bool isValid()
+	    {
+	        return gdiFont && gdiFont->GetLastStatus() == Gdiplus::Ok;
+	    }
+		
+		
+		
+		private:
+			
+		bool update()
+		{
+
+			
+			if(isCustomFont)
+			{
+			
+	            if(!fontCollection || fontCollection->GetFamilyCount() <= 0)
+	                return false;			
+			
+				if(foundFamily == 0)
+					return false;
+				
+				//Create the font
+				gdiFont.reset(new Gdiplus::Font(family.get(),24,Gdiplus::FontStyleRegular,Gdiplus::UnitPixel));
+				
+			}
+			else
+			{
+				
+				gdiFont.reset(new Gdiplus::Font(ws::WIDE(fontName).c_str(), 
+	            24, 
+	            Gdiplus::FontStyleRegular, 
+	            Gdiplus::UnitPixel));
+			}
+			
+			
+			return gdiFont->GetLastStatus() == Gdiplus::Ok;			
+		}	
+			
+		
+		std::string fontName = "Arial";
+	    std::unique_ptr<Gdiplus::PrivateFontCollection> fontCollection;
+	    std::unique_ptr<Gdiplus::Font> gdiFont;
+		std::unique_ptr<Gdiplus::FontFamily> family;	
+		int foundFamily = 0;
+		bool isCustomFont = false;
+		std::string fontFilePath;
+	};
+
+
+
+	class Text : public ws::Drawable
+	{
+		public:
+		
+		
+		
+		
+		Text(){}
+		~Text(){}
+		
+		
+		
+		
+		Text(ws::Font &newfont)
+		{ fontRef = &newfont; }
+		
+		
+		
+		void setFont(ws::Font &newFont)
+		{ fontRef = &newFont; }
+		
+		ws::Font* getFont()
+		{ return fontRef; }
+		
+		void setString(std::string str)
+		{ text = str; }
+		
+		std::string getString()
+		{ return text; }
+		
+		
+		void setCharacterSize(int size)
+		{ charSize = size;}
+		
+		int getCharacterSize()
+		{ return charSize; }	
+		
+		void setStyle(Gdiplus::FontStyle fontStyle)
+		{ style = fontStyle;}
+		
+		Gdiplus::FontStyle getStyle()
+		{ return style; }		
+		
+		void setFillColor(Gdiplus::Color color)
+		{ fillColor = color; }
+		
+		Gdiplus::Color getFillColor()
+		{ return fillColor; }
+		
+		void setBorderColor(Gdiplus::Color color)
+		{ borderColor = color; }
+		
+		Gdiplus::Color getBorderColor()
+		{ return borderColor; }
+		
+		void setBorderWidth(int w)
+		{ borderWidth = w; }
+		
+		int getBorderWidth()
+		{ return borderWidth; }
+		
+		
+		
+
+		
+		
+		
+		virtual bool contains(ws::Vec2i pos) override
+		{
+			return Drawable::contains(pos);
+		}
+		
+		virtual void draw(Gdiplus::Graphics* canvas) override 
+		{
+			
+			Gdiplus::FontFamily &family = *fontRef->getFamilyHandle();
+			
+			if(!family.IsStyleAvailable(style))
+            {
+            	std::cerr << "Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed."<<std::endl;
+                if(family.IsStyleAvailable(Gdiplus::FontStyleRegular))
+                    style = Gdiplus::FontStyleRegular;
+                else if(family.IsStyleAvailable(Gdiplus::FontStyleBold))
+                    style = Gdiplus::FontStyleBold;
+                else if(family.IsStyleAvailable(Gdiplus::FontStyleItalic))
+                    style = Gdiplus::FontStyleItalic;
+                else
+                    return;
+            }
+			
+			
+			
+			Gdiplus::GraphicsPath path;
+			
+		    Gdiplus::StringFormat format(Gdiplus::StringFormat::GenericTypographic());
+			format.SetFormatFlags(format.GetFormatFlags() | Gdiplus::StringFormatFlagsNoFitBlackBox | Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
+			
+			path.AddString(
+			ws::WIDE(text).c_str(), 
+			int(text.length()),
+			fontRef->getFamilyHandle(), 
+			style, 
+			charSize, 
+			Gdiplus::PointF(0,0), 
+			&format
+			);
+    
+    		Gdiplus::Pen outlinePen(borderColor, borderWidth);
+    		outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
+		    
+		    Gdiplus::RectF bounds;
+		    path.GetBounds(&bounds, NULL, &outlinePen);
+		    
+		    width = bounds.Width;
+		    height = bounds.Height;
+		    
+		    
+		    Gdiplus::SolidBrush fillBrush(fillColor);
+    
+    		//drawing the outline
+    		canvas->DrawPath(&outlinePen, &path);
+    		
+    		//filling text
+    		canvas->FillPath(&fillBrush, &path);
+    		
+		} 
+		
+		
+		private:
+		
+		Gdiplus::Color fillColor = Gdiplus::Color(255,0,0,0);	
+		Gdiplus::Color borderColor = Gdiplus::Color(255,255,0,0);	
+		ws::Font *fontRef = nullptr;	
+		std::string text = "";
+		int borderWidth = 0;
+		int charSize = 12;	
+		Gdiplus::FontStyle style = Gdiplus::FontStyleRegular;
+		
+		
+	};
+	
+	
+	
+	
+	class Poly : public ws::Drawable 
+	{
+	    public:
+	    std::vector<ws::Vec2i> vertices;
+	    
+	    
+	    private:
+	    Gdiplus::Color fillColor = {255,255,0,0};    
+	    Gdiplus::Color borderColor = {255,255,0,100};    
+	    int borderWidth = 2;
+	    bool filled = true;
+	    bool closed = true;
+	    
+	    ws::Texture *textureRef = nullptr;
+	    ws::Texture effectTexture;
+	    bool textureNeedsUpdate = true;
+	    
+	    std::vector<ws::Vec2f> uvs;
+	    bool hasUVs = false;
+	    
+	    public:
+	        
+	    Poly() = default;
+	    
+	    
+	    Poly(std::vector<ws::Vec2i>& vertices, Gdiplus::Color fillColor = {255,255,0,0}, Gdiplus::Color borderColor = {255,255,0,255}, int borderWidth = 2, bool filled = true)
+	    {
+	        this->vertices = vertices;
+	        this->fillColor = fillColor;
+	        this->borderColor = borderColor;
+	        this->borderWidth = borderWidth;
+	        this->filled = filled;
+	    }
+	    
+	    
+	    void addVertex(ws::Vec2i vertex) 
+	    {
+	        vertices.push_back(vertex);
+	        uvs.push_back(ws::Vec2f(0, 0));
+	        textureNeedsUpdate = true;
+	    }
+	    
+	    void addVertex(int x, int y) 
+	    {
+	        vertices.push_back({x, y});
+	        uvs.push_back(ws::Vec2f(0, 0));
+	        textureNeedsUpdate = true;
+	    }
+	    
+	    void clear() 
+	    {
+	        vertices.clear();
+	        uvs.clear();
+	        hasUVs = false;
+	        textureNeedsUpdate = true;
+	    }
+	    
+	    size_t vertexCount() 
+	    {
+	        return vertices.size();
+	    }
+	    
+	    
+	    bool isValid() 
+	    {
+	        return vertices.size() >= 3;
+	    }
+	    
+	    
+	    ws::Vec2i getCentroid() 
+	    {
+	        if (vertices.empty()) return {0, 0};
+	        
+	        long long sumX = 0, sumY = 0;
+	        for (const auto& vertex : vertices) {
+	            sumX += vertex.x;
+	            sumY += vertex.y;
+	        }
+	        
+	        return {static_cast<int>(sumX / vertices.size()), 
+	                static_cast<int>(sumY / vertices.size())};
+	    }
+	    
+	    
+	    virtual bool contains(ws::Vec2i point) override 
+	    {
+	        if (vertices.size() < 3) return false;
+	        
+	        int crossings = 0;
+	        size_t n = vertices.size();
+	        
+	        for (size_t a = 0; a < n; a++) 
+	        {
+	            ws::Vec2i p1 = vertices[a];
+	            ws::Vec2i p2 = vertices[(a + 1) % n];
+	            
+	            if (point.x == p1.x && point.y == p1.y) return true;
+	            
+	            if (p1.y == p2.y && point.y == p1.y && 
+	                point.x >= std::min(p1.x, p2.x) && point.x <= std::max(p1.x, p2.x)) {
+	                return true;
+	            }
+	            
+	            if ((p1.y > point.y) != (p2.y > point.y)) {
+	                double xIntersection = (p2.x - p1.x) * (point.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
+	                
+	                if (point.x <= xIntersection) {
+	                    crossings++;
+	                }
+	            }
+	        }
+	        
+	        return (crossings % 2 == 1);
+	    }
+	    
+	    
+	    bool intersects(Line &line) 
+	    {
+	        if (vertices.size() < 2) return false;
+	        
+	        for (size_t i = 0; i < vertices.size(); i++) {
+	            ws::Vec2i p1 = vertices[i];
+	            ws::Vec2i p2 = vertices[(i + 1) % vertices.size()];
+	            
+	            Line edge(p1, p2);
+	            if (edge.intersects(line)) {
+	                return true;
+	            }
+	        }
+	        
+	        if (contains(line.start) || contains(line.end)) {
+	            return true;
+	        }
+	        
+	        return false;
+	    }
+	    
+	    
+	    bool intersects(Poly &other) 
+	    {
+	        for (const auto& vertex : other.vertices) 
+	        {
+	            if (contains(vertex)) 
+	            {
+	                return true;
+	            }
+	        }
+	        
+	        for (const auto& vertex : vertices) {
+	            if (other.contains(vertex)) {
+	                return true;
+	            }
+	        }
+	        
+	        for (size_t i = 0; i < vertices.size(); i++) {
+	            ws::Vec2i p1 = vertices[i];
+	            ws::Vec2i p2 = vertices[(i + 1) % vertices.size()];
+	            Line edge1(p1, p2);
+	            
+	            for (size_t j = 0; j < other.vertices.size(); j++) {
+	                ws::Vec2i p3 = other.vertices[j];
+	                ws::Vec2i p4 = other.vertices[(j + 1) % other.vertices.size()];
+	                Line edge2(p3, p4);
+	                
+	                if (edge1.intersects(edge2)) {
+	                    return true;
+	                }
+	            }
+	        }
+	        
+	        return false;
+	    }
+	    
+	    
+	    ws::IntRect getBoundingRect() 
+	    {
+	        if (vertices.empty()) return {0, 0, 0, 0};
+	        
+	        ws::IntRect rect = {vertices[0].x, vertices[0].y, vertices[0].x, vertices[0].y};
+	        
+	        for (const auto& vertex : vertices) {
+	            rect.left = std::min(rect.left, vertex.x);
+	            rect.top = std::min(rect.top, vertex.y);
+	            rect.width = std::max(rect.width, vertex.x);
+	            rect.height = std::max(rect.height, vertex.y);
+	        }
+	        
+	        rect.width = rect.width - rect.left;
+	        rect.height = rect.height - rect.top;
+	        
+	        return rect;
+	    }
+	    
+	    
+	    void setTexture(ws::Texture &tex)
+	    {
+	        textureRef = &tex;
+	        textureNeedsUpdate = true;
+	    }   
+	    
+	    void removeTexture()
+	    {
+	        textureRef = nullptr;
+	    }
+	    
+	    ws::Texture* getTexture()
+	    {
+	        return textureRef;
+	    }
+	    
+	    void setUV(size_t vertexIndex, float u, float v)
+	    {
+	        if(vertexIndex >= 0 && vertexIndex < vertices.size())
+	        {
+	            if(vertexIndex >= uvs.size())
+	            {
+	                uvs.resize(vertices.size(), ws::Vec2f(0, 0));
+	            }
+	            uvs[vertexIndex] = ws::Vec2f(u, v);
+	            hasUVs = true;
+	            textureNeedsUpdate = true;
+	        }
+	    }
+	    
+	    void updateTexture()
+	    {
+	        textureNeedsUpdate = true;
+	    }
+	    
+	    void setFillColor(Gdiplus::Color color)    
+	    {
+	        fillColor = color;
+	    }
+	    
+	    void setBorderColor(Gdiplus::Color color)
+	    {
+	        borderColor = color;
+	    }
+	    
+	    Gdiplus::Color getFillColor()
+	    {
+	        return fillColor;
+	    }
+	    
+	    Gdiplus::Color getBorderColor()
+	    {
+	        return borderColor;
+	    }
+	    
+	    
+	    void setBorderWidth(int w)
+	    {
+	        borderWidth = w;
+	    }
+	    
+	    int getBorderWidth()
+	    {
+	        return borderWidth;
+	    }
+	    
+	    void setFilled(bool b = true)
+	    {
+	        filled = b;
+	    }
+	    
+	    void setClosed(bool b = true)
+	    {
+	        closed = b;
+	    }
+	    
+	    bool getFilled()
+	    {
+	        return filled;
+	    }
+	    
+	    bool getClosed()
+	    {
+	        return closed;
+	    }
+	    
+	    
+	    private:
+	    
+	    bool pointInPolygon(ws::Vec2i p) 
+	    {
+	        if (vertices.size() < 3) return false;
+	        
+	        int crossings = 0;
+	        size_t n = vertices.size();
+	        
+	        for (size_t a = 0; a < n; a++) 
+	        {
+	            ws::Vec2i p1 = vertices[a];
+	            ws::Vec2i p2 = vertices[(a + 1) % n];
+	            
+	            if (p.x == p1.x && p.y == p1.y) return true;
+	            
+	            if (p1.y == p2.y && p.y == p1.y && 
+	                p.x >= std::min(p1.x, p2.x) && p.x <= std::max(p1.x, p2.x)) {
+	                return true;
+	            }
+	            
+	            if ((p1.y > p.y) != (p2.y > p.y)) {
+	                double xIntersection = (p2.x - p1.x) * (p.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
+	                
+	                if (p.x <= xIntersection) {
+	                    crossings++;
+	                }
+	            }
+	        }
+	        
+	        return (crossings % 2 == 1);
+	    }
+	    
+	    void generateEffectTexture()
+	    {
+	        if(!textureRef || !textureRef->isValid()) return;
+	        
+	        ws::IntRect bounds = getBoundingRect();
+	        if(bounds.width <= 0 || bounds.height <= 0) return;
+	        
+	        effectTexture.create(bounds.width, bounds.height, Gdiplus::Color(0, 0, 0, 0));
+	        
+	        int texWidth = textureRef->getSize().x;
+	        int texHeight = textureRef->getSize().y;
+	        
+	        if(!hasUVs || uvs.size() != vertices.size())
+	        {
+	            uvs.clear();
+	            for(const auto& vertex : vertices)
+	            {
+	                float u = static_cast<float>(vertex.x - bounds.left) / bounds.width;
+	                float v = static_cast<float>(vertex.y - bounds.top) / bounds.height;
+	                uvs.push_back(ws::Vec2f(u, v));
+	            }
+	            hasUVs = true;
+	        }
+	        
+	        for(int y = 0; y < bounds.height; y++)
+	        {
+	            for(int x = 0; x < bounds.width; x++)
+	            {
+	                ws::Vec2i worldPoint(x + bounds.left, y + bounds.top);
+	                
+	                if(pointInPolygon(worldPoint))
+	                {
+	                    ws::Vec2f uv = getUVForPoint(worldPoint, bounds);
+	                    
+	                    uv.x = std::max(0.0f, std::min(1.0f, uv.x));
+	                    uv.y = std::max(0.0f, std::min(1.0f, uv.y));
+	                    
+	                    int texX = static_cast<int>(uv.x * (texWidth - 1));
+	                    int texY = static_cast<int>(uv.y * (texHeight - 1));
+	                    
+	                    Gdiplus::Color texColor = textureRef->getPixel(texX, texY);
+	                    effectTexture.setPixel(x, y, texColor);
+	                }
+	            }
+	        }
+	        
+	        textureNeedsUpdate = false;
+	    }
+	    
+	    ws::Vec2f getUVForPoint(ws::Vec2i point, ws::IntRect bounds)
+	    {
+	        if(vertices.size() == 3)
+	        {
+	            return barycentricUV(point, vertices[0], vertices[1], vertices[2],
+	                                uvs[0], uvs[1], uvs[2]);
+	        }
+	        
+	        for(size_t i = 1; i < vertices.size() - 1; i++)
+	        {
+	            if(pointInTriangle(point, vertices[0], vertices[i], vertices[i + 1]))
+	            {
+	                return barycentricUV(point, vertices[0], vertices[i], vertices[i + 1],
+	                                    uvs[0], uvs[i], uvs[i + 1]);
+	            }
+	        }
+	        
+	        return ws::Vec2f(0, 0);
+	    }
+	    
+	    bool pointInTriangle(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c)
+	    {
+	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) /
+	                     ((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
+	        float beta = ((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y)) /
+	                    ((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
+	        float gamma = 1.0f - alpha - beta;
+	        
+	        return (alpha >= 0 && beta >= 0 && gamma >= 0);
+	    }
+	    
+	    ws::Vec2f barycentricUV(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c,
+	                           ws::Vec2f uvA, ws::Vec2f uvB, ws::Vec2f uvC)
+	    {
+	        float denom = (b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y);
+	        if(fabs(denom) < 0.0001f) return uvA;
+	        
+	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) / denom;
+	        float beta = ((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y)) / denom;
+	        float gamma = 1.0f - alpha - beta;
+	        
+	        float u = alpha * uvA.x + beta * uvB.x + gamma * uvC.x;
+	        float v = alpha * uvA.y + beta * uvB.y + gamma * uvC.y;
+	        
+	        return ws::Vec2f(u, v);
+	    }
+	    
+	    public:
+	    virtual void draw(Gdiplus::Graphics* canvas) override 
+	    {
+	        if (vertices.size() < 2) return;
+	        
+	        if(!textureRef)
+	        {
+	            std::vector<Gdiplus::PointF> transformedPoints;
+	            
+	            for (const auto& vertex : vertices) {
+	                transformedPoints.push_back(Gdiplus::PointF(
+	                    static_cast<Gdiplus::REAL>(vertex.x),
+	                    static_cast<Gdiplus::REAL>(vertex.y)
+	                ));
+	            }
+	            
+	            Gdiplus::Pen borderPen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+	            Gdiplus::SolidBrush fillBrush(fillColor);
+	            
+	            if (filled && closed && vertices.size() >= 3) {
+	                canvas->FillPolygon(&fillBrush, transformedPoints.data(), 
+	                                  static_cast<INT>(transformedPoints.size()));
+	            }
+	            
+	            if (closed && vertices.size() >= 3) {
+	                canvas->DrawPolygon(&borderPen, transformedPoints.data(), 
+	                                  static_cast<INT>(transformedPoints.size()));
+	            } 
+	            else if (vertices.size() >= 2) {
+	                canvas->DrawLines(&borderPen, transformedPoints.data(), 
+	                                static_cast<INT>(transformedPoints.size()));
+	            }
+	        }
+	        else
+	        {
+	            if(textureNeedsUpdate || !effectTexture.isValid())
+	            {
+	                generateEffectTexture();
+	            }
+	            
+	            if(effectTexture.isValid())
+	            {
+	                ws::IntRect bounds = getBoundingRect();
+	                
+	                Gdiplus::TextureBrush textureBrush(effectTexture.bitmap);
+	                
+	                Gdiplus::Matrix transform;
+	                transform.Translate(static_cast<Gdiplus::REAL>(bounds.left), 
+	                                  static_cast<Gdiplus::REAL>(bounds.top));
+	                textureBrush.SetTransform(&transform);
+	                
+	                std::vector<Gdiplus::PointF> transformedPoints;
+	                for (const auto& vertex : vertices) {
+	                    transformedPoints.push_back(Gdiplus::PointF(
+	                        static_cast<Gdiplus::REAL>(vertex.x),
+	                        static_cast<Gdiplus::REAL>(vertex.y)
+	                    ));
+	                }
+	                
+	                canvas->FillPolygon(&textureBrush, transformedPoints.data(), 
+	                                  static_cast<INT>(transformedPoints.size()));
+	                
+	                if(borderWidth > 0)
+	                {
+	                    Gdiplus::Pen borderPen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+	                    canvas->DrawPolygon(&borderPen, transformedPoints.data(), 
+	                                      static_cast<INT>(transformedPoints.size()));
+	                }
+	            }
+	        }
+	    }
+	};
+	
+	
+	
+
+
+	
+	class Radial : public Drawable
+	{
+		public:
+		Poly poly;
+		
+		Radial()
+		{
+			poly.setFillColor(Gdiplus::Color(255,100,200,100));
+			poly.setBorderColor(Gdiplus::Color(255,50,255,50));
+			poly.setBorderWidth(2);
+			poly.setClosed();
+			poly.setFilled();
+			make();
+			origin.x = radius;
+			origin.y = radius;
+		}
+		
+		void make(int points = 8)
+		{
+			poly.clear();
+			
+			double inc = (2 * M_PI)/points; 
+			
+			for(double a=0;a<(2*M_PI);a+=inc)
+			{
+				double angle = a;
+				int resx = static_cast<int>(std::cos(angle) * float(radius));
+				int resy = static_cast<int>(std::sin(angle) * float(radius));
+				poly.addVertex(resx + radius, resy + radius);
+			}
+			m_points = points;
+			
+			// Update Drawable properties
+			width = 2 * radius;
+			height = 2 * radius;
+
+			// Update position based on center
+			x = center.x - origin.x;
+			y = center.y - origin.y;
+		}
+		
+		
+		
+		void setPosition(int posx,int posy)
+		{
+			center = {posx,posy};
+			x = center.x - origin.x;
+			y = center.y - origin.y;
+		}
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			setPosition(pos.x, pos.y);
+		}
+		
+		
+		
+		void move(ws::Vec2i delta)
+		{
+			center.x += delta.x;
+			center.y += delta.y;
+			x = center.x - origin.x;
+			y = center.y - origin.y;
+		}
+		
+		void move(int deltaX,int deltaY)
+		{
+			move(ws::Vec2i(deltaX, deltaY));
+		}
+		
+		
+		void setPointCount(int count)
+		{
+			m_points = count;
+			make(m_points);
+		}
+		
+		void setRadius(int size)
+		{
+			radius = size;
+			make(m_points);
+		}
+		
+		void setFillColor(Gdiplus::Color color)
+		{
+			poly.setFillColor(color); 
+		}
+		
+		void setBorderColor(Gdiplus::Color color)
+		{
+			poly.setBorderColor(color);
+		}
+		
+		void setBorderWidth(int size)
+		{
+			poly.setBorderWidth(size);
+		}
+		
+		
+		int getRadius()
+		{
+			return radius;
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			return center;
+		}
+		
+		int getPointCount()
+		{
+			return m_points;
+		}
+		
+		
+		virtual void draw(Gdiplus::Graphics* canvas) override
+		{
+			poly.draw(canvas);
+		}
+		
+		virtual bool contains(ws::Vec2i pos) override
+		{
+			// Convert to local coordinates
+			float localX = static_cast<float>(pos.x - x - origin.x);
+			float localY = static_cast<float>(pos.y - y - origin.y);
+			
+			// Reverse scale
+			if (scale.x != 1.0f) localX /= scale.x;
+			if (scale.y != 1.0f) localY /= scale.y;
+			
+			// Check if point is within circle
+			return (localX * localX + localY * localY) <= (radius * radius);
+		}	
+		
+	
+		private:
+		ws::Vec2i center = {0, 0};
+		int m_points = 500;
+		int radius = 10;
+	};
+
+
+
+
+
+
+	class Round : public ws::Drawable
+	{
+		public:
+			
+		
+		virtual void draw(Gdiplus::Graphics* canvas) override
+		{
+	        Gdiplus::Pen borderPen(m_borderColor, static_cast<Gdiplus::REAL>(m_borderWidth));
+	        Gdiplus::SolidBrush fillBrush(m_fillColor);
+			
+			canvas->DrawEllipse(&borderPen,0,0,width,height);
+			canvas->FillEllipse(&fillBrush,0,0,width,height);
+			
+		}
+		
+		
+		
+		bool contains(int px,int py)
+		{
+			return contains(ws::Vec2i(px,py));
+		}
+		
+		//STILL DOES NOT WORK!!!!
+		virtual bool contains(ws::Vec2i p) override
+		{
+			
+		      // Convert to local coordinates
+	        float localX = static_cast<float>(p.x - x);
+	        float localY = static_cast<float>(p.y - y);
+	        
+	        // Reverse scale
+	        if (scale.x != 1.0f) localX /= scale.x;
+	        if (scale.y != 1.0f) localY /= scale.y;
+	        
+	        // Adjust for origin
+	        localX += origin.x;
+	        localY += origin.y;
+	        
+	        // Ellipse equation check
+	        float centerX = width / 2.0f;
+	        float centerY = height / 2.0f;
+	        float radiusX = width / 2.0f;
+	        float radiusY = height / 2.0f;
+	        
+	        if (radiusX <= 0 || radiusY <= 0) return false;
+	        
+	        float normalizedX = (localX - centerX) / radiusX;
+	        float normalizedY = (localY - centerY) / radiusY;
+	        
+	        return (normalizedX * normalizedX + normalizedY * normalizedY) <= 1.0f;		
+			
+		}
+		
+		
+		
+		void setBorderColor(Gdiplus::Color color){m_borderColor = color;}
+		void setFillColor(Gdiplus::Color color){m_fillColor = color;}
+		void setBorderWidth(int w){m_borderWidth = w;}
+		Gdiplus::Color getBorderColor() {return m_borderColor;}
+		Gdiplus::Color getFillColor() {return m_fillColor;}
+		int getBorderWidth() {return m_borderWidth;}
+		
+		
+		private:
+			Gdiplus::Color m_borderColor = Gdiplus::Color(255,100,200,100);
+			Gdiplus::Color m_fillColor = Gdiplus::Color(255,50,150,50);
+			int m_borderWidth = 2;
+	
+		
+
+	};
+	
+
+
+		
+}
+
+
+
+
+
+// ========== SYSTEM ==========
+namespace ws 
+{
+	
+	
+	
+	
+
+
+//	namespace Network
+//	{
+//		
+//		
+//		class Host
+//		{
+//			public:
+//			
+//			
+//			Host(std::string ip)
+//			{
+//				host = gethostbyname(ip.c_str());
+//				
+//				if(host == nullptr)
+//					std::cerr << "Failed to create Host!\n";	
+//			}
+//			
+//			
+//			HOSTENT* getHandle()
+//			{return host;}
+//			
+//			
+//			
+//			private:
+//			HOSTENT *host = nullptr;
+//		};
+//
+//
+//		class Server
+//		{
+//			public:
+//			
+//			Server(ws::Network::Host &host,int PORT = 80)
+//			{
+//				//Define server info
+//				//A struct that will hold socket info like ip and port.
+//				
+//				
+//				ZeroMemory(&sin,sizeof(sin));
+//				
+//				//Network byte order requires Big endian instead of little endian. Convert it.
+//				sin.sin_port = htons(PORT);
+//				sin.sin_family = AF_INET;
+//				
+//				//define address
+//				memcpy(&sin.sin_addr.S_un.S_addr, host.getHandle()->h_addr_list[0], sizeof(sin.sin_addr.S_un.S_addr));
+//								
+//			}
+//			
+//			
+//			SOCKADDR_IN &getHandle()
+//			{ return sin;}
+//			
+//			private:
+//			SOCKADDR_IN sin;
+//		};
+//		
+//		
+//		class Socket
+//		{
+//			public:
+//			
+//			Socket()
+//			{
+//				//AF_INET defines the socket as being through the internet(not just network. public Internet)
+//				//SOCK_STREAM defines the socket as streaming over tcpIP.
+//			    sock = socket(AF_INET,SOCK_STREAM,0); //Raw Socket
+//			    
+//			    if(sock < 0)
+//			    	std::cerr << "Failed to create socket!\n";
+//			}
+//			
+//			~Socket()
+//			{
+//				closesocket(sock);
+//			}
+//
+//			SOCKET &getHandle()
+//			{return sock;}			
+//
+//
+//			bool connectToServer(ws::Network::Server &server)
+//			{
+//				//Connect
+//				//Type cast &sin to const sockaddr*
+//				if(connect(sock,(const sockaddr*)&server.getHandle(), sizeof(server.getHandle())) != 0)
+//					return false;
+//				return true;
+//			}
+//			
+//			
+//			
+//			bool sendData(std::string data)
+//			{ 
+//				const char* mdata = data.c_str(); 
+//				
+//				if(!send(sock,mdata,strlen(mdata),0))
+//					return false;
+//				return true;
+//			}
+//			
+//			
+//			std::string getData(int maximumBytes = 4096)
+//			{
+//				//Receives data line by line. Do the while loop to get the entire thing.
+//				char szBuffer[4096];
+//				char szTemp[4096];
+//				
+//				while(recv(sock,szTemp,maximumBytes/*Choose Maximum chars received*/,0))
+//				{
+//					//Put temp onto buffer
+//					strcat(szBuffer,szTemp);
+//				}
+//				std::string str = szBuffer;
+//				return str;
+//			}
+//			
+//			private:
+//			SOCKET sock;		
+//		};
+//		
+//	}
+//
+
+
+
+	class ClipData
+	{
+		private:
+		std::vector<std::string> files;
+		std::string text = "";
+		ws::Texture texture;
+		
+		public:
+		
+		ClipData()
+		{
+		}
+		
+		
+		void setTexture(ws::Texture tex)
+		{
+			texture = tex;
+		}
+		void setText(std::string str)
+		{
+			text = str;
+		}
+		void setFiles(std::vector<std::string> FilesVector)
+		{
+			files = FilesVector;
+		}
+		ws::Texture getTexture()
+		{
+			return texture;
+		}
+		std::string getText()
+		{
+			return text;
+		}
+		std::vector<std::string>& getFiles()
+		{
+			return files;
+		}
+		
+	};
+	
+	
+	
+	
+	class Clipboard
+	{
+	private:
+	    // Helper function to copy a rectangular region from a GDI+ Bitmap
+	    Gdiplus::Bitmap* copyRectOfBitmap(ws::Texture &texture, ws::IntRect rect)
+	    {
+	        if (!texture.isValid()) return nullptr;
+	        
+	        // Get bitmap dimensions
+	        int srcWidth = texture.bitmap->GetWidth();
+	        int srcHeight = texture.bitmap->GetHeight();
+	        
+	        // Determine copy area
+	        int copyWidth, copyHeight, copyLeft, copyTop;
+	        
+	        if (rect.width == 0 && rect.height == 0 && rect.left == 0 && rect.top == 0) {
+	            // Copy entire bitmap
+	            copyLeft = 0;
+	            copyTop = 0;
+	            copyWidth = srcWidth;
+	            copyHeight = srcHeight;
+	        } else {
+	            // Copy specified rectangle
+	            copyLeft = rect.left;
+	            copyTop = rect.top;
+	            copyWidth = rect.width;
+	            copyHeight = rect.height;
+	            
+	            // Clamp to bitmap bounds
+	            if (copyLeft < 0) copyLeft = 0;
+	            if (copyTop < 0) copyTop = 0;
+	            if (copyLeft + copyWidth > srcWidth) copyWidth = srcWidth - copyLeft;
+	            if (copyTop + copyHeight > srcHeight) copyHeight = srcHeight - copyTop;
+	            
+	            // Check if rectangle is valid
+	            if (copyWidth <= 0 || copyHeight <= 0) return nullptr;
+	        }
+	        
+	        // Create a new bitmap for the copied region
+	        Gdiplus::Bitmap* copyBitmap = new Gdiplus::Bitmap(copyWidth, copyHeight, 
+	                                                         PixelFormat32bppARGB);
+	        
+	        // Create graphics context for the new bitmap
+	        Gdiplus::Graphics graphics(copyBitmap);
+	        
+	        // Draw the specified region from source to destination
+	        graphics.DrawImage(texture.bitmap, 
+	                          0, 0, copyLeft, copyTop, copyWidth, copyHeight, 
+	                          Gdiplus::UnitPixel);
+	        
+	        return copyBitmap;
+	    }
+	    
+	    // Convert GDI+ Bitmap to HBITMAP for clipboard (CF_BITMAP format)
+	    HBITMAP gdipBitmapToHBITMAP(Gdiplus::Bitmap* gdipBitmap)
+	    {
+	        if (!gdipBitmap) return nullptr;
+	        
+	        HBITMAP hBitmap = nullptr;
+	        Gdiplus::Color color(0, 0, 0, 0); // Transparent background
+	        Gdiplus::Status status = gdipBitmap->GetHBITMAP(color, &hBitmap);
+	        
+	        if (status != Gdiplus::Ok) {
+	            return nullptr;
+	        }
+	        
+	        return hBitmap;
+	    }
+	    
+	    // Convert GDI+ Bitmap to DIB for clipboard (CF_DIB format)
+	    HGLOBAL gdipBitmapToDIB(Gdiplus::Bitmap* gdipBitmap)
+	    {
+	        if (!gdipBitmap) return nullptr;
+	        
+	        UINT width = gdipBitmap->GetWidth();
+	        UINT height = gdipBitmap->GetHeight();
+	        
+	        // Lock the bitmap bits
+	        Gdiplus::BitmapData bitmapData;
+	        Gdiplus::Rect rect(0, 0, width, height);
+	        
+	        if (gdipBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, 
+	                                PixelFormat32bppARGB, &bitmapData) != Gdiplus::Ok) {
+	            return nullptr;
+	        }
+	        
+	        // Prepare BITMAPINFOHEADER
+	        BITMAPINFOHEADER bi = {0};
+	        bi.biSize = sizeof(BITMAPINFOHEADER);
+	        bi.biWidth = width;
+	        bi.biHeight = height;  // Positive for top-down DIB
+	        bi.biPlanes = 1;
+	        bi.biBitCount = 32;
+	        bi.biCompression = BI_RGB;
+	        bi.biSizeImage = width * height * 4;
+	        
+	        // Calculate total size needed
+	        DWORD dwSize = sizeof(BITMAPINFOHEADER) + bi.biSizeImage;
+	        
+	        // Allocate global memory
+	        HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, dwSize);
+	        if (!hGlobal) {
+	            gdipBitmap->UnlockBits(&bitmapData);
+	            return nullptr;
+	        }
+	        
+	        // Lock the global memory
+	        LPBYTE lpData = (LPBYTE)GlobalLock(hGlobal);
+	        if (!lpData) {
+	            GlobalFree(hGlobal);
+	            gdipBitmap->UnlockBits(&bitmapData);
+	            return nullptr;
+	        }
+	        
+	        // Copy BITMAPINFOHEADER
+	        memcpy(lpData, &bi, sizeof(BITMAPINFOHEADER));
+	        
+	        // Copy pixel data (convert from bottom-up to top-down if needed)
+	        LPBYTE pDest = lpData + sizeof(BITMAPINFOHEADER);
+	        LPBYTE pSrc = (LPBYTE)bitmapData.Scan0;
+	        
+	        // Copy scanline by scanline (bitmapData is bottom-up, DIB we want top-down)
+	        for (UINT y = 0; y < height; y++) {
+	            // Copy entire scanline
+	            memcpy(pDest + (y * width * 4), 
+	                   pSrc + ((height - 1 - y) * bitmapData.Stride), 
+	                   width * 4);
+	        }
+	        
+	        // Cleanup
+	        gdipBitmap->UnlockBits(&bitmapData);
+	        GlobalUnlock(hGlobal);
+	        
+	        return hGlobal;
+	    }
+	    
+	    // Convert HBITMAP to GDI+ Bitmap
+	    Gdiplus::Bitmap* hbitmapToGdipBitmap(HBITMAP hBitmap)
+	    {
+	        if (!hBitmap) return nullptr;
+	        
+	        // Create GDI+ bitmap from HBITMAP
+	        Gdiplus::Bitmap* bitmap = Gdiplus::Bitmap::FromHBITMAP(hBitmap, NULL);
+	        
+	        // If FromHBITMAP fails, try creating a new bitmap and copying
+	        if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
+	            if (bitmap) delete bitmap;
+	            
+	            // Get bitmap info
+	            BITMAP bm;
+	            GetObject(hBitmap, sizeof(BITMAP), &bm);
+	            
+	            // Create a new GDI+ bitmap
+	            bitmap = new Gdiplus::Bitmap(bm.bmWidth, bm.bmHeight, PixelFormat32bppARGB);
+	            
+	            // Create graphics and draw the HBITMAP
+	            Gdiplus::Graphics graphics(bitmap);
+	            Gdiplus::Bitmap tempBitmap(hBitmap, NULL);
+	            graphics.DrawImage(&tempBitmap, 0, 0, bm.bmWidth, bm.bmHeight);
+	        }
+	        
+	        return bitmap;
+	    }
+	
+	
+	
+	
+	
+	
+		bool OpenClipboardCheck()
+		{
+	        if (!OpenClipboard(NULL)) {
+	            return false;
+	        }
+			return true;
+		}
+	
+	
+	
+	
+	
+	public:
+	    Clipboard()
+		{}
+
+	    ClipData paste() 
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return ClipData();
+	        }
+			
+			ClipData data;
+	        
+			//text
+	        if (IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+	            HANDLE hData = GetClipboardData(CF_UNICODETEXT);
+	            if (hData) {
+	                LPCWSTR pGlobal = (LPCWSTR)GlobalLock(hData);
+	                if (pGlobal) {
+	                    data.setText(ws::SHORT(pGlobal));
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+			
+			ws::Texture tex = pasteTexture();
+			
+			//texture
+			data.setTexture(tex);
+			
+			//files
+			data.setFiles(pasteFiles());
+			
+			
+	        
+	        CloseClipboard();
+	        return data;
+	    }
+
+	    
+	    bool copyText(const std::string& str) 
+	    {
+	        const std::wstring text = ws::WIDE(str);
+	        
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        size_t length = (text.length() + 1) * sizeof(wchar_t);
+	        HGLOBAL hGlobal = GlobalAlloc(GHND | GMEM_SHARE, length);
+	        if (!hGlobal) {
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        LPWSTR pGlobal = (LPWSTR)GlobalLock(hGlobal);
+	        if (!pGlobal) {
+	            GlobalFree(hGlobal);
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        wcsncpy_s(pGlobal, length / sizeof(wchar_t), text.c_str(), text.length());
+	        GlobalUnlock(hGlobal);
+	        
+	        SetClipboardData(CF_UNICODETEXT, hGlobal);
+	        CloseClipboard();
+	        return true;
+	    }
+	    
+
+	    
+	    bool copyTexture(ws::Texture &texture, ws::IntRect rect = {0,0,0,0}) 
+	    {
+	        if (!texture.isValid()) return false;
+	        
+	        // Create a copy of the specified region
+	        Gdiplus::Bitmap* copyBitmap = copyRectOfBitmap(texture, rect);
+	        if (!copyBitmap) return false;
+	        
+	        
+	        if (!OpenClipboardCheck()) {
+	            delete copyBitmap;
+				return false;
+	        }
+	        
+	        
+	        EmptyClipboard();
+	        
+	        bool success = false;
+	        
+	        // Try DIB format first (most compatible)
+	        HGLOBAL hDib = gdipBitmapToDIB(copyBitmap);
+	        if (hDib && SetClipboardData(CF_DIB, hDib)) {
+	            success = true;
+	        } else if (hDib) {
+	            GlobalFree(hDib);
+	        }
+	        
+	        // Also try BITMAP format
+	        HBITMAP hBitmap = gdipBitmapToHBITMAP(copyBitmap);
+	        if (hBitmap && SetClipboardData(CF_BITMAP, hBitmap)) {
+	            success = true;
+	        } else if (hBitmap) {
+	            DeleteObject(hBitmap);
+	        }
+	        
+	        delete copyBitmap;
+	        CloseClipboard();
+	        
+	        return success;
+	    }
+	    
+	    private:
+	    ws::Texture pasteTexture(ws::IntRect rect = {0,0,0,0}) 
+	    {
+	        ws::Texture tex;
+	        
+	        if (!OpenClipboardCheck()) {
+	            return tex;
+	        }
+
+			if (tex.bitmap) {
+				delete tex.bitmap;
+				tex.bitmap = nullptr;
+			}
+	        
+	        // Try to get DIB first (better quality)
+	        if (IsClipboardFormatAvailable(CF_DIB)) {
+	            HANDLE hData = GetClipboardData(CF_DIB);
+	            if (hData) {
+	                LPVOID pData = GlobalLock(hData);
+	                if (pData) {
+	                    BITMAPINFOHEADER* bih = (BITMAPINFOHEADER*)pData;
+	                    
+	                    // Calculate pixel data offset
+	                    LPBYTE pPixels = (LPBYTE)pData + bih->biSize;
+	                    
+	                    // Create GDI+ bitmap from DIB
+	                    Gdiplus::Bitmap* bitmap = new Gdiplus::Bitmap(
+	                        bih->biWidth, 
+	                        abs(bih->biHeight), 
+	                        bih->biWidth * 4, 
+	                        PixelFormat32bppARGB, 
+	                        pPixels);
+	                    
+	                    if (bitmap && bitmap->GetLastStatus() == Gdiplus::Ok) {
+	                        tex.loadFromBitmapPlus(*bitmap);
+	                    } else {
+	                        delete bitmap;
+	                    }
+	                    
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+	        // Fall back to BITMAP format
+	        else if (IsClipboardFormatAvailable(CF_BITMAP)) {
+	            HBITMAP hClipboardBitmap = (HBITMAP)GetClipboardData(CF_BITMAP);
+	            if (hClipboardBitmap) {
+	                Gdiplus::Bitmap* clipboardBitmap = hbitmapToGdipBitmap(hClipboardBitmap);
+	                if (clipboardBitmap && clipboardBitmap->GetLastStatus() == Gdiplus::Ok) {
+	                    
+						tex.create(clipboardBitmap->GetWidth(),clipboardBitmap->GetHeight());
+						tex.loadFromBitmapPlus(*clipboardBitmap);
+	                } else {
+	                    delete clipboardBitmap;
+	                }
+	            }
+	        }
+	        
+	        CloseClipboard();
+	        
+	        // Apply rectangle cropping if needed and we have a valid texture
+	        if (tex.isValid() && rect.width > 0 && rect.height > 0) {
+	            Gdiplus::Bitmap* croppedBitmap = copyRectOfBitmap(tex, rect);
+	            if (croppedBitmap) {
+	                delete tex.bitmap;
+	                tex.create(croppedBitmap->GetWidth(),croppedBitmap->GetHeight());
+					tex.loadFromBitmapPlus(*croppedBitmap);
+	                
+	            }
+	        }
+	        
+	        return tex;
+	    }
+		public:
+
+	    bool copyFile(const std::string& filePath)
+	    {
+	        std::wstring widePath = ws::WIDE(filePath);
+	        
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        // Calculate required memory size
+	        size_t pathSize = (widePath.length() + 1) * sizeof(wchar_t);
+	        size_t dropFilesSize = sizeof(DROPFILES) + pathSize + sizeof(wchar_t); // +1 wchar_t for double null terminator
+	        
+	        // Allocate global memory
+	        HGLOBAL hGlobal = GlobalAlloc(GHND | GMEM_SHARE, dropFilesSize);
+	        if (!hGlobal) {
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Lock and prepare DROPFILES structure
+	        DROPFILES* pDropFiles = (DROPFILES*)GlobalLock(hGlobal);
+	        if (!pDropFiles) {
+	            GlobalFree(hGlobal);
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Initialize DROPFILES structure
+	        pDropFiles->pFiles = sizeof(DROPFILES);  // Offset to file list
+	        pDropFiles->pt = { 0, 0 };              // Drop point (unused)
+	        pDropFiles->fNC = FALSE;                 // Client area
+	        pDropFiles->fWide = TRUE;                // Unicode strings
+	        
+	        // Copy file path(s) after the DROPFILES structure
+	        wchar_t* pFileList = (wchar_t*)((BYTE*)pDropFiles + sizeof(DROPFILES));
+	        wcscpy_s(pFileList, widePath.length() + 1, widePath.c_str());
+	        
+	        // Double null-terminate the file list
+	        pFileList[widePath.length() + 1] = L'\0';
+	        
+	        GlobalUnlock(hGlobal);
+	        
+	        // Set clipboard data
+	        bool success = SetClipboardData(CF_HDROP, hGlobal) != NULL;
+	        CloseClipboard();
+	        
+	        if (!success) {
+	            GlobalFree(hGlobal);
+	        }
+	        
+	        return success;
+	    }
+	    
+
+	    bool copyFiles(const std::vector<std::string>& filePaths)
+	    {
+	        if (filePaths.empty()) {
+	            return false;
+	        }
+	        
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        
+	        EmptyClipboard();
+	        
+	        // Calculate total size needed
+	        size_t totalPathsSize = 0;
+	        std::vector<std::wstring> widePaths;
+	        for (const auto& path : filePaths) {
+	            std::wstring widePath = ws::WIDE(path);
+	            widePaths.push_back(widePath);
+	            totalPathsSize += (widePath.length() + 1) * sizeof(wchar_t);
+	        }
+	        
+	        size_t dropFilesSize = sizeof(DROPFILES) + totalPathsSize + sizeof(wchar_t); // +1 for final null
+	        
+	        // Allocate global memory
+	        HGLOBAL hGlobal = GlobalAlloc(GHND | GMEM_SHARE, dropFilesSize);
+	        if (!hGlobal) {
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Lock and prepare DROPFILES structure
+	        DROPFILES* pDropFiles = (DROPFILES*)GlobalLock(hGlobal);
+	        if (!pDropFiles) {
+	            GlobalFree(hGlobal);
+	            CloseClipboard();
+	            return false;
+	        }
+	        
+	        // Initialize DROPFILES structure
+	        pDropFiles->pFiles = sizeof(DROPFILES);
+	        pDropFiles->pt = { 0, 0 };
+	        pDropFiles->fNC = FALSE;
+	        pDropFiles->fWide = TRUE;
+	        
+	        // Copy all file paths
+	        wchar_t* pFileList = (wchar_t*)((BYTE*)pDropFiles + sizeof(DROPFILES));
+	        size_t offset = 0;
+	        
+	        for (const auto& widePath : widePaths) {
+	            wcscpy_s(pFileList + offset, widePath.length() + 1, widePath.c_str());
+	            offset += widePath.length() + 1;  // +1 for null terminator
+	        }
+	        
+	        // Final null terminator
+	        pFileList[offset] = L'\0';
+	        
+	        GlobalUnlock(hGlobal);
+	        
+	        // Set clipboard data
+	        bool success = SetClipboardData(CF_HDROP, hGlobal) != NULL;
+	        CloseClipboard();
+	        
+	        if (!success) {
+	            GlobalFree(hGlobal);
+	        }
+	        
+	        return success;
+	    }
+	    
+		private:
+
+	    std::vector<std::string> pasteFiles()
+	    {
+	        std::vector<std::string> filePaths;
+	        
+	        if (!OpenClipboardCheck()) {
+	            return filePaths;
+	        }
+	        
+	        if (IsClipboardFormatAvailable(CF_HDROP)) {
+	            HANDLE hData = GetClipboardData(CF_HDROP);
+	            if (hData) {
+	                HDROP hDrop = (HDROP)GlobalLock(hData);
+	                if (hDrop) {
+	                    // Get number of files
+	                    UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+	                    
+	                    // Get each file path
+	                    for (UINT i = 0; i < fileCount; i++) {
+	                        // Get required buffer size
+	                        UINT bufferSize = DragQueryFileW(hDrop, i, NULL, 0);
+	                        
+	                        if (bufferSize > 0) {
+	                            std::wstring widePath(bufferSize + 1, L'\0');
+	                            DragQueryFileW(hDrop, i, &widePath[0], bufferSize + 1);
+	                            filePaths.push_back(ws::SHORT(widePath));
+	                        }
+	                    }
+	                    
+	                    GlobalUnlock(hData);
+	                }
+	            }
+	        }
+	        
+	        CloseClipboard();
+	        return filePaths;
+	    }
+	    
+	    std::string pasteFile()
+	    {
+	        auto files = pasteFiles();
+	        if (!files.empty()) 
+			{
+				return files[0];
+	        }
+	        return "";
+	    }
+		
+		public:
+	    
+		
+
+	    bool hasFiles()
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        bool hasFiles = IsClipboardFormatAvailable(CF_HDROP);
+	        CloseClipboard();
+	        return hasFiles;
+	    }
+
+
+	    
+	    bool hasText() 
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        bool hasText = IsClipboardFormatAvailable(CF_UNICODETEXT);
+	        CloseClipboard();
+	        return hasText;
+	    }
+	    
+	    bool hasTexture() 
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        bool hasImage = IsClipboardFormatAvailable(CF_BITMAP);
+	        CloseClipboard();
+	        return hasImage;
+	    }
+	    
+		
+		
+	    bool clear() 
+	    {
+	        if (!OpenClipboardCheck()) {
+	            return false;
+	        }
+	        bool success = EmptyClipboard();
+	        CloseClipboard();
+	        return success;
+	    }
+	    
+		
+		
+		
+	}clipboard;
+	
+	
+	
+	class InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict
+	{
+		public:	
+		
+		//GDI+	
+		Gdiplus::GdiplusStartupInput gdiplusstartup;
+		ULONG_PTR gdiplustoken;
+		//Network - Winsock
+		//WSADATA data;
+		int maxControlID = 0;
+		
+		
+		
+		InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
+		{
+			//GDI+
+			Gdiplus::GdiplusStartup(&gdiplustoken,&gdiplusstartup,nullptr);
+			
+			//Network <><><><><><><><><><><><><><>
+			
+			//Make a WORD(DWORD is double WORD). 
+			//Winsock takes a 16 bit WORD.
+			//The WORD for winsock is two parts combined. 2 and 2 make winsock V2.2
+			
+			//WORD version = MAKEWORD(2,2);
+			
+			//Startup winsock as V2.2
+			//if(WSAStartup(version, &data) != 0)
+		    //	std::cerr << "Failed to initialize Networking!" << std::endl;
+
+
+			//IDropTarget
+			OleInitialize(nullptr);							
+		}
+		
+		~InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
+		{
+			//Gdi+
+			Gdiplus::GdiplusShutdown(gdiplustoken);
+			
+			//Network
+			//WSACleanup();
+			
+			//IDropTarget
+			OleUninitialize();
+		}
+		
+	}initializerandreallyreallylongnamesothatitwontcauseanamingconflict;//Nobody should be messing with this class anyways...
+
+
+	
+	class Window;
+
+	class Child
+	{
+		public:
+		
+		HWND hwnd = NULL;
+		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
+		DWORD textStyle = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+		
+
+		unsigned int controlID = 0;
+		COLORREF backgroundColor = RGB(0,0,0);
+		COLORREF textColor = RGB(255,255,255);
+		COLORREF borderColor = RGB(0,0,0);
+		
+		private:
+		
+		HFONT customFont = nullptr;
+		std::string text = "";
+		int x = 0,y = 0,width = 100,height = 100;		
+
+		public:
+		
+		Child()
+		{
+			int &maxControlID = initializerandreallyreallylongnamesothatitwontcauseanamingconflict.maxControlID;
+			controlID = maxControlID+1;
+			maxControlID++;
+		}
+
+        virtual ~Child()
+        {
+            if (hwnd && IsWindow(hwnd))
+            {
+                DestroyWindow(hwnd);
+            }
+        }				
+		
+		void setPosition(int xPos,int yPos)
+		{
+			x = xPos;
+			y = yPos;
+			
+			if (hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		}		
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			setPosition(pos.x, pos.y);
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			return {x,y};
+		}
+		
+		void setSize(int w,int h)
+		{
+			width = w;
+			height = h;
+			
+			if (hwnd)
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		
+		void setSize(ws::Vec2i size)
+		{
+			setSize(size.x, size.y);
+		}
+		
+		ws::Vec2i getSize()
+		{
+			return {width,height};
+		}
+		
+		void addStyle(DWORD addedStyle)
+		{
+            style |= addedStyle;
+			if (hwnd)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style);
+                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+            
+		}
+		
+		void removeStyle(DWORD removedStyle)
+		{
+			
+			style &= ~removedStyle;
+			if (hwnd)
+            {
+                SetWindowLong(hwnd, GWL_STYLE, style);
+                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }	
+					
+		}
+		
+        bool hasStyle(DWORD checkStyle)
+        {
+            if (hwnd)
+            {
+                DWORD currentStyle = GetWindowLong(hwnd, GWL_STYLE);
+                return (currentStyle & checkStyle) != 0;
+            }
+            return (style & checkStyle) != 0;
+        }
+		
+		void setText(std::string newText)
+		{
+			
+			text = newText;
+			if (hwnd)
+                SetWindowTextA(hwnd, text.c_str());
+            
+		}
+		
+		std::string getText()
+		{
+			if (!hwnd) return text;
+
+			int len = GetWindowTextLengthW(hwnd);
+			if (len == 0) return "";
+
+			std::wstring wbuf(len + 1, L'\0');
+			GetWindowTextW(hwnd, &wbuf[0], len + 1);
+			wbuf.resize(len); // remove the null terminator
+
+			return ws::SHORT(wbuf);
+		}
+
+		void setFont(ws::Font &font, ws::Text &textSettings)
+		{
+			if (!hwnd || !font.isValid()) return;
+			
+			if (customFont)
+			{
+				DeleteObject(customFont);
+				customFont = NULL;
+			}
+			
+			Gdiplus::Font* gdipFont = font.getFontHandle();
+			if (!gdipFont) return;
+			
+			Gdiplus::FontFamily family;
+			gdipFont->GetFamily(&family);
+			
+			WCHAR familyName[LF_FACESIZE];
+			family.GetFamilyName(familyName);
+			
+			int style = textSettings.getStyle();
+			bool isBold = (style & Gdiplus::FontStyleBold) != 0;
+			bool isItalic = (style & Gdiplus::FontStyleItalic) != 0;
+			bool isUnderline = (style & Gdiplus::FontStyleUnderline) != 0;
+			bool isStrikeout = (style & Gdiplus::FontStyleStrikeout) != 0;
+			
+			int heightInPixels = textSettings.getCharacterSize();
+			
+			customFont = CreateFontW(
+				-heightInPixels,               
+				0,                             
+				0,                             
+				0,                             
+				isBold ? FW_BOLD : FW_NORMAL, 
+				isItalic ? TRUE : FALSE,       
+				isUnderline ? TRUE : FALSE,    
+				isStrikeout ? TRUE : FALSE,    
+				DEFAULT_CHARSET,               
+				OUT_DEFAULT_PRECIS,            
+				CLIP_DEFAULT_PRECIS,           
+				DEFAULT_QUALITY,               
+				DEFAULT_PITCH | FF_DONTCARE,   
+				familyName                     
+			);
+			
+			if (customFont)
+			{
+				SendMessage(hwnd, WM_SETFONT, (WPARAM)customFont, TRUE);
+			}
+		}
+		
+		
+		bool contains(ws::Vec2i point)
+		{
+			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
+		}
+		
+		
+		
+		virtual bool init(ws::Window &parent){return false;}
+		
+		
+		
+		
+		
+		
+		void setFillColor(COLORREF color)
+	    {
+	        backgroundColor = color;
+	        if (hwnd)
+	            InvalidateRect(hwnd, NULL, TRUE);
+	    }
+	    
+	    void setTextColor(COLORREF color)
+	    {
+	        textColor = color;
+	        if (hwnd)
+	            InvalidateRect(hwnd, NULL, TRUE);
+	    }
+		
+		void setBorderColor(COLORREF color)
+		{
+			borderColor = color;
+			if (hwnd)
+			    InvalidateRect(hwnd, NULL, TRUE);
+		}
+		
+		
+		
+		
+	};
+
+
+	class Window;
+	
+	class WindowManager
+	{
+		public:
+		static std::map<HWND, ws::Window*> windows;
+		static std::mutex windowsMutex;
+		static bool initialized;
+		
+		
+		static void init();		
+		static LRESULT CALLBACK GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam);
+		static void addWindow(ws::Window* window);
+		static void removeWindow(HWND hwnd);		
+		static Window* GetWindow(HWND hwnd);
+		
+	};
+
+
+	class Cursor
+	{
+		private:
+		HCURSOR handle = nullptr;
+		bool animated = false;
+		std::wstring srcPath;		
+		public:
+		
+		enum class Type
+		{
+			// Standard system cursors (IDC_*)
+			Arrow,          // IDC_ARROW
+			IBeam,          // IDC_IBEAM
+			Wait,           // IDC_WAIT
+			Cross,          // IDC_CROSS
+			UpArrow,        // IDC_UPARROW
+			SizeNWSE,       // IDC_SIZENWSE
+			SizeNESW,       // IDC_SIZENESW
+			SizeWE,         // IDC_SIZEWE
+			SizeNS,         // IDC_SIZENS
+			SizeAll,        // IDC_SIZEALL
+			No,             // IDC_NO
+			Hand,           // IDC_HAND
+			AppStarting,    // IDC_APPSTARTING
+			Help,           // IDC_HELP
+			Pin,            // IDC_PIN (Windows 7+)
+			Person,         // IDC_PERSON (Windows 8+)
+
+			// OLE drag‑and‑drop cursors (from ole32.dll)
+			Copy,           // resource ID 2
+			Move,           // resource ID 3
+			Link            // resource ID 4
+		};
+		
+		HCURSOR getHandle()
+		{
+			return handle;
+		}
+
+		
+		Cursor()
+		{}
+		
+		Cursor(Type type)
+		{
+			loadAs(type);
+		}
+		
+		void loadAs(Type type)
+		{
+			animated = false;
+			srcPath.clear();			
+			if (handle)
+				DestroyCursor(handle);  
+
+			switch (type)
+			{
+				case Type::Arrow:        handle = LoadCursor(nullptr, IDC_ARROW); break;
+				case Type::IBeam:        handle = LoadCursor(nullptr, IDC_IBEAM); break;
+				case Type::Wait:         handle = LoadCursor(nullptr, IDC_WAIT); break;
+				case Type::Cross:        handle = LoadCursor(nullptr, IDC_CROSS); break;
+				case Type::UpArrow:      handle = LoadCursor(nullptr, IDC_UPARROW); break;
+				case Type::SizeNWSE:     handle = LoadCursor(nullptr, IDC_SIZENWSE); break;
+				case Type::SizeNESW:     handle = LoadCursor(nullptr, IDC_SIZENESW); break;
+				case Type::SizeWE:       handle = LoadCursor(nullptr, IDC_SIZEWE); break;
+				case Type::SizeNS:       handle = LoadCursor(nullptr, IDC_SIZENS); break;
+				case Type::SizeAll:      handle = LoadCursor(nullptr, IDC_SIZEALL); break;
+				case Type::No:           handle = LoadCursor(nullptr, IDC_NO); break;
+				case Type::Hand:         handle = LoadCursor(nullptr, IDC_HAND); break;
+				case Type::AppStarting:  handle = LoadCursor(nullptr, IDC_APPSTARTING); break;
+				case Type::Help:         handle = LoadCursor(nullptr, IDC_HELP); break;
+				case Type::Pin:          handle = LoadCursor(nullptr, IDC_PIN); break;
+				case Type::Person:       handle = LoadCursor(nullptr, IDC_PERSON); break;
+
+				// OLE drag‑and‑drop cursors – requires loading from ole32.dll
+				case Type::Copy:
+				{
+					HMODULE ole = GetModuleHandle(L"ole32.dll");
+					if (ole)
+						handle = (HCURSOR)LoadImage(ole, MAKEINTRESOURCE(2), IMAGE_CURSOR, 0, 0, LR_DEFAULTCOLOR);
+					if (!handle)
+						handle = LoadCursor(nullptr, IDC_HAND);  // fallback
+					break;
+				}
+				case Type::Move:
+				{
+					HMODULE ole = GetModuleHandle(L"ole32.dll");
+					if (ole)
+						handle = (HCURSOR)LoadImage(ole, MAKEINTRESOURCE(3), IMAGE_CURSOR, 0, 0, LR_DEFAULTCOLOR);
+					if (!handle)
+						handle = LoadCursor(nullptr, IDC_ARROW);  // fallback
+					break;
+				}
+				case Type::Link:
+				{
+					HMODULE ole = GetModuleHandle(L"ole32.dll");
+					if (ole)
+						handle = (HCURSOR)LoadImage(ole, MAKEINTRESOURCE(4), IMAGE_CURSOR, 0, 0, LR_DEFAULTCOLOR);
+					if (!handle)
+						handle = LoadCursor(nullptr, IDC_HAND);   // fallback
+					break;
+				}
+			}
+		}
+
+		bool loadFromTexture(const ws::Texture& texture, int hotSpotX = 0, int hotSpotY = 0)
+		{
+			animated = false;
+			srcPath.clear();			
+			if (!texture.isValid()) return false;
+
+			Gdiplus::Bitmap* gdipBitmap = texture.bitmap;
+			UINT width = gdipBitmap->GetWidth();
+			UINT height = gdipBitmap->GetHeight();
+
+			// <><><> 32‑bpp colour DIB section 
+			BITMAPINFO bmi = {};
+			bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth       = width;
+			bmi.bmiHeader.biHeight      = -(LONG)height;          // top‑down
+			bmi.bmiHeader.biPlanes      = 1;
+			bmi.bmiHeader.biBitCount    = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+
+			void* colourBits = nullptr;
+			HBITMAP hbmColor = CreateDIBSection(nullptr, &bmi, DIB_RGB_COLORS, &colourBits, nullptr, 0);
+			if (!hbmColor) return false;
+
+			Gdiplus::BitmapData data;
+			Gdiplus::Rect rect(0, 0, width, height);
+			if (gdipBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &data) != Gdiplus::Ok)
+			{
+				DeleteObject(hbmColor);
+				return false;
+			}
+			memcpy(colourBits, data.Scan0, width * height * 4);
+			gdipBitmap->UnlockBits(&data);
+
+			// <><><> 1‑bpp mask DIB section
+			size_t maskStride = ((width + 31) / 32) * 4;               // DWORD‑aligned stride in bytes
+			size_t maskBufferSize = maskStride * height;
+			std::vector<BYTE> maskBits(maskBufferSize, 0xFF);          // all bits = 1 (opaque mask)
+
+			BITMAPINFO maskBmi = {};
+			maskBmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+			maskBmi.bmiHeader.biWidth       = width;
+			maskBmi.bmiHeader.biHeight      = -(LONG)height;
+			maskBmi.bmiHeader.biPlanes      = 1;
+			maskBmi.bmiHeader.biBitCount    = 1;
+			maskBmi.bmiHeader.biCompression = BI_RGB;
+			maskBmi.bmiHeader.biSizeImage   = (DWORD)maskBufferSize;
+
+			void* maskBitsPtr = nullptr;
+			HBITMAP hbmMask = CreateDIBSection(nullptr, &maskBmi, DIB_RGB_COLORS, &maskBitsPtr, nullptr, 0);
+			if (!hbmMask)
+			{
+				DeleteObject(hbmColor);
+				return false;
+			}
+			memcpy(maskBitsPtr, maskBits.data(), maskBufferSize);
+
+			//<><> Create the cursor
+			ICONINFO iconInfo = {};
+			iconInfo.fIcon    = FALSE;          // cursor, not icon
+			iconInfo.xHotspot = hotSpotX;
+			iconInfo.yHotspot = hotSpotY;
+			iconInfo.hbmMask  = hbmMask;
+			iconInfo.hbmColor = hbmColor;
+
+			HCURSOR newCursor = CreateIconIndirect(&iconInfo);
+
+			// Clean up the temporary bitmaps
+			DeleteObject(hbmColor);
+			DeleteObject(hbmMask);
+
+			if (newCursor)
+			{
+				if (handle) DestroyCursor(handle);
+				handle = newCursor;
+			}
+			else
+				return false;
+			return true;
+		}
+
+		bool loadFromFile(const std::string& filename)
+		{
+			animated = false;
+			srcPath.clear();			
+			if (handle)
+			{
+				DestroyCursor(handle);
+				handle = nullptr;
+			}
+
+			std::wstring wfilename = ws::WIDE(filename);
+
+			// just detect it from the extension, no reason to make the caller do this
+			bool isAni = wfilename.size() >= 4 &&
+						 _wcsicmp(wfilename.c_str() + wfilename.size() - 4, L".ani") == 0;
+
+			if (isAni) {
+				handle = LoadCursorFromFileW(wfilename.c_str());
+			} else {
+				handle = (HCURSOR)LoadImageW(
+					nullptr,
+					wfilename.c_str(),
+					IMAGE_CURSOR,
+					0, 0,
+					LR_LOADFROMFILE | LR_DEFAULTSIZE
+				);
+			}
+
+			if (!handle) {
+				std::cerr << "Failed to load cursor from file: " << filename << std::endl;
+				animated = false;
+				srcPath.clear();
+				return false;
+			}
+
+			animated = isAni;
+			srcPath  = isAni ? wfilename : std::wstring{};
+			return true;
+		}
+
+
+		~Cursor()
+		{
+			if (handle)
+				DestroyCursor(handle);
+		}
+
+		Cursor(const Cursor& other) : animated(other.animated), srcPath(other.srcPath)
+		{
+			if (other.handle)
+			{
+				if (other.animated && !other.srcPath.empty())
+				{
+					// CopyIcon loses animation frames, reload from file instead
+					handle = LoadCursorFromFileW(other.srcPath.c_str());
+					if (!handle)
+						handle = (HCURSOR)CopyIcon((HICON)other.handle); // fallback just in case
+				}
+				else
+				{
+					handle = (HCURSOR)CopyIcon((HICON)other.handle);
+				}
+			}
+		}
+
+		Cursor& operator=(const Cursor& other)
+		{
+			if (this != &other)
+			{
+				if (handle) DestroyCursor(handle);
+				animated = other.animated;
+				srcPath  = other.srcPath;
+				if (other.handle)
+				{
+					if (other.animated && !other.srcPath.empty())
+					{
+						handle = LoadCursorFromFileW(other.srcPath.c_str());
+						if (!handle)
+							handle = (HCURSOR)CopyIcon((HICON)other.handle);
+					}
+					else
+					{
+						handle = (HCURSOR)CopyIcon((HICON)other.handle);
+					}
+				}
+				else
+				{
+					handle = nullptr;
+				}
+			}
+			return *this;
+		}
+
+		Cursor(Cursor&& other) noexcept
+			: handle(other.handle), animated(other.animated), srcPath(std::move(other.srcPath))
+		{
+			other.handle   = nullptr;
+			other.animated = false;
+		}
+
+		Cursor& operator=(Cursor&& other) noexcept
+		{
+			if (this != &other)
+			{
+				if (handle) DestroyCursor(handle);
+				handle         = other.handle;
+				animated       = other.animated;
+				srcPath        = std::move(other.srcPath);
+				other.handle   = nullptr;
+				other.animated = false;
+			}
+			return *this;
+		}
+	};
+	
+	
+	class Window
+	{
+		public:
+		
+		HWND hwnd;	
+
+		private:
+
+		
+		friend class WindowManager;
+		
+		bool isRunning = false;
+		
+		std::queue<MSG> msgQ;
+		
+		INITCOMMONCONTROLSEX icex;
+		
+		ws::Cursor cursor; 
+
+
+		
+		
+		public:		
+		
+		
+		ws::View view;
+		std::vector<ws::Child*> children;
+		ws::Texture backBuffer;
+	    Gdiplus::Graphics* canvas;
+		
+		Window()
+		{
+			canvas = nullptr;
+        	hwnd = nullptr;
+		}
+		
+		
+		
+		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
+		{
+			create(width,height,title,style,exStyle);
+		}
+		
+		
+	
+
+		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
+		{
+
+			
+			//Check if manager is initialized and init if so.
+			WindowManager::init();
+			
+			
+			//Note to self: the style must be set this way because hwnd has not been initialized yet!
+			style |= WS_CLIPCHILDREN;
+			//exStyle |= WS_EX_COMPOSITED;
+			
+			
+			//This is for initialization of winapi child objects sucg as buttons and textboxes.
+			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+			icex.dwICC = ICC_STANDARD_CLASSES;  // Enables a set of common controls.
+			InitCommonControlsEx(&icex);
+			///////////////////////////////
+			
+			
+			view.init({0,0,width,height});
+			
+			
+			hwnd = CreateWindowEx(
+			exStyle,
+			L"Window",
+			ws::WIDE(title).c_str(),
+			style,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			width,
+			height,
+			nullptr,
+			nullptr,
+			GetModuleHandle(nullptr),
+			this
+			);
+			
+			
+		    if (hwnd == nullptr) {
+		        std::cerr << "Failed to create window!" << std::endl;
+				exit(-1);
+		    }			
+			
+			backBuffer.create(view.getSize().x, view.getSize().y);
+			canvas = new Gdiplus::Graphics(backBuffer.getHDC());
+			
+
+			isRunning = true;
+			setVisible(true);
+			UpdateWindow(hwnd);
+			setFocus();
+
+
+
+
+			// Required for WM_DROPFILES to be delivered at all
+			DragAcceptFiles(hwnd, TRUE);
+
+			// Required on 64-bit: UAC blocks WM_DROPFILES by default
+			ChangeWindowMessageFilterEx(hwnd, WM_DROPFILES,    MSGFLT_ALLOW, nullptr);
+			ChangeWindowMessageFilterEx(hwnd, WM_COPYDATA,     MSGFLT_ALLOW, nullptr);
+			ChangeWindowMessageFilterEx(hwnd, 0x0049,          MSGFLT_ALLOW, nullptr); // WM_COPYGLOBALDATA (internal)
+			
+		}
+
+        ~Window()
+        {
+			RevokeDragDrop(hwnd);
+
+			if (canvas) {
+				delete canvas;
+				canvas = nullptr;
+			}
+
+			if (hwnd && IsWindow(hwnd)) {
+				DestroyWindow(hwnd);
+			}
+        }
+		
+		
+		void close()
+		{
+		    if (hwnd && IsWindow(hwnd)) {
+		        DestroyWindow(hwnd);
+		    }
+		    isRunning = false;
+		}
+		
+		bool isOpen()
+		{
+			if(!isRunning || !hwnd)
+				return false;
+			
+			MSG msg;
+			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
+			{
+				
+				if (msg.message == WM_QUIT) {
+					isRunning = false;
+					return false;
+				}
+				
+				
+				bool isOurs = (msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd));
+				
+				if (isOurs) 
+				{
+					msgQ.push(msg);
+				}
+				
+				if (isOurs && !IsDialogMessage(hwnd, &msg)) 
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				} 
+				else if(!isOurs) 
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+			}				
+			
+			return isRunning && hwnd;
+		}
+		
+	    bool pollEvent(MSG &message) {
+	        if (msgQ.empty()) {
+	            return false;
+	        }
+	        
+	        message = msgQ.front();
+	        msgQ.pop();
+	        return true;
+	    }	
+		
+	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
+		{
+			if (!hwnd) return;
+
+			ws::Vec2i needed = view.getSize();
+
+			if (!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
+			{
+				delete canvas;
+				canvas = nullptr;
+				backBuffer.create(needed.x, needed.y);
+				canvas = new Gdiplus::Graphics(backBuffer.getHDC());
+				canvas->SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+				canvas->SetPixelOffsetMode(Gdiplus::PixelOffsetModeNone);
+				canvas->SetSmoothingMode(Gdiplus::SmoothingModeNone);
+			}
+
+			if (canvas)
+				canvas->Clear(color);		
+	    }
+		
+		void draw(Drawable &draw)
+		{
+			if(!canvas || !hwnd) return;
+
+
+
+
+
+			Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
+        	canvas->GetTransform(&originalMatrix);
+
+			// save clip region
+			Gdiplus::Region originalClip;
+			canvas->GetClip(&originalClip);
+			
+			//Apply the transformation
+			view.apply(*canvas);
+			
+			//draw the object in world coords.
+			draw.drawGlobal(canvas);
+			
+			//Restore the original transformation so that the transform can be applied again next time. 
+			//This is because changes occur and need to be transformed too.
+			canvas->SetTransform(&originalMatrix);
+			canvas->SetClip(&originalClip);//restore the original clip boundary.
+		}
+		
+	    void display() 
+		{
+			if(!hwnd)
+		    	return;
+			InvalidateRect(hwnd, NULL, FALSE);
+		    UpdateWindow(hwnd);
+	    }		
+		
+		
+		
+		
+		void setPixel(int x,int y,ws::Hue hue)
+		{
+			backBuffer.setPixel(x,y,hue);
+		}
+		
+		ws::Hue getPixel(int x,int y)
+		{
+			return backBuffer.getPixel(x,y).GetValue();
+		}
+		
+		std::string getTitle()
+		{
+			if(!hwnd)
+				return "";
+				
+			char title[256];
+            GetWindowTextA(hwnd, title, sizeof(title));
+			return std::string(title);			
+		}
+		
+		void setTitle(std::string title)
+		{
+			if(!hwnd)
+				return;
+			SetWindowTextA(hwnd,ws::TO_LPCSTR(title));
+		}
+		
+		void setView(ws::View &v)
+		{
+			view = v;
+		}
+		
+		ws::View getView()
+		{
+			return view;
+		}
+		
+		void setVisible(bool val)
+		{
+			if(!hwnd)
+				return;
+				
+			if(!val)
+				ShowWindow(hwnd, SW_HIDE);
+			else
+				ShowWindow(hwnd, SW_SHOW);
+		}
+		
+		bool getVisible()
+		{
+			if(!hwnd)
+				return false;
+			return IsWindowVisible(hwnd);
+		}
+		
+		void setFocus()
+		{
+			SetFocus(hwnd);
+		}
+		
+		bool hasFocus()
+		{
+			HWND focus = GetFocus();
+			return (focus == hwnd);
+		}
+		
+		void setLayerAfter(HWND lastHwnd)
+		{
+			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
+		}
+		
+		void addStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getStyle();
+			s |= style;
+			
+				
+			SetWindowLongA(hwnd,GWL_STYLE,s);		
+		}
+		
+		void removeStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getStyle();
+			s &= ~style;
+			
+				
+			SetWindowLongA(hwnd,GWL_STYLE,s);			
+		}
+		
+		void setAllStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			SetWindowLongA(hwnd,GWL_STYLE,0);
+			
+			SetWindowLongA(hwnd,GWL_STYLE,style);			
+		}
+
+		void addExStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getExStyle();
+			s |= style;
+			
+				
+			SetWindowLongA(hwnd,GWL_EXSTYLE,s);		
+		}
+		
+		void removeExStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			DWORD s = getExStyle();
+			s &= ~style;
+			
+				
+			SetWindowLongA(hwnd,GWL_EXSTYLE,s);			
+		}
+		
+		void setAllExStyle(DWORD style)
+		{
+			if(!hwnd)
+				return;
+			
+			SetWindowLongA(hwnd,GWL_EXSTYLE,0);
+			
+			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
+		}
+
+		DWORD getExStyle()
+		{	
+			return GetWindowLong(hwnd, GWL_EXSTYLE);
+		}
+	    
+	    DWORD getStyle()
+	    {
+	    	return GetWindowLong(hwnd, GWL_STYLE);
+            
+		}
+	    
+	    bool hasStyle(DWORD checkStyle)
+	    {
+	    	return (getStyle() & checkStyle);
+		}
+		
+		bool hasExStyle(DWORD checkStyle)
+	    {
+	    	return (getExStyle() & checkStyle);
+		}
+		
+		void setSize(ws::Vec2i size)
+		{
+			setSize(size.x,size.y);
+		}
+	    
+	    void setSize(int screenWidth,int screenHeight)
+	    {
+	    	if(screenWidth <= 0 || screenHeight <= 0)
+			{
+				setVisible(false);
+				std::cerr << "Warning! You tried to set a window to an invalid size. This has been converted into a safe setVisible(false) command. Try using the setVisible function as a better practice.\n";
+				return;
+			}
+	    	SetWindowPos(hwnd, 
+			nullptr, 
+			0, 
+			0, 
+			screenWidth, 
+			screenHeight,
+			SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            
+		}
+		
+		ws::Vec2i getSize()
+		{
+			RECT rect;
+			GetClientRect(hwnd, &rect);
+            int width = rect.right - rect.left;
+            int height = rect.bottom - rect.top;
+
+
+			return ws::Vec2i(width,height);			
+		}
+		
+		void setPosition(ws::Vec2i pos)
+		{
+			setPosition(pos.x,pos.y);
+		}
+		
+		void setPosition(int posx,int posy)
+		{
+	    	SetWindowPos(hwnd, 
+			nullptr, 
+			posx, 
+			posy, 
+			0, 
+			0,
+			SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);			
+		}
+		
+		ws::Vec2i getPosition()
+		{
+			if(!hwnd)
+				return ws::Vec2i(0,0);
+				
+            RECT rect;
+            GetWindowRect(hwnd, &rect);
+						
+            // Remove window decorations for size calculation
+            RECT clientRect;
+            GetClientRect(hwnd, &clientRect);
+            
+			return ws::Vec2i(clientRect.left,clientRect.top);			
+		}
+
+		void setFullscreen(bool fullscreen = true) 
+		{
+			if (fullscreen == isFullscreen) return;
+			
+			if (fullscreen) 
+			{
+				//save the style
+				windowedStyle = getStyle();
+				GetWindowRect(hwnd, &windowedRect);
+				
+				int screenWidth  = GetSystemMetrics(SM_CXSCREEN);
+				int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+				
+				removeStyle(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+				addStyle(WS_POPUP | WS_VISIBLE);
+				
+				SetWindowPos(hwnd, HWND_TOP, 0, 0, screenWidth, screenHeight,SWP_FRAMECHANGED | SWP_NOACTIVATE);
+				
+				isFullscreen = true;
+			} 
+			else 
+			{
+				setAllStyle(windowedStyle);
+				
+				SetWindowPos(hwnd, HWND_TOP,
+				windowedRect.left, windowedRect.top,
+				windowedRect.right  - windowedRect.left,
+				windowedRect.bottom - windowedRect.top,
+				SWP_FRAMECHANGED | SWP_NOACTIVATE);
+				
+				isFullscreen = false;
+			}
+		}
+	    
+	    bool getFullscreen() const {
+	        return isFullscreen;
+	    }
+
+		void setChromaKey(ws::Hue hue)//losing window control for some reason
+		{
+			addExStyle(WS_EX_LAYERED);
+			SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
+		}
+		
+		ws::Vec2i toWorld(int x,int y)
+		{
+			return view.toWorld(x,y,getSize());
+		}
+		
+		ws::Vec2i toWorld(ws::Vec2i pos)
+		{
+			return toWorld(pos.x,pos.y);
+		}
+		
+		ws::Vec2i toScreen(int x,int y)
+		{
+			return view.toScreen(x,y,getSize());
+		}
+		
+		ws::Vec2i toScreen(ws::Vec2i pos)
+		{
+			return toScreen(pos.x,pos.y);
+		}
+
+		void addChild(ws::Child &child)
+		{
+			children.push_back(&child);
+			child.init(*this);
+		}
+		
+		void removeChild(ws::Child &child)
+		{
+			for(size_t a=0;a<children.size();a++)
+			{
+				if(&child == children[a])
+				{
+					children.erase(children.begin() + a);
+					break;
+				}
+			}
+		}
+		
+		bool hasChild(ws::Child &child)
+		{
+			for(size_t a=0;a<children.size();a++)
+			{
+				if(&child == children[a])
+				{
+					return true;
+				}
+			}			
+			return false;
+		}		
+		
+		
+		void setCursor(ws::Cursor newcursor)
+		{
+			cursor = newcursor;
+		}
+		ws::Cursor getCursor()
+		{
+			return cursor;
+		}
+		
+		private:
+
+		
+		LRESULT handleMessage(UINT uMsg,WPARAM wParam,LPARAM lParam)
+		{
+
+            switch (uMsg) {
+	            case WM_DESTROY:
+					WindowManager::removeWindow(hwnd);
+					isRunning = false;
+					if (WindowManager::windows.empty())
+						PostQuitMessage(0);
+	                return 0;
+	            
+				case WM_CLOSE:
+					DestroyWindow(hwnd);
+					return 0;
+
+				case WM_COMMAND:
+				{
+					MSG msg = {};
+					msg.hwnd = hwnd;
+					msg.message = WM_COMMAND;
+					msg.wParam = wParam;
+					msg.lParam = lParam;
+					msgQ.push(msg);
+					return 0;
+				}
+
+				case WM_SETCURSOR:
+				{
+					if (LOWORD(lParam) == HTCLIENT)
+					{
+						SetClassLongPtr(hwnd, GCLP_HCURSOR, 
+							(LONG_PTR)(cursor.getHandle() ? cursor.getHandle() : LoadCursor(nullptr, IDC_ARROW)));
+
+					}
+					return DefWindowProc(hwnd, uMsg, wParam, lParam);
+				}				
+				
+	            case WM_PAINT: {
+	            	
+	            	
+	                PAINTSTRUCT ps;
+	                HDC hdc = BeginPaint(hwnd, &ps);
+
+					if (backBuffer.isFastDIB()) {
+						ws::Vec2i screenSize = getSize();
+						ws::Vec2i worldSize  = view.getSize();
+
+						if (screenSize.x == worldSize.x && screenSize.y == worldSize.y)
+							BitBlt(hdc, 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, backBuffer.getHDC(), 0, 0, SRCCOPY);
+						else
+						{
+							SetStretchBltMode(hdc, COLORONCOLOR);
+							StretchBlt(hdc, 0, 0, screenSize.x, screenSize.y, backBuffer.getHDC(), 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, SRCCOPY);
+						}
+					}
+	              
+	                
+	                EndPaint(hwnd, &ps);
+	                return 0;
+
+	            }
+				case WM_ERASEBKGND:
+					return 1;
+				case WM_DROPFILES:
+				{
+					MSG msg = {};
+					msg.hwnd = hwnd;
+					msg.message = WM_DROPFILES;
+					msg.wParam = wParam;
+					msg.lParam = lParam;
+					msgQ.push(msg);
+					return 0;
+				}
+				default:
+				{
+					return DefWindowProc(hwnd, uMsg, wParam, lParam);					
+				}
+				
+
+	        }
+			
+            
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        }
+		
+		bool isFullscreen = false;
+		RECT windowedRect; // Stores window position/size when not fullscreen
+    	DWORD windowedStyle; // Stores window style when not fullscreen			
+	};
+	
+	
+	//Window Manager Stuff
+	
+	inline void ws::WindowManager::init()
+	{
+		if(initialized)
+			return;
+		HINSTANCE instance = GetModuleHandle(nullptr);
+		
+		WNDCLASS wc = {};
+		wc.lpfnWndProc = WindowManager::GlobalProc;
+		wc.hInstance = instance;
+		wc.lpszClassName = L"Window";
+		wc.hCursor = NULL;
+		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+		
+		if(!RegisterClass(&wc))
+		{
+			std::cerr << "Failed to initialize Window"<<std::endl;
+			exit(-1);
+		}
+		initialized = true;
+	}
+	
+	inline LRESULT CALLBACK ws::WindowManager::GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		
+		if(msg == WM_NCCREATE)
+		{
+			CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+			ws::Window* pWindow = reinterpret_cast<ws::Window*>(pCreate->lpCreateParams);
+			
+			pWindow->hwnd = hwnd; 
+			
+			windows[hwnd] = pWindow;
+			
+			SetWindowLongPtr(hwnd,GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWindow));
+			
+			return DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+		
+		ws::Window* pWindow = reinterpret_cast<ws::Window*>(GetWindowLongPtr(hwnd,GWLP_USERDATA));
+		
+		if(pWindow)
+		{
+			return pWindow->handleMessage(msg,wParam,lParam);
+		}
+		
+		return DefWindowProc(hwnd, msg, wParam, lParam);
+	}
+	
+	
+	inline void ws::WindowManager::addWindow(ws::Window* window)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		windows[window->hwnd] = window;			
+	}
+	inline void ws::WindowManager::removeWindow(HWND hwnd)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		windows.erase(hwnd);//hwnd is a pointer to a location. Therefore, it may be used to point to my ws::Window.
+	}
+	
+	inline ws::Window* ws::WindowManager::GetWindow(HWND hwnd)
+	{
+		//std::lock_guard<std::mutex> lock(windowsMutex);
+		auto it = windows.find(hwnd);
+		if (it != windows.end()) {
+			return it->second;
+		}
+		return nullptr;
+	}		
+	
+	
+	
+	std::map<HWND, ws::Window*> ws::WindowManager::windows;
+	std::mutex ws::WindowManager::windowsMutex;
+    bool ws::WindowManager::initialized = false;	
+
+
+
+    enum class DropEffect {
+        None = DROPEFFECT_NONE,
+        Copy = DROPEFFECT_COPY,
+        Move = DROPEFFECT_MOVE,
+        Link = DROPEFFECT_LINK
+    };
+
+	class DropTarget : public IDropTarget
+	{
+		
+		private:
+		
+		ws::Window *windowRef = nullptr;
+		DWORD m_lastEffect = DROPEFFECT_NONE;
+
+		enum class AcceptedType { None, Files, Images, Text };
+		AcceptedType m_acceptedType = AcceptedType::None;
+		
+		struct TypeSetting 
+		{
+			bool enabled = false;
+			DWORD effect = DROPEFFECT_COPY;
+			std::function<bool()> condition = [](){return true;};
+		} m_files, m_text, m_images;
+		
+		std::queue<std::pair<ws::ClipData, DWORD>> m_dropQueue;
+		
+
+		bool hasFiles(IDataObject* pData) const {
+			if (!pData) return false;
+			FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			return SUCCEEDED(pData->QueryGetData(&fmt));
+		}
+
+		bool hasText(IDataObject* pData) const {
+			if (!pData) return false;
+			FORMATETC fmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			return SUCCEEDED(pData->QueryGetData(&fmt));
+		}
+
+		bool hasImage(IDataObject* pData) const 
+		{
+			if (!pData) return false;
+
+			FORMATETC fmt = { CF_DIB, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			if (SUCCEEDED(pData->QueryGetData(&fmt))) return true;
+
+			fmt.cfFormat = CF_DIBV5;
+			if (SUCCEEDED(pData->QueryGetData(&fmt))) return true;
+
+			static CLIPFORMAT pngFormat = (CLIPFORMAT)RegisterClipboardFormatW(L"PNG");
+			if (pngFormat) {
+				fmt.cfFormat = pngFormat;
+				if (SUCCEEDED(pData->QueryGetData(&fmt))) return true;
+			}
+
+			//Check for FileGroupDescriptor
+			static CLIPFORMAT fileGroupDescW = (CLIPFORMAT)RegisterClipboardFormatW(L"FileGroupDescriptorW");
+			static CLIPFORMAT fileGroupDescA = (CLIPFORMAT)RegisterClipboardFormatA("FileGroupDescriptor");
+			
+			if (fileGroupDescW) {
+				fmt.cfFormat = fileGroupDescW;
+				if (SUCCEEDED(pData->QueryGetData(&fmt))) {
+					return true;
+				}
+			}
+			if (fileGroupDescA) {
+				fmt.cfFormat = fileGroupDescA;
+				if (SUCCEEDED(pData->QueryGetData(&fmt))) {
+					return true;
+				}
+			}
+
+			//check for URL that looks like an image (fallback)
+			static CLIPFORMAT urlFormat = (CLIPFORMAT)RegisterClipboardFormatW(L"UniformResourceLocatorW");
+			if (urlFormat) {
+				fmt.cfFormat = urlFormat;
+				fmt.tymed = TYMED_HGLOBAL;
+				if (SUCCEEDED(pData->QueryGetData(&fmt))) {
+					STGMEDIUM stg = {};
+					if (SUCCEEDED(pData->GetData(&fmt, &stg))) {
+						LPCWSTR url = (LPCWSTR)GlobalLock(stg.hGlobal);
+						if (url) {
+							std::wstring ext = std::wcsrchr(url, L'.') ? std::wcsrchr(url, L'.') : L"";
+							// Common image extensions
+							static const std::vector<std::wstring> imageExts = {
+								L".png", L".jpg", L".jpeg", L".gif", L".bmp",
+								L".tif", L".tiff", L".webp", L".ico"
+							};
+							for (const auto& e : imageExts) {
+								if (_wcsicmp(ext.c_str(), e.c_str()) == 0) {
+									GlobalUnlock(stg.hGlobal);
+									ReleaseStgMedium(&stg);
+									return true;
+								}
+							}
+						}
+						GlobalUnlock(stg.hGlobal);
+						ReleaseStgMedium(&stg);
+					}
+				}
+			}
+
+			//check CF_HDROP with image extension
+			fmt.cfFormat = CF_HDROP;
+			fmt.tymed = TYMED_HGLOBAL;
+			if (SUCCEEDED(pData->QueryGetData(&fmt))) {
+				STGMEDIUM stg = {};
+				if (SUCCEEDED(pData->GetData(&fmt, &stg))) {
+					HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal);
+					if (hDrop) {
+						wchar_t file[MAX_PATH] = {};
+						if (DragQueryFileW(hDrop, 0, file, MAX_PATH) > 0) {
+							std::wstring ext = std::wcsrchr(file, L'.') ? std::wcsrchr(file, L'.') : L"";
+							static const std::vector<std::wstring> imageExts = {
+								L".png", L".jpg", L".jpeg", L".gif", L".bmp",
+								L".tif", L".tiff", L".webp", L".ico"
+							};
+							for (const auto& e : imageExts) {
+								if (_wcsicmp(ext.c_str(), e.c_str()) == 0) {
+									GlobalUnlock(stg.hGlobal);
+									ReleaseStgMedium(&stg);
+									return true;
+								}
+							}
+						}
+						GlobalUnlock(stg.hGlobal);
+					}
+					ReleaseStgMedium(&stg);
+				}
+			}
+
+			return false;
+		}	
+
+		public:
+		
+		
+		void acceptType(std::string type,ws::DropEffect effect = ws::DropEffect::Copy)
+		{
+			DWORD dwEffect = static_cast<DWORD>(effect); 
+			if (type == "images")
+			{
+				m_images.enabled = true;
+				m_images.effect = dwEffect;
+				m_images.condition = nullptr;
+			}
+			if (type == "text")
+			{
+				m_text.enabled = true;
+				m_text.effect = dwEffect;
+				m_text.condition = nullptr;
+			}
+			if (type == "files")
+			{
+				m_files.enabled = true;
+				m_files.effect = dwEffect;
+				m_files.condition = nullptr;
+			}		
+		}
+
+		void rejectType(std::string type)
+		{
+			if(type == "images")
+				m_images.enabled = false;
+			if(type == "text")
+				m_text.enabled = false;			
+			if(type == "files")
+				m_files.enabled = false;							
+		}
+		
+		void rejectAll()
+		{
+			m_files.enabled = m_text.enabled = m_images.enabled = false;
+			m_files.effect = m_text.effect = m_images.effect = static_cast<DWORD>(ws::DropEffect::Copy);
+		}
+
+		void onlyAcceptIf(std::string droptype,std::function<bool()> function)
+		{
+			if (droptype == "images")
+			{
+				m_images.enabled = true;   // still need to accept the type
+				m_images.condition = function;
+			}
+			if(droptype == "text")
+			{
+				m_text.enabled = true;
+				m_text.condition = function;
+			}
+			if(droptype == "files")
+			{
+				m_files.enabled = true;
+				m_files.condition = function;
+			}
+		}
+
+
+
+
+		bool pollDrop(ws::ClipData& outData, DropEffect& outEffect) 
+		{
+			if(!windowRef)return false;
+			if (m_dropQueue.empty()) 
+				return false;
+			auto& front = m_dropQueue.front();
+			outData = std::move(front.first);
+			outEffect = static_cast<DropEffect>(front.second);
+			m_dropQueue.pop();
+			return true;
+		}
+
+		
+
+		// IUnknown
+		HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override
+		{
+			if(!windowRef)return S_OK;
+			if (riid == IID_IUnknown || riid == IID_IDropTarget)
+			{ 
+				*ppv = this; 
+				AddRef(); return S_OK; 
+			}
+			*ppv = nullptr; 
+			return E_NOINTERFACE;
+		}
+		ULONG STDMETHODCALLTYPE AddRef()  override { return 1; }
+		ULONG STDMETHODCALLTYPE Release() override { return 1; }
+
+		// IDropTarget
+		HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState,POINTL pt, DWORD* pdwEffect) override 
+		{ 
+			if(!windowRef)return S_OK;
+			m_lastEffect = DROPEFFECT_NONE;
+			m_acceptedType = AcceptedType::None;
+
+			if (m_images.enabled && hasImage(pDataObj))
+			{
+				m_acceptedType = AcceptedType::Images;
+				if (!m_images.condition || m_images.condition())
+					m_lastEffect = m_images.effect;
+			}
+			else if (m_files.enabled && hasFiles(pDataObj))
+			{
+				m_acceptedType = AcceptedType::Files;
+				if (!m_files.condition || m_files.condition())
+					m_lastEffect = m_files.effect;
+			}
+			else if (m_text.enabled && hasText(pDataObj))
+			{
+				m_acceptedType = AcceptedType::Text;
+				if (!m_text.condition || m_text.condition())
+					m_lastEffect = m_text.effect;
+			}
+
+			*pdwEffect = m_lastEffect;
+
+			ws::Cursor c;
+			
+
+			if (m_lastEffect & DROPEFFECT_COPY)
+				c.loadAs(ws::Cursor::Type::Copy);
+			else if (m_lastEffect & DROPEFFECT_MOVE)
+				c.loadAs(ws::Cursor::Type::Move);
+			else
+				c.loadAs(ws::Cursor::Type::Arrow);
+			
+			windowRef->setCursor(c);
+			
+			return S_OK;
+		}
+		
+		HRESULT STDMETHODCALLTYPE DragOver (DWORD grfKeyState, POINTL pt,DWORD* pdwEffect) override 
+		{ 
+			if(!windowRef)return S_OK;
+			DWORD newEffect = DROPEFFECT_NONE;
+
+			switch (m_acceptedType)
+			{
+				case AcceptedType::Files:
+					if (!m_files.condition || m_files.condition())
+						newEffect = m_files.effect;
+					break;
+				case AcceptedType::Images:
+					if (!m_images.condition || m_images.condition())
+						newEffect = m_images.effect;
+					break;
+				case AcceptedType::Text:
+					if (!m_text.condition || m_text.condition())
+						newEffect = m_text.effect;
+					break;
+				default:
+					break;
+			}
+
+			*pdwEffect = newEffect;
+			m_lastEffect = newEffect;
+			
+			ws::Cursor c;
+			
+			if (m_lastEffect & DROPEFFECT_COPY)
+				c.loadAs(ws::Cursor::Type::Copy);
+			else if (m_lastEffect & DROPEFFECT_MOVE)
+				c.loadAs(ws::Cursor::Type::Move);
+			else
+				c.loadAs(ws::Cursor::Type::Arrow);
+			
+			windowRef->setCursor(c);
+			
+			return S_OK;
+		}
+		HRESULT STDMETHODCALLTYPE DragLeave() override 
+		{ 
+			if(!windowRef)return S_OK;
+			m_acceptedType = AcceptedType::None;
+			ws::Cursor c;
+			c.loadAs(ws::Cursor::Type::Arrow);
+			windowRef->setCursor(c);
+			return S_OK;
+		}
+
+
+		HRESULT STDMETHODCALLTYPE Drop(IDataObject* obj, DWORD, POINTL, DWORD* e) override
+		{
+			if(!windowRef)return S_OK;
+			*e = static_cast<DWORD>(m_lastEffect);
+
+
+			// 1. FileGroupDescriptorW + FileContents  — browser files/images - does not support image links.
+			// 2. CF_HDROP                             — explorer files
+			// 3. CF_DIBV5 / CF_DIB                   — bitmap from image editors
+			// 4. PNG (RegisterClipboardFormat)        — lossless with alpha
+			// 5. CF_UNICODETEXT                       — plain text fallback
+			// 6. UniformResourceLocatorW             — URL only drag			
+
+
+
+			ws::ClipData data;
+
+			// ---- 1. CF_HDROP (Explorer file drag) ----
+			FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			STGMEDIUM stg = {};
+			if (SUCCEEDED(obj->GetData(&fmt, &stg)))
+			{
+				HDROP hDrop = (HDROP)GlobalLock(stg.hGlobal);
+				UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+				std::vector<std::string> files;
+				for (UINT i = 0; i < count; i++)
+				{
+					wchar_t path[MAX_PATH] = {};
+					DragQueryFileW(hDrop, i, path, MAX_PATH);
+					files.push_back(ws::SHORT(path));
+				}
+				data.setFiles(files);
+				GlobalUnlock(stg.hGlobal);
+				ReleaseStgMedium(&stg);
+			}
+
+			// ---- 2. FileGroupDescriptorW + FileContents (browser image/file drag) ----
+			FORMATETC descFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"FileGroupDescriptorW"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			STGMEDIUM descStg = {};
+			if (SUCCEEDED(obj->GetData(&descFmt, &descStg)))
+			{
+				FILEGROUPDESCRIPTORW* fgd = (FILEGROUPDESCRIPTORW*)GlobalLock(descStg.hGlobal);
+				if (fgd && fgd->cItems > 0)
+				{
+					GlobalUnlock(descStg.hGlobal);
+					ReleaseStgMedium(&descStg);
+
+					// try IStream first
+					FORMATETC contentFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"FileContents"), nullptr, DVASPECT_CONTENT, 0, TYMED_ISTREAM };
+					STGMEDIUM contentStg = {};
+					if (SUCCEEDED(obj->GetData(&contentFmt, &contentStg)))
+					{
+						std::vector<BYTE> bytes;
+						BYTE buf[4096];
+						ULONG bytesRead = 0;
+						while (SUCCEEDED(contentStg.pstm->Read(buf, sizeof(buf), &bytesRead)) && bytesRead > 0)
+							bytes.insert(bytes.end(), buf, buf + bytesRead);
+						if (!bytes.empty())
+						{
+							ws::Texture tex;
+							if (tex.loadFromMemory(bytes.data(), bytes.size()))
+								data.setTexture(tex);
+						}
+						ReleaseStgMedium(&contentStg);
+					}
+					else
+					{
+						// fallback to HGLOBAL
+						contentFmt.tymed = TYMED_HGLOBAL;
+						if (SUCCEEDED(obj->GetData(&contentFmt, &contentStg)))
+						{
+							LPVOID pData = GlobalLock(contentStg.hGlobal);
+							SIZE_T size  = GlobalSize(contentStg.hGlobal);
+							if (pData && size > 0)
+							{
+								ws::Texture tex;
+								if (tex.loadFromMemory(pData, size))
+									data.setTexture(tex);
+							}
+							GlobalUnlock(contentStg.hGlobal);
+							ReleaseStgMedium(&contentStg);
+						}
+					}
+				}
+				else
+				{
+					GlobalUnlock(descStg.hGlobal);
+					ReleaseStgMedium(&descStg);
+				}
+			}
+
+
+			// ---- 3. PNG custom format (alpha-transparent images from many apps) ----
+			if (!data.getTexture().isValid())
+			{
+				FORMATETC pngFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"PNG"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+				STGMEDIUM pngStg = {};
+				if (SUCCEEDED(obj->GetData(&pngFmt, &pngStg)))
+				{
+					LPVOID pData = GlobalLock(pngStg.hGlobal);
+					SIZE_T size  = GlobalSize(pngStg.hGlobal);
+					if (pData && size > 0)
+					{
+						ws::Texture tex;
+						if (tex.loadFromMemory(pData, size))
+							data.setTexture(tex);
+					}
+					GlobalUnlock(pngStg.hGlobal);
+					ReleaseStgMedium(&pngStg);
+				}
+			}
+
+			// ---- 4. CF_DIBV5 then CF_DIB (Paint, Photoshop, screenshot tools) ----
+			if (!data.getTexture().isValid())
+			{
+				CLIPFORMAT dibFormats[] = { CF_DIBV5, CF_DIB };
+				for (CLIPFORMAT cf : dibFormats)
+				{
+					FORMATETC dibFmt = { cf, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+					STGMEDIUM dibStg = {};
+					if (SUCCEEDED(obj->GetData(&dibFmt, &dibStg)))
+					{
+						LPVOID pData = GlobalLock(dibStg.hGlobal);
+						if (pData)
+						{
+							BITMAPINFOHEADER* bih = (BITMAPINFOHEADER*)pData;
+							int w      = bih->biWidth;
+							int h      = abs(bih->biHeight);
+							bool topDown = (bih->biHeight < 0);
+							int stride = ((w * bih->biBitCount + 31) / 32) * 4;
+							LPBYTE pPixels = (LPBYTE)pData + bih->biSize;
+
+							Gdiplus::Bitmap* src = topDown
+								? new Gdiplus::Bitmap(w, h,  stride, PixelFormat32bppRGB, pPixels)
+								: new Gdiplus::Bitmap(w, h, -stride, PixelFormat32bppRGB, pPixels + (h - 1) * stride);
+
+							if (src && src->GetLastStatus() == Gdiplus::Ok)
+							{
+								ws::Texture tex;
+								tex.loadFromBitmapPlus(*src);
+								data.setTexture(tex);
+							}
+							delete src;
+							GlobalUnlock(dibStg.hGlobal);
+						}
+						ReleaseStgMedium(&dibStg);
+						if (data.getTexture().isValid()) break;
+					}
+				}
+			}
+
+			// ---- 5. CF_UNICODETEXT (plain text from anywhere) ----
+			FORMATETC textFmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+			STGMEDIUM textStg = {};
+			if (SUCCEEDED(obj->GetData(&textFmt, &textStg)))
+			{
+				LPCWSTR p = (LPCWSTR)GlobalLock(textStg.hGlobal);
+				if (p) data.setText(ws::SHORT(p));
+				GlobalUnlock(textStg.hGlobal);
+				ReleaseStgMedium(&textStg);
+			}
+
+			// ---- 6. UniformResourceLocatorW (URL-only drags) ----
+			if (data.getText().empty())
+			{
+				FORMATETC urlFmt = { (CLIPFORMAT)RegisterClipboardFormatW(L"UniformResourceLocatorW"), nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+				STGMEDIUM urlStg = {};
+				if (SUCCEEDED(obj->GetData(&urlFmt, &urlStg)))
+				{
+					LPCWSTR p = (LPCWSTR)GlobalLock(urlStg.hGlobal);
+					if (p) data.setText(ws::SHORT(p));
+					GlobalUnlock(urlStg.hGlobal);
+					ReleaseStgMedium(&urlStg);
+				}
+			}
+
+			m_dropQueue.push({ std::move(data), m_lastEffect });
+
+			return S_OK;
+		}
+		
+		void setWindow(ws::Window &window)
+		{
+			RegisterDragDrop(window.hwnd, this);	
+			windowRef = &window;
+		}
+		
+		
+		
+	};
+
+
+}
+
+
+
+namespace ws //GLOBAL INPUT
+{
+    
+	namespace Global
+	{
+	
+		ws::Vec2i getMousePos(ws::Window &window)
+		{
+			
+		    POINT p;
+		    if(!GetCursorPos(&p))
+		    {
+		        return {0,0};
+		    }
+		    
+		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
+
+
+		    return p;
+		}
+		
+		ws::Vec2i getMousePos()
+		{
+				
+			POINT p;
+			if(!GetCursorPos(&p))
+			{
+				return {0,0};
+			}
+			
+			return p;
+		
+		}
+		
+		
+		bool getButton(int button)
+		{
+			if ((GetAsyncKeyState(button) & 0x8000) != 0)
+				return true;
+			return false;			
+		}
+		
+		//depreciated functions. Avoid using these!
+		bool getMouseButton(int vmButton)
+		{
+			return getButton(vmButton);
+		}
+		bool getKey(int vmKey)
+		{
+			return getButton(vmKey);
+		}
+		
+		
+		
+	}
+	
+}
+
+
+
+
+
+namespace ws //CHILD WINDOW API
+{
+	
+
+
+
+	class Dropdown
+	{
+		public:
+	    
+		Dropdown(int newID, std::string newName)
+	    {
+	        if (newID != 0) // Leaf items don't need a menu handle
+	            handle = CreatePopupMenu();
+	        ID = newID;
+	        name = newName;
+	        isPopup = (newID != 0);
+	    }
+	    
+	    void addItem(int id,DWORD type, std::string itemName)
+	    {
+	        if (isPopup)
+	            AppendMenuA(handle, type, id, ws::TO_LPCSTR(itemName));
+	    }
+	    
+	    void addSubmenu(Dropdown &submenu)
+	    {
+	        if (isPopup && submenu.isPopup)
+	            AppendMenuA(handle, MF_POPUP, (UINT_PTR)submenu.getHandle(), 
+	                       ws::TO_LPCSTR(submenu.getName()));
+	    }
+		
+		HMENU getHandle()
+		{ return handle; }
+		
+		std::string getName()
+		{ return name;}
+		
+		int getID()
+		{ return ID;}
+		
+		void addItem(Dropdown drop)
+		{
+			if (isPopup)
+				AppendMenuA(this->handle, MF_STRING, drop.getID(), ws::TO_LPCSTR(drop.getName()));
+		}
+		
+		
+		private:
+	    HMENU handle = nullptr;
+	    int ID = 0;
+	    std::string name = "";
+	    bool isPopup = false;
+			
+	};
+	
+	class Menu
+	{
+		public:
+		HMENU bar;
+
+		private:
+		ws::Window* windowRef = nullptr;
+
+		public:
+		
+		Menu()
+		{
+			bar = CreateMenu();
+		}
+		
+		void addDropdown(ws::Dropdown &drop)
+		{
+			AppendMenuA(bar, MF_POPUP, (UINT_PTR)drop.getHandle(), ws::TO_LPCSTR(drop.getName()));
+			if(windowRef != nullptr)
+				windowRef->setSize(windowRef->getSize());
+		}
+		
+		void setWindow(ws::Window &window)
+		{
+			SetMenu(window.hwnd, bar);	
+			windowRef = &window;
+			if(windowRef != nullptr)
+				windowRef->setSize(windowRef->getSize());
+		}
+		
+		
+		int getEvent(MSG &m)//You can use this for readability or you can use the normal way.
+		{
+			if(m.message == WM_COMMAND)
+				return LOWORD(m.wParam);
+			return -1;
+		}
+		
+	};
+
+
+	
+	
+	
+	
+	
+	
+
+
+
+
+
+
+
+
+	
+	class ClickMenu
+	{
+		public:
+		
+		
+		
+		void addFlag(DWORD newFlag)
+		{ flags |= newFlag; }
+		
+		void removeFlag(DWORD removeFlag)
+		{ flags &= ~removeFlag;}
+		
+		DWORD getFlags()
+		{ return flags; }		
+		
+		
+		int getCommand()
+		{return command;}
+		
+		std::vector<std::string> getList()
+		{ return list; }
+		
+		void setList(std::vector<std::string> newList)
+		{ list = newList; }
+		
+		void addItem(std::string item)
+		{ list.push_back(item);}
+		
+		void removeItem(std::string item)
+		{	
+			for(size_t a=0;a<list.size();a++)
+			{
+				if(list[a] == item)
+				{
+					list.erase(list.begin() + a);
+					break;
+				}
+			}
+			
+		}
+		
+		void init(ws::Window &newParent)
+		{ parentRef = &newParent;}
+		
+		ws::Window *getParent()
+		{ return parentRef;}
+		
+		
+		
+		
+		
+		bool show(ws::Vec2i mouse)
+		{
+			if(parentRef == nullptr)
+			{
+				MessageBoxA(NULL,"Attempted to show a ClickMenu without referencing a parent window! Use Init().","Failed init!",MB_OK | MB_ICONINFORMATION);
+				return false;
+			}
+			HMENU hMenu = CreatePopupMenu();
+			if(!hMenu)
+				return false;
+			
+			for(size_t a=0;a<list.size();a++)
+			{
+				AppendMenu(hMenu, MF_STRING, 1+a, ws::WIDE(list[a]).c_str());
+            }
+            
+
+            POINT pt = mouse;
+            ClientToScreen(parentRef->hwnd, &pt);
+
+
+            // Show context menu and get selection
+            command = TrackPopupMenu(
+                hMenu, 
+                flags,
+                pt.x,
+                pt.y,
+                0,
+                parentRef->hwnd,
+                NULL
+            );
+
+			
+
+            DestroyMenu(hMenu); // Cleanup
+            
+            
+            return true;
+		}	
+		
+		private:
+		int command = 0;	
+		std::vector<std::string> list;	
+		ws::Window *parentRef = nullptr;
+		DWORD flags = TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD;
+	};
+	
+	
+	
+	
+	
+	class FileWindow
+	{
+	    public:
+	    
+	    FileWindow()
+	    {
+	        
+	    }
+	    
+	    void setFileName(std::string file)
+	    {
+	        fileName = file;
+	    }
+	    
+	    std::string getFileName()
+	    {
+	        return fileName;
+	    }
+	    
+	    void setTitle(std::string name)
+	    { 
+	        title = name; 
+	    }
+	    
+	    std::string getTitle()
+	    { 
+	        return title; 
+	    }
+	    
+	    void addFlag(DWORD newFlag)
+	    { 
+	        flags |= newFlag; 
+	    }
+	    
+	    void removeFlag(DWORD removeFlag)
+	    { 
+	        flags &= ~removeFlag;
+	    }
+	    
+	    DWORD getFlags()
+	    { 
+	        return flags; 
+	    }
+	    
+	    bool open(ws::Window *parent = nullptr)
+	    {
+			
+	        std::wstring wtitle = ws::WIDE(title);
+	        std::wstring wfileName = ws::WIDE(fileName);
+	        
+	        wcsncpy(szFile, wfileName.c_str(), MAX_PATH - 1);
+	        szFile[MAX_PATH - 1] = L'\0';
+	        
+
+	    
+	        OPENFILENAMEW ofn = {0};
+	        ofn.lStructSize = sizeof(OPENFILENAMEW);
+	        ofn.lpstrFilter = L"All Files\0*.*\0";
+	        ofn.lpstrFile = szFile;
+	        ofn.nMaxFile = MAX_PATH;
+	        ofn.lpstrTitle = wtitle.c_str();
+	        ofn.Flags = flags;
+	        ofn.nFilterIndex = defaultFilter;
+	        ofn.lpstrDefExt = L"";
+
+
+	        if(parent == nullptr)
+	            ofn.hwndOwner = NULL;
+	        else
+	            ofn.hwndOwner = parent->hwnd;
+
+	        
+	        if (!fileName.empty()) {
+	            std::filesystem::path p(fileName);
+	            if (std::filesystem::exists(p)) {
+	                std::wstring wdir = ws::WIDE(p.parent_path().string());
+	                ofn.lpstrInitialDir = wdir.c_str();
+	            }
+	        }
+	        
+	        if(parent)
+	        {
+	            MSG m;
+	            while(parent->pollEvent(m)) {}
+	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
+	        if(GetOpenFileNameW(&ofn))
+	        {
+	            fileName = ws::SHORT(szFile);
+	            return true;
+	        }
+	        else
+	        {
+	            fileName.clear();
+	            return false;
+	        }
+	    }
+	    
+	    bool save(ws::Window *parent = nullptr)
+	    {
+	        std::wstring wtitle = ws::WIDE(title);
+	        std::wstring wfileName = ws::WIDE(fileName);
+	        
+	        wcsncpy(szFile, wfileName.c_str(), MAX_PATH - 1);
+	        szFile[MAX_PATH - 1] = L'\0';
+	        
+
+	        OPENFILENAMEW ofn = {0};
+	        ofn.lStructSize = sizeof(OPENFILENAMEW);
+	        ofn.lpstrFilter = L"All Files\0*.*\0";
+	        ofn.lpstrFile = szFile;
+	        ofn.nMaxFile = MAX_PATH;
+	        ofn.lpstrTitle = wtitle.c_str();
+	        ofn.Flags = flags | OFN_OVERWRITEPROMPT;
+	        ofn.nFilterIndex = defaultFilter;
+	        ofn.lpstrDefExt = L"";
+
+
+	        if(parent == nullptr)
+	            ofn.hwndOwner = NULL;
+	        else
+	            ofn.hwndOwner = parent->hwnd;
+	        
+
+	        
+	        if (!fileName.empty()) {
+	            std::filesystem::path p(fileName);
+	            if (p.has_parent_path()) {
+	                std::wstring wdir = ws::WIDE(p.parent_path().string());
+	                ofn.lpstrInitialDir = wdir.c_str();
+	            }
+	        }
+	        
+	        if(parent)
+	        {
+	            MSG m;
+	            while(parent->pollEvent(m)) {}
+	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
+	        
+	        if(GetSaveFileNameW(&ofn))
+	        {
+	            fileName = ws::SHORT(szFile);
+	            return true;
+	        }
+	        else
+	        {
+	            fileName.clear();
+	            return false;                
+	        }
+	    }
+	    
+	    private:
+	    
+	    DWORD flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NODEREFERENCELINKS | OFN_NOCHANGEDIR | OFN_EXPLORER;    
+	    std::string title = "File Explorer";    
+	    int defaultFilter = 1;
+	    std::string fileName = ""; 
+	    
+	    //Temporary buffer
+	    wchar_t szFile[MAX_PATH] = L"";
+	    
+	};
+	
+	
+	
+	class FolderWindow
+	{
+	    public:
+	    
+	    FolderWindow()
+	    {
+	        
+	    }
+	    
+	    void setTitle(std::string name)
+	    {
+	        title = name;
+	    }
+	    
+	    std::string getTitle()
+	    {
+	        return title;
+	    }
+	    
+	    void addFlag(DWORD flag)
+	    { 
+	        flags |= flag;
+	    }
+	    
+	    void setFlags(DWORD allFlags)
+	    { 
+	        flags = allFlags;
+	    }
+	    
+	    void removeFlag(DWORD flag)
+	    { 
+	        flags &= ~flag;
+	    }
+	    
+	    DWORD getFlags()
+	    {
+	        return flags;
+	    }
+	    
+	    std::string getFolderName()
+	    { 
+	        return folderName;
+	    }
+	    
+	    bool open(ws::Window *parent = nullptr)
+	    {
+	        std::wstring wtitle = ws::WIDE(title);
+	        
+	        BROWSEINFOW bi = {0};
+	        bi.lpszTitle = wtitle.c_str();
+	        bi.ulFlags = flags;
+	        
+	        if(parent == nullptr)
+	            bi.hwndOwner = NULL;
+	        else
+	            bi.hwndOwner = parent->hwnd;
+	        
+	        if (!initialFolder.empty()) {
+	            std::wstring winitial = ws::WIDE(initialFolder);
+	            bi.lParam = (LPARAM)winitial.c_str();
+	            bi.lpfn = BrowseCallbackProc;
+	            bi.ulFlags |= BIF_NEWDIALOGSTYLE;
+	        }
+	    
+	        if(parent)
+	        {
+	            MSG m;
+	            while(parent->pollEvent(m)) {}
+	        }
+			else
+				std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+	        
+	        
+	        LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
+	        if (pidl != nullptr) {
+	            // Get the path of the selected folder
+	            wchar_t path[MAX_PATH];
+	            if (SHGetPathFromIDListW(pidl, path)) {
+	                
+					folderName = ws::SHORT(path);
+	                
+	                // Free the PIDL
+	                CoTaskMemFree(pidl);
+	                return true;
+	            }
+	            CoTaskMemFree(pidl);
+	        }
+	        
+	        folderName = "";
+	        return false;
+	    }
+	    
+	    void setInitialFolder(std::string folder)
+	    {
+	        initialFolder = folder;
+	    }
+	    
+	    private:
+	    std::string title = "Select Folder";
+	    DWORD flags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+	    std::string folderName = "";
+	    std::string initialFolder = "";
+	    
+	    // callback function for setting initial folder
+	    static int __stdcall BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
+	    {
+	        if (uMsg == BFFM_INITIALIZED) {
+	            SendMessageW(hwnd, BFFM_SETSELECTIONW, TRUE, lpData);
+	        }
+	        return 0;
+	    }
+	};
+	
+
+
+	class ComboBox : public Child
+	{
+		private:
+		std::vector<std::string> pendingItems;
+	    public:
+	    ComboBox()
+	    {
+	    }
+	    
+	    virtual bool init(ws::Window &parent) override
+	    {
+	        if(!parent.hwnd)
+	        {
+	            std::cerr << "Child Error: Selected parent is not valid!\n";
+	            return false;
+	        }
+	        
+			
+	        // Add combo box specific styles
+	        addStyle(CBS_DROPDOWN);
+	        addStyle(WS_VSCROLL);
+	        
+	        hwnd = CreateWindowEx(
+	            0,
+	            TEXT("COMBOBOX"),
+	            NULL,
+	            style,
+	            getPosition().x,
+	            getPosition().y,
+	            getSize().x,
+	            getSize().y,  // Dropdown height
+	            parent.hwnd,
+	            (HMENU)(UINT_PTR)controlID,
+	            GetModuleHandle(nullptr),
+	            nullptr);
+	            
+	        if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create ComboBox!\n";
+	            return false;
+	        }
+	        
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+			
+	        // Set extended UI for better appearance
+	        SendMessage(hwnd, CB_SETEXTENDEDUI, (WPARAM)TRUE, 0);
+
+			for (const auto& item : pendingItems)
+			{
+				addItem(item);
+			}
+			pendingItems.clear();
+
+	        
+	        ShowWindow(hwnd, SW_SHOW);
+	        UpdateWindow(hwnd);
+	        
+	        return true;
+	    }
+	    
+	    void addItem(const std::string& item)
+	    {
+			if (!hwnd) {
+				// store for later if hwnd doesn't exist yet
+				pendingItems.push_back(item);
+				return;
+			}
+	        SendMessageA(hwnd, CB_ADDSTRING, 0, (LPARAM)item.c_str());
+	    }
+	    
+	    void addItems(const std::vector<std::string>& items)
+	    {
+			if (!hwnd) {
+				// store for later if hwnd doesn't exist yet
+				for(size_t a=0;a<items.size();a++)
+					pendingItems.push_back(items[a]);
+				return;
+			}
+	        for (const auto& item : items)
+	        {
+	            addItem(item);
+	        }
+	    }
+	    
+	    void removeItem(int index)
+	    {
+	        if (!hwnd) return;
+	        SendMessage(hwnd, CB_DELETESTRING, (WPARAM)index, 0);
+	    }
+	    
+	    void clear()
+	    {
+	        if (!hwnd) return;
+	        SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
+	    }
+	    
+	    int getSelectedIndex()
+	    {
+	        if (!hwnd) return -1;
+	        return (int)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
+	    }
+	    
+	    void setSelectedIndex(int index)
+	    {
+	        if (!hwnd) return;
+	        SendMessage(hwnd, CB_SETCURSEL, (WPARAM)index, 0);
+	    }
+	    
+	    std::string getSelectedText()
+	    {
+	        if (!hwnd) return "";
+	        
+	        int index = getSelectedIndex();
+	        if (index == -1) return "";
+	        
+	        int length = (int)SendMessage(hwnd, CB_GETLBTEXTLEN, (WPARAM)index, 0);
+	        if (length == CB_ERR) return "";
+	        
+	        std::vector<char> buffer(length + 1);
+	        SendMessageA(hwnd, CB_GETLBTEXT, (WPARAM)index, (LPARAM)buffer.data());
+	        
+	        return std::string(buffer.data());
+	    }
+	    
+	    int getItemCount()
+	    {
+	        if (!hwnd) return 0;
+	        return (int)SendMessage(hwnd, CB_GETCOUNT, 0, 0);
+	    }
+	    
+	    std::string getItemText(int index)
+	    {
+	        if (!hwnd || index < 0) return "";
+	        
+	        int length = (int)SendMessage(hwnd, CB_GETLBTEXTLEN, (WPARAM)index, 0);
+	        if (length == CB_ERR) return "";
+	        
+	        std::vector<char> buffer(length + 1);
+	        SendMessageA(hwnd, CB_GETLBTEXT, (WPARAM)index, (LPARAM)buffer.data());
+	        
+	        return std::string(buffer.data());
+	    }
+	    
+	    bool selectionChanged(MSG &msg)
+	    {
+	        if (msg.message == WM_COMMAND && HIWORD(msg.wParam) == CBN_SELCHANGE)
+	        {
+	            if (LOWORD(msg.wParam) == controlID)
+	            {
+	                return true;
+	            }
+	        }
+	        return false;
+	    }
+	    
+	    void setDropdownStyle(bool allowEdit = true)
+	    {
+	        if (!hwnd) return;
+	        
+	        removeStyle(CBS_DROPDOWN);
+	        removeStyle(CBS_DROPDOWNLIST);
+	        
+	        if (allowEdit)
+	        {
+	            addStyle(CBS_DROPDOWN);  // Editable combo box
+	        }
+	        else
+	        {
+	            addStyle(CBS_DROPDOWNLIST);  // Non-editable combo box
+	        }
+	        
+	        SetWindowLong(hwnd, GWL_STYLE, style);
+	        SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+	                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+	    }
+	    
+	    std::string getEditText()
+	    {
+	        if (!hwnd) return "";
+	        
+	        LRESULT textLength = SendMessage(hwnd, WM_GETTEXTLENGTH, 0, 0);
+	        if (textLength <= 0)
+	            return "";
+	        
+	        std::vector<char> buffer(static_cast<size_t>(textLength) + 1);
+	        SendMessageA(hwnd, WM_GETTEXT, static_cast<WPARAM>(buffer.size()), 
+	                    reinterpret_cast<LPARAM>(buffer.data()));
+	        
+	        return std::string(buffer.data());
+	    }
+	    
+	    void setEditText(const std::string& text)
+	    {
+	        if (!hwnd) return;
+	        SendMessageA(hwnd, WM_SETTEXT, 0, (LPARAM)text.c_str());
+	    }
+	};
+
+
+	
+	
+	class Button : public Child
+	{
+		public:
+		
+		
+		Button()
+		{	
+		}
+		
+		
+		virtual bool init(ws::Window &parent) override
+		{
+			
+			if(!parent.hwnd)
+			{
+				std::cerr << "Child Error: Selected parent is not valid!\n";
+				return false;
+			}
+			
+			
+			
+			
+			
+			hwnd = CreateWindowEx(
+			0,
+			L"BUTTON",
+			ws::WIDE(getText()).c_str(),
+			style,
+			getPosition().x,
+			getPosition().y,
+			getSize().x,
+			getSize().y,
+			parent.hwnd,
+            (HMENU)(UINT_PTR)controlID,
+            GetModuleHandle(nullptr),
+            nullptr);			
+			
+		    if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create Button!\n";
+	            return false;
+	        }	
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+		
+			ShowWindow(hwnd,SW_SHOW);
+			UpdateWindow(hwnd);
+		
+			return true;		
+		}
+		
+		
+		
+	    bool isPressed(MSG &msg)
+	    {
+	    	
+	    	
+	        if(msg.message == WM_COMMAND && HIWORD(msg.wParam) == BN_CLICKED)
+	        {
+	            if(LOWORD(msg.wParam) == controlID)
+	            {
+	                return true;
+	            }
+	        }
+	        return false;
+	    }
+
+	};
+	
+
+
+
+	class Slider : public Child
+	{
+		public:
+		
+		
+		Slider()
+		{
+		}
+		
+		
+		virtual bool init(ws::Window &parent) override
+		{
+			
+			if(!parent.hwnd)
+			{
+				std::cerr << "Child Error: Selected parent is not valid!\n";
+				return false;
+			}
+			
+			
+			addStyle(TBS_HORZ);
+			addStyle(TBS_AUTOTICKS);
+			
+			
+			hwnd = CreateWindowEx(
+			0,
+			TRACKBAR_CLASS,
+			ws::WIDE(getText()).c_str(),
+			style,
+			getPosition().x,
+			getPosition().y,
+			getSize().x,
+			getSize().y,
+			parent.hwnd,
+            (HMENU)(UINT_PTR)controlID,
+            GetModuleHandle(nullptr),
+            nullptr);			
+			
+		    if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create Slider!\n";
+	            return false;
+	        }	
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+
+		
+			ShowWindow(hwnd,SW_SHOW);
+			UpdateWindow(hwnd);
+			
+			setRange(0,100);
+		
+			return true;		
+		}
+		
+		
+		
+	    bool getScroll(MSG &msg)
+	    {
+	    	
+	        if((msg.message == WM_HSCROLL || msg.message == WM_VSCROLL) && (HWND)msg.lParam == hwnd)
+	        {
+	            slidePos = (int)SendMessage(hwnd, TBM_GETPOS, 0, 0);
+	            
+				return true;
+	        }
+	        return false;
+	    }
+	    
+	    
+	    void setHorizontal()
+	    {
+	    	removeStyle(TBS_VERT);
+	    	addStyle(TBS_HORZ);
+		}
+		
+		void setVertical()
+		{
+	    	removeStyle(TBS_HORZ);
+	    	addStyle(TBS_VERT);
+		}
+		
+        
+		void setRange(int minimum = 0,int maximum = 100)
+		{
+			SendMessage(hwnd, TBM_SETRANGEMIN, TRUE, minimum);
+			SendMessage(hwnd, TBM_SETRANGEMAX, TRUE, maximum);
+		}
+		
+		void setSlidePosition(int pos = 0)
+		{
+			SendMessage(hwnd, TBM_SETPOS, TRUE, pos);
+			slidePos = pos; 
+		}
+		
+		int getSlidePosition()
+		{
+			return slidePos;
+		}
+		
+		
+		private:
+			int slidePos = 0;
+		
+	};
+
+
+
+	class TextBox : public Child
+	{
+		public:
+		
+		virtual bool init(ws::Window &parent) override
+		{
+			
+			if(!parent.hwnd)
+			{
+				std::cerr << "Child Error: Selected parent is not valid!\n";
+				return false;
+			}
+			
+			
+			
+			addStyle(ES_AUTOVSCROLL);
+			addStyle(ES_AUTOHSCROLL);
+			addStyle(ES_MULTILINE);
+			
+			
+			hwnd = CreateWindowEx(
+			WS_EX_CLIENTEDGE,
+			TEXT("EDIT"),
+			ws::WIDE(getText()).c_str(),
+			style,
+			getPosition().x,
+			getPosition().y,
+			getSize().x,
+			getSize().y,
+			parent.hwnd,
+            (HMENU)(UINT_PTR)controlID,
+            GetModuleHandle(nullptr),
+            nullptr);			
+			
+		    if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create Textbox!\n";
+	            return false;
+	        }	
+
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+		
+			SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)char_limit, 0);
+		
+			ShowWindow(hwnd,SW_SHOW);
+			UpdateWindow(hwnd);
+			
+		
+			return true;		
+		}		
+		int char_limit = 0;
+		void setCharacterLimit(int max_chars = 0)//0 is infinite
+		{
+			if(!hwnd)
+				char_limit = max_chars;
+			else
+				SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)max_chars, 0);			
+		}
+		
+		
+		bool getFocus()
+		{
+	        if (!hwnd) return false;
+	        return (GetFocus() == hwnd);			
+		}
+		
+	};
+	
+	
+	
+	
+	
+	
+	class Label : public Child
+	{
+		public:
+		Label()
+		{
+			
+		}
+		
+		virtual bool init(ws::Window &parent) override
+		{
+			
+			if(!parent.hwnd)
+			{
+				std::cerr << "Child Error: Selected parent is not valid!\n";
+				return false;
+			}
+			
+			addStyle(SS_NOTIFY);
+			addStyle(SS_LEFT);
+			
+			
+			
+			hwnd = CreateWindowEx(
+			0,
+			TEXT("STATIC"),
+			ws::WIDE(getText()).c_str(),
+			style,
+			getPosition().x,
+			getPosition().y,
+			getSize().x,
+			getSize().y,
+			parent.hwnd,
+            (HMENU)(UINT_PTR)controlID,
+            GetModuleHandle(nullptr),
+            nullptr);			
+			
+		    if (!hwnd)
+	        {
+	            std::cerr << "Child Error: Failed to create Label!\n";
+	            return false;
+	        }	
+
+			ws::Font font;
+			font.loadFromSystem("Arial");
+			ws::Text text;
+			text.setCharacterSize(15);
+			setFont(font,text);
+		
+			ShowWindow(hwnd,SW_SHOW);
+			UpdateWindow(hwnd);
+		
+			return true;		
+		}
+				
+		
+		
+		
+	};
+	
+	
+	
+	
+}
+
+
+#endif
