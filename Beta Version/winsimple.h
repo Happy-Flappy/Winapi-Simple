@@ -1780,12 +1780,17 @@ namespace ws
 		int width = 0;
 		int height = 0;
 
+		private:
+			HDC     m_hdcMem  = nullptr;
+			HBITMAP m_hDIB    = nullptr;
+			HBITMAP m_hOldBmp = nullptr;
+			void*   m_dibBits = nullptr;
+			bool    m_isFast  = false;
+
 		public:
 
 		
 		Gdiplus::Bitmap* bitmap;
-		
-		
 		
 		
 		Texture() : bitmap(nullptr) {}
@@ -1795,217 +1800,342 @@ namespace ws
 		{
 			loadFromFile(path);
 		}
-		
+
+		private:
+
+		//this function destroys the DIB before destroying any GDI variables it references. If the DIB is not referencing a GDI regular memory section then this function will not remove the DIB section and normal cleanup will occur in the destructor.
+		void destroyDIB()
+		{
+			if (bitmap && m_isFast) {
+				delete bitmap;
+				bitmap = nullptr;
+			}
+
+			if (m_hOldBmp && m_hdcMem) {
+				SelectObject(m_hdcMem, m_hOldBmp);
+				m_hOldBmp = nullptr;
+			}
+
+			if (m_hDIB) {
+				DeleteObject(m_hDIB);
+				m_hDIB    = nullptr;
+				m_dibBits = nullptr;
+			}
+
+			if (m_hdcMem) {
+				DeleteDC(m_hdcMem);
+				m_hdcMem = nullptr;
+			}
+
+			m_isFast = false;
+		}		
+
+		void copyFrom(const Texture& other)
+		{
+			if(!other.bitmap || other.width <= 0 || other.height <= 0)
+				return;
+
+			if(other.m_isFast)
+			{
+				if(!create(other.width, other.height))
+					return;
+
+				if(m_dibBits && other.m_dibBits)
+				{
+					memcpy(m_dibBits, other.m_dibBits, other.width * other.height * 4);
+				}
+			}
+			else
+			{
+				bitmap = other.bitmap->Clone(
+					0, 0, other.width, other.height,
+					PixelFormat32bppARGB
+				);
+				if(bitmap && bitmap->GetLastStatus() == Gdiplus::Ok)
+				{
+					width  = other.width;
+					height = other.height;
+				}
+				else
+				{
+					delete bitmap;
+					bitmap = nullptr;
+					width  = height = 0;
+				}
+			}
+		}
+
+		public:
 		
 	    ~Texture()
 	    {
+			destroyDIB();
 			
-	        if (bitmap != nullptr)
-	        {
-	            delete bitmap;
-	            bitmap = nullptr;
-	        }
-			width = 0;
+			//this will only cleanup if destroyDIB hasn't already cleanedup and made bitmap null.
+			if (bitmap) {
+				delete bitmap;
+				bitmap = nullptr;
+			}
+
+			width  = 0;
 			height = 0;
 	    }		
 		
 
 
-		//move
-	    Texture(Texture&& other) noexcept
-	        : width(other.width), height(other.height),bitmap(other.bitmap)
-	    {
-	        other.bitmap = NULL;
-	        other.width = 0;
-	        other.height = 0;
-	    }
-
-		//copy
-	    Texture(const Texture& other) : width(0), height(0), bitmap(nullptr)
-	    {
-	        if (other.bitmap && other.width > 0 && other.height > 0) {
-	            bitmap = other.bitmap->Clone(0, 0, other.width, other.height, PixelFormat32bppARGB);
-	            width = other.width;
-	            height = other.height;
-	        }
-	    }
 
 
-		//Copy assignment
-	    Texture& operator=(const Texture& other)
-	    {
-	        if (this != &other)
-	        {
-	            // Clean up existing bitmap
-	            if (bitmap != nullptr)
-	            {
-	                delete bitmap;
-	                bitmap = nullptr;
-	            }
-	            
-	            // Copy from other if it has valid bitmap
-	            if (other.bitmap && other.width > 0 && other.height > 0)
-	            {
-	                bitmap = other.bitmap->Clone(0, 0, other.width, other.height, PixelFormat32bppARGB);
-	                width = other.width;
-	                height = other.height;
-	            }
-	            else
-	            {
-	                bitmap = nullptr;
-	                width = 0;
-	                height = 0;
-	            }
-	        }
-	        return *this;
-	    }
+		// Copy constructor
+		Texture(const Texture& other)
+			: width(0), height(0), bitmap(nullptr),
+			  m_hdcMem(nullptr), m_hDIB(nullptr),
+			  m_hOldBmp(nullptr), m_dibBits(nullptr),
+			  m_isFast(false)
+		{
+			copyFrom(other);
+		}
 
-		//move assignment
-	    Texture& operator=(Texture&& other) noexcept
-	    {
-	        if (this != &other)
-	        {
-	            if (bitmap != NULL)
-	            {
-					delete bitmap;
-					bitmap = nullptr;
-	            }
-	            
-	            bitmap = other.bitmap;
-	            width = other.width;
-	            height = other.height;
-	            
-	            other.bitmap = nullptr;
-	            other.width = 0;
-	            other.height = 0;
-	        }
-	        return *this;
-	    }		
+		// Copy assignment
+		Texture& operator=(const Texture& other)
+		{
+			if (this != &other)
+			{
+				destroyDIB();
+				if (bitmap) { delete bitmap; bitmap = nullptr; }
+				width  = 0;
+				height = 0;
+				copyFrom(other);
+			}
+			return *this;
+		}
+
+		
+		//move construct
+		Texture(Texture&& other) noexcept
+			: width(other.width),
+			  height(other.height),
+			  bitmap(other.bitmap),
+			  m_hdcMem(other.m_hdcMem),
+			  m_hDIB(other.m_hDIB),
+			  m_hOldBmp(other.m_hOldBmp),
+			  m_dibBits(other.m_dibBits),
+			  m_isFast(other.m_isFast)
+		{
+			// Null out the source so its destructor does nothing
+			other.bitmap    = nullptr;
+			other.m_hdcMem  = nullptr;
+			other.m_hDIB    = nullptr;
+			other.m_hOldBmp = nullptr;
+			other.m_dibBits = nullptr;
+			other.m_isFast  = false;
+			other.width     = 0;
+			other.height    = 0;
+		}
+
+		// Move assign
+		Texture& operator=(Texture&& other) noexcept
+		{
+			if (this != &other)
+			{
+				destroyDIB();
+				if (bitmap) { delete bitmap; bitmap = nullptr; }
+
+				width       = other.width;
+				height      = other.height;
+				bitmap      = other.bitmap;
+				m_hdcMem    = other.m_hdcMem;
+				m_hDIB      = other.m_hDIB;
+				m_hOldBmp   = other.m_hOldBmp;
+				m_dibBits   = other.m_dibBits;
+				m_isFast    = other.m_isFast;
+
+				// null out the source
+				other.bitmap    = nullptr;
+				other.m_hdcMem  = nullptr;
+				other.m_hDIB    = nullptr;
+				other.m_hOldBmp = nullptr;
+				other.m_dibBits = nullptr;
+				other.m_isFast  = false;
+				other.width     = 0;
+				other.height    = 0;
+			}
+			return *this;
+		}
 		
 
-	
-		bool create(int w,int h,Gdiplus::Color color = {0,0,0,0})
+		//create a dibsection so that the GDI+ bitmap actually points to that dib section. With a dibsection as the memory basis, ws::Textures can be BitBlt using GDI.
+		bool create(int w, int h, Gdiplus::Color color = Gdiplus::Color(0,0,0,0))
 		{
-			if (bitmap != nullptr) {
-				delete bitmap;
-				bitmap = nullptr;
-			}
-			
-			bitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
-			
-			Gdiplus::Graphics* gr;
-			gr = new Gdiplus::Graphics(bitmap);
-			gr->Clear(color);
-			
-			
-			if(gr)
-			{
-				delete gr;
-				gr = nullptr;
-			}
-			if(!bitmap)
-				return false;
-				
-			width = w;
+			destroyDIB();
+			if (bitmap) { delete bitmap; bitmap = nullptr; }
+
+			width  = w;
 			height = h;
+
+			BITMAPINFO bmi              = {};
+			bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth       =  w;
+			bmi.bmiHeader.biHeight      = -h;
+			bmi.bmiHeader.biPlanes      = 1;
+			bmi.bmiHeader.biBitCount    = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+
+			HDC hdcScreen = GetDC(nullptr);
+			m_hDIB = CreateDIBSection(hdcScreen, &bmi, DIB_RGB_COLORS, &m_dibBits, nullptr, 0);
+			ReleaseDC(nullptr, hdcScreen);
+
+			if (!m_hDIB) {
+				std::cerr << "Texture::create failed to create DIBSection\n";
+				return false;
+			}
+
+			m_hdcMem  = CreateCompatibleDC(nullptr);
+			m_hOldBmp = (HBITMAP)SelectObject(m_hdcMem, m_hDIB);
+
+			bitmap = new Gdiplus::Bitmap(w, h, w * 4, PixelFormat32bppARGB, (BYTE*)m_dibBits);
+
+			if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
+				std::cerr << "Texture::create failed to create GDI+ wrapper\n";
+				destroyDIB();
+				return false;
+			}
+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.Clear(color);
+
+			m_isFast = true;
 			return true;
 		}
 	
 	
+	
+		Gdiplus::Bitmap* getHandle()
+		{
+			return bitmap;
+		}
+		
+		HDC getHDC() const
+		{
+			return m_hdcMem;
+		}
+		
+		HBITMAP getDIB() const
+		{
+			return m_hDIB;
+		}
+		
+		HBITMAP getOldBMP() const
+		{
+			return m_hOldBmp;
+		}
+		
+		void* getBITS() const
+		{
+			return m_dibBits;
+		}
+		
+		bool isFastDIB() const
+		{
+			return m_isFast;
+		}	
 		
 		
 		bool loadFromFile(std::string path)
 		{
-
-
-	        if (bitmap != NULL)
-	        {
-	            delete bitmap;
-	            bitmap = nullptr;
-	            width = 0;
-	            height = 0;
-	        }
-
-
-			if(!ResolveRelativePath(path))
+			if (!ResolveRelativePath(path))
 				return false;
 
-
+			// Load into a temporary GDI+ bitmap
 			std::wstring wpath = WIDE(path);
-			bitmap = Gdiplus::Bitmap::FromFile(wpath.c_str());
-			
-			
-			
-			if(bitmap == nullptr || bitmap->GetLastStatus() != Gdiplus::Ok)
+			Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromFile(wpath.c_str());
+
+			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
 			{
 				std::cerr << "Failed to load image at " << std::quoted(path) << ".\n";
-				if (bitmap != nullptr)
-				{
-					delete bitmap;
-					bitmap = nullptr;
-				}
+				if (temp) { delete temp; }
 				return false;
 			}
-			
-			width = bitmap->GetWidth();
-			height = bitmap->GetHeight();		
-			
+
+			int w = temp->GetWidth();
+			int h = temp->GetHeight();
+
+			// Create DIBSection of the same size
+			if (!create(w, h))
+			{
+				delete temp;
+				return false;
+			}
+
+			// Draw temp into the DIBSection via GDI+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.DrawImage(temp, 0, 0, w, h);
+
+			delete temp;
 			return true;
 		}
 
 
-		bool loadFromMemory(const void* buffer,size_t bufferSize)
+		bool loadFromMemory(const void* buffer, size_t bufferSize)
 		{
-		    // create a global memory object
-		    HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
-		    if (!hGlobal) {
-		        return false;
-		    }
-		    
-		    // copy the data to the global memory
-		    void* pData = GlobalLock(hGlobal);
-		    if (!pData) {
-		        GlobalFree(hGlobal);
-		        return false;
-		    }
-		    
-		    memcpy(pData, buffer, bufferSize);
-		    GlobalUnlock(hGlobal);
-		    
-		    // Create IStream from the global memory
-		    IStream* pStream = nullptr;
-		    HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pStream);
-		    if (FAILED(hr)) {
-		        GlobalFree(hGlobal);
-		        return false;
-		    }
-		    
-		    bitmap = Gdiplus::Bitmap::FromStream(pStream);
-		    pStream->Release();
-		    
-		    if (bitmap == nullptr || bitmap->GetLastStatus() != Gdiplus::Ok) {
-		        if (bitmap) {
-		            delete bitmap;
-		            bitmap = nullptr;
-		        }
-		        return false;
-		    }
-		    
-		    width = bitmap->GetWidth();
-		    height = bitmap->GetHeight();
-		    return true;
-		}
+			// Copy buffer into global memory for IStream
+			HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
+			if (!hGlobal) return false;
 
-		
-		
-		bool loadFromBitmapPlus(Gdiplus::Bitmap &pBitmap)
-		{
-			UINT width = pBitmap.GetWidth();
-			UINT height = pBitmap.GetHeight();
-			bitmap = pBitmap.Clone(0, 0, width, height, PixelFormat32bppARGB);
+			void* pData = GlobalLock(hGlobal);
+			if (!pData) { GlobalFree(hGlobal); return false; }
+			memcpy(pData, buffer, bufferSize);
+			GlobalUnlock(hGlobal);
+
+			IStream* pStream = nullptr;
+			HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pStream);
+			if (FAILED(hr)) { GlobalFree(hGlobal); return false; }
+
+			// Load into a temporary GDI+ bitmap
+			Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromStream(pStream);
+			pStream->Release();
+
+			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
+			{
+				if (temp) { delete temp; }
+				return false;
+			}
+
+			int w = temp->GetWidth();
+			int h = temp->GetHeight();
+
+			// Create DIBSection of the same size
+			if (!create(w, h))
+			{
+				delete temp;
+				return false;
+			}
+
+			// Draw temp into the DIBSection via GDI+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.DrawImage(temp, 0, 0, w, h);
+
+			delete temp;
 			return true;
 		}
-		
+
+
+		bool loadFromBitmapPlus(Gdiplus::Bitmap& src)
+		{
+			int w = src.GetWidth();
+			int h = src.GetHeight();
+
+			if (w <= 0 || h <= 0) return false;
+
+			// Create DIBSection of the same size
+			if (!create(w, h))
+				return false;
+
+			// Draw source bitmap into the DIBSection via GDI+
+			Gdiplus::Graphics g(m_hdcMem);
+			g.DrawImage(&src, 0, 0, w, h);
+
+			return true;
+		}
 		
 		
 		
@@ -2026,32 +2156,64 @@ namespace ws
 	    
 	    
 	    
-		void setPixel(int index,Gdiplus::Color color)
+		void setPixel(int index, Gdiplus::Color color)
 		{
 			int x = index % width;
-		    int y = index / width;
-			setPixel(x,y,color);
+			int y = index / width;
+			setPixel(x, y, color);
+		}
+
+		void setPixel(int xIndex, int yIndex, Gdiplus::Color color)
+		{
+			if (xIndex < 0 || xIndex >= width || yIndex < 0 || yIndex >= height)
+				return;
+
+			if (m_isFast && m_dibBits)
+			{
+				// direct DIB access. the pixel format is 32bit BGRA
+				BYTE* pixel = static_cast<BYTE*>(m_dibBits) + (yIndex * width + xIndex) * 4;
+				pixel[0] = color.GetB(); // Blue
+				pixel[1] = color.GetG(); // Green
+				pixel[2] = color.GetR(); // Red
+				pixel[3] = color.GetA(); // Alpha
+			}
+			else if (bitmap)
+			{
+				// fallback to GDI+ if this texture does not use the GDI regular DIB method.
+				bitmap->SetPixel(xIndex, yIndex, color);
+			}
 		}
 	    
-	    void setPixel(int xIndex,int yIndex,Gdiplus::Color color)
-	    {
-			bitmap->SetPixel(xIndex, yIndex, color);
-		}
 	    
-	    
-	    Gdiplus::Color getPixel(int index)
+		Gdiplus::Color getPixel(int index)
 		{
 			int x = index % width;
-		    int y = index / width;
-			return getPixel(x,y);
+			int y = index / width;
+			return getPixel(x, y);
 		}
-	    
-	    
-	    Gdiplus::Color getPixel(int xIndex,int yIndex)
-	    {
-	    	Gdiplus::Color color;
-			bitmap->GetPixel(xIndex, yIndex, &color);
-			return color;
+
+		Gdiplus::Color getPixel(int xIndex, int yIndex)
+		{
+			if (xIndex < 0 || xIndex >= width || yIndex < 0 || yIndex >= height)
+				return Gdiplus::Color(0, 0, 0, 0);   // return transparent black
+
+			if (m_isFast && m_dibBits)
+			{
+				BYTE* pixel = static_cast<BYTE*>(m_dibBits) + (yIndex * width + xIndex) * 4;
+				return Gdiplus::Color(pixel[3],   // Alpha
+									  pixel[2],   // Red
+									  pixel[1],   // Green
+									  pixel[0]);  // Blue
+			}
+			else if (bitmap)
+			{
+				//fallback if not a fast DIB.
+				Gdiplus::Color color;
+				bitmap->GetPixel(xIndex, yIndex, &color);
+				return color;
+			}
+
+			return Gdiplus::Color(0, 0, 0, 0);
 		}
 	    
 	    
@@ -2242,6 +2404,7 @@ namespace ws
 	        
 	        currentFrame = 0;
 			currentTexture = textures[0];
+			this->path = path;
 			return true;
 		}
 		
@@ -2399,6 +2562,11 @@ namespace ws
 		
 		
 		
+		std::string getPath()
+		{
+			return path;
+		}
+		
 		
 		
 		private:
@@ -2406,6 +2574,7 @@ namespace ws
 	    ws::Texture currentTexture;
 	    std::vector<double> delays;  
 		std::string status = "stopped";
+		std::string path = "";
 		
 		int currentFrame = 0;
 		int totalFrames = 0;
@@ -2628,27 +2797,27 @@ namespace ws
 	        Gdiplus::Matrix transform;
 	        
 
+			//move to world position.
+			transform.Translate(
+				static_cast<Gdiplus::REAL>(x),
+				static_cast<Gdiplus::REAL>(y)
+			);
 
-		    transform.Translate(static_cast<Gdiplus::REAL>(x), 
-		                       static_cast<Gdiplus::REAL>(y));
-		    
-		    // Apply rotation around the origin point
-		    if (rotation != 0.0f) {
-		        transform.Translate(static_cast<Gdiplus::REAL>(origin.x * scale.x), 
-		                           static_cast<Gdiplus::REAL>(origin.y * scale.y));
-		        transform.Rotate(rotation);
-		        transform.Translate(static_cast<Gdiplus::REAL>(-origin.x * scale.x), 
-		                           static_cast<Gdiplus::REAL>(-origin.y * scale.y));
-		    }
+			//rotate around (0,0) which is now the origin point
+			if (rotation != 0.0f) {
+				transform.Rotate(rotation);
+			}
 
+			//scale in local space
+			if (scale.x != 1.0f || scale.y != 1.0f) {
+				transform.Scale(scale.x, scale.y);
+			}
 
-		    
-		    // Apply scale
-		    if (scale.x != 1.0f || scale.y != 1.0f) {        	
-		        transform.Scale(scale.x, scale.y);	            
-		    }
-		    
-	        
+			transform.Translate(
+				static_cast<Gdiplus::REAL>(-origin.x),
+				static_cast<Gdiplus::REAL>(-origin.y)
+			);			
+
 	        
 	        //graphics->SetTransform(&transform);
 	        graphics->MultiplyTransform(&transform, Gdiplus::MatrixOrderPrepend);
@@ -5275,6 +5444,7 @@ namespace ws
 		HWND hwnd;	
 
 		private:
+
 		
 		friend class WindowManager;
 		
@@ -5285,6 +5455,8 @@ namespace ws
 		INITCOMMONCONTROLSEX icex;
 		
 		ws::Cursor cursor; 
+
+
 		
 		
 		public:		
@@ -5355,11 +5527,8 @@ namespace ws
 				exit(-1);
 		    }			
 			
-				
-			//The window manager will add the window in WM_NCCREATE so theres no need to call addWindow() here.
-			
-			backBuffer.create(view.getSize().x,view.getSize().y); 
-			canvas = new Gdiplus::Graphics(backBuffer.bitmap);
+			backBuffer.create(view.getSize().x, view.getSize().y);
+			canvas = new Gdiplus::Graphics(backBuffer.getHDC());
 			
 
 			isRunning = true;
@@ -5383,20 +5552,15 @@ namespace ws
         ~Window()
         {
 			RevokeDragDrop(hwnd);
-					
-			
+
 			if (canvas) {
-		        delete canvas;
-		        canvas = nullptr;
-		    }
-		    if (backBuffer.bitmap) {
-		        delete backBuffer.bitmap;
-		        backBuffer.bitmap = nullptr;
-		    }
+				delete canvas;
+				canvas = nullptr;
+			}
+
 			if (hwnd && IsWindow(hwnd)) {
 				DestroyWindow(hwnd);
-			}	
-				
+			}
         }
 		
 		
@@ -5457,29 +5621,23 @@ namespace ws
 		
 	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
 		{
-			if(!hwnd)
-				return;
-				
-			
-		    // Clean up old resources
-		    if (canvas) {
-		        delete canvas;
-		        canvas = nullptr;
-		    }
-		    //Do the cleanup here or suffer memory overload
-		    if (backBuffer.bitmap) {
-		        delete backBuffer.bitmap;
-		        backBuffer.bitmap = nullptr;
-		    }
-		    
-			backBuffer.create(view.getSize().x,view.getSize().y);
-		    canvas = new Gdiplus::Graphics(backBuffer.bitmap);
-			
-			canvas->SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-			canvas->SetPixelOffsetMode(Gdiplus::PixelOffsetModeNone);
-			canvas->SetSmoothingMode(Gdiplus::SmoothingModeNone);
+			if (!hwnd) return;
 
-			canvas->Clear(color);			
+			ws::Vec2i needed = view.getSize();
+
+			if (!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
+			{
+				delete canvas;
+				canvas = nullptr;
+				backBuffer.create(needed.x, needed.y);
+				canvas = new Gdiplus::Graphics(backBuffer.getHDC());
+				canvas->SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+				canvas->SetPixelOffsetMode(Gdiplus::PixelOffsetModeNone);
+				canvas->SetSmoothingMode(Gdiplus::SmoothingModeNone);
+			}
+
+			if (canvas)
+				canvas->Clear(color);		
 	    }
 		
 		void draw(Drawable &draw)
@@ -5850,6 +6008,7 @@ namespace ws
 		}
 		
 		private:
+
 		
 		LRESULT handleMessage(UINT uMsg,WPARAM wParam,LPARAM lParam)
 		{
@@ -5894,40 +6053,18 @@ namespace ws
 	                PAINTSTRUCT ps;
 	                HDC hdc = BeginPaint(hwnd, &ps);
 
-					if (backBuffer.bitmap) {
-				        
-						if (canvas) {
-					        delete canvas;
-					        canvas = nullptr;
-					    }
-					    
-					    //faster to use bitbltting
-						if(hdc)
+					if (backBuffer.isFastDIB()) {
+						ws::Vec2i screenSize = getSize();
+						ws::Vec2i worldSize  = view.getSize();
+
+						if (screenSize.x == worldSize.x && screenSize.y == worldSize.y)
+							BitBlt(hdc, 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, backBuffer.getHDC(), 0, 0, SRCCOPY);
+						else
 						{
-							HBITMAP hBitmap;
-							backBuffer.bitmap->GetHBITMAP(Gdiplus::Color(0, 0, 0), &hBitmap);
-							HDC hdcMem = CreateCompatibleDC(hdc);
-							HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hBitmap);
-
-				            //SetStretchBltMode(hdc, HALFTONE); //For better quality stretching - Causes blur though! (NOT GOOD FOR CLEAN STRETCHING)
-				            SetBrushOrgEx(hdc, 0, 0, NULL);
-							
 							SetStretchBltMode(hdc, COLORONCOLOR);
-							StretchBlt(hdc,0,0,getSize().x,getSize().y,hdcMem,0,0,view.getSize().x,view.getSize().y,SRCCOPY);
-							
-							
-							SelectObject(hdcMem, hbmOld);
-							DeleteDC(hdcMem);
-							DeleteObject(hBitmap); 
+							StretchBlt(hdc, 0, 0, screenSize.x, screenSize.y, backBuffer.getHDC(), 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, SRCCOPY);
 						}
-						
-						//much slower when using graphics.drawimage 
-//						if (hdc) {
-//				            Gdiplus::Graphics graphics(hdc);
-//				            graphics.DrawImage(backBuffer.bitmap, 0, 0, width, height);
-//				        }
-				    }
-
+					}
 	              
 	                
 	                EndPaint(hwnd, &ps);
