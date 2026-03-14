@@ -213,9 +213,40 @@
 * Added ws::DropEffect for ws::DropTarget enums.
 
 
+## V1.6 - Beta
+
+* Changed Drawable Transform so that position is always translated to origin point.
+* Changed ws::Texture to use ws::Hue in the set and get pixel functions instead of Gdiplus::Color. 
+* ws::Texture still uses GDI+ bitmap but now the bitmap points to a GDI regular memory location. This is faster and allows users to BitBlt the contents of ws::Textures. Outcome - 30000x performance increase
+* Added getter functions for the handles to the GDI regular members in ws::Texture.
+* Modified ws::Window in responce to modifying ws::Texture to use a DIB section that GDI+ refers to. As opposed to copying every new frame from GDI+ to the backBuffer in ws::Window, which was of Type Gdiplus::bitmap only. Outcome - 5x speed increase
+* Optimized ws::Window::clear() 9x faster.
+
+### Total optimizations
+
+* ws::Window::Clear = 9x faster
+* ws::Window::Draw = 5x faster
+* ws::Texture::setPixel() = 30000x faster! (2 million pixels per second) :O - Apparently GDI+ setpixel is pathetically slow.
+
+
+* Split winsimple.h into separate files:
+* winsimple.hpp - Core
+* winsimple-clipboard.hpp - clipboard and dragdrop
+* winsimple-controls.hpp - winapi controls such as buttons and save dialog
+
+* Added new control child - ws::ListBox
+* Added legacy transparency option in ws::Window::setChromaKey(ws::Hue hue,bool legacy = false) - Legacy uses per pixel alpha and the winapi UpdateLayeredWindow() function.
+* Added Contains function to IntRect,FloatRect,and DoubleRect.
+* Changed ws::Drawable coordinates from int to float. 
+* Added move() to ws::Drawable.
+* Changed ws::Shift() to stay on last frame till restarted instead of always auto looping.
+* Added ws::ExploreWindow, which has many more options than FileWindow and supports both folder opening and file opening. The original classes are retained for compatibility.
+
+
 # New major features to be added. 
 
 
+* More Winapi Controls
 
 * Video class
 
