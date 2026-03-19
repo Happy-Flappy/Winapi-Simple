@@ -3964,13 +3964,33 @@ namespace ws
 	        return isFullscreen;
 	    }
 
-		void setChromaKey(ws::Hue hue,bool legacy = false)//losing window control for some reason
+		void enableChromaKey(ws::Hue hue,bool legacy = false)//losing window control for some reason
 		{
 			m_perPixelAlpha = legacy;				
 			
 			addExStyle(WS_EX_LAYERED);
-			SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
+			
+			if(!legacy)
+				SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
 		}
+		
+		void disableChromaKey()
+		{
+			removeExStyle(WS_EX_LAYERED);
+		}
+		
+		void enableAlphaOnly(float alpha)
+		{
+			addExStyle(WS_EX_LAYERED);
+			if(!m_perPixelAlpha)
+				SetLayeredWindowAttributes(hwnd,0,alpha,LWA_ALPHA);			
+		}
+		
+		void disableAlphaOnly()
+		{
+			disableChromaKey();
+		}
+		
 		
 		ws::Vec2i toWorld(int x,int y)
 		{
