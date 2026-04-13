@@ -10,6 +10,8 @@
 #include <queue>
 #include <functional>
 
+//Clipboard And DragNDrop Linking: -lole32 -luuid
+
 namespace ws
 {
 	class ClipboardInit

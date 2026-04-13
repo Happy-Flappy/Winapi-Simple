@@ -241,7 +241,12 @@
 * Added move() to ws::Drawable.
 * Changed ws::Shift() to stay on last frame till restarted instead of always auto looping.
 * Added ws::ExploreWindow, which has many more options than FileWindow and supports both folder opening and file opening. The original classes are retained for compatibility.
-
+* Added ws::ColorDialog for choosing a color.
+* Added ws::Screen for screen related stuff.
+* Added getPixel() to ws::Screen
+* Added setPixel() and getSnapshot() to ws::Screen
+* Added setSize() to ws::Screen - Affects resolution 
+* Added 4 new Demos to  Beta Version 1.6
 
 # New major features to be added. 
 

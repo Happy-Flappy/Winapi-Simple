@@ -1,6 +1,8 @@
 #ifndef WINSIMPLE_AUDIO
 #define WINSIMPLE_AUDIO
 
+//Audio Linking: -lwinmm
+
 namespace ws 
 {
 	

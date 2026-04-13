@@ -3,7 +3,8 @@
 
 
 // winsimple.hpp – Core Windows GDI+ graphics library (header‑only core)
-// Link with: -lgdi32 -luser32 -lgdiplus -lole32
+
+//Core Winsimple Linking:  -lgdi32 -luser32 -lgdiplus -lole32
 
 
 // Suppress unnecessary depreciation warnings if any.
@@ -1876,7 +1877,7 @@ namespace ws
 	    {
 	        return gdiFont && gdiFont->GetLastStatus() == Gdiplus::Ok;
 	    }
-		
+
 		
 		
 		private:
@@ -4253,6 +4254,147 @@ namespace ws
 		
 		
 	}
+
+	class Screen
+	{
+		HDC hdc = nullptr;
+		bool valid = true;
+		
+		public:
+		
+		Screen()
+		{
+			hdc = GetDC(NULL);
+			if(hdc == NULL)
+				valid = false;
+		}
+		
+		~Screen()
+		{
+			ReleaseDC(NULL, hdc);
+		}
+		
+		HDC getHDC()
+		{
+			return hdc;
+		}
+		
+		std::vector<ws::Vec2i> getDisplayModes()
+		{
+			std::vector<ws::Vec2i> modes;
+			
+			DEVMODE dm = {};
+			dm.dmSize = sizeof(dm);
+			DWORD modeNum = 0;
+
+			while(EnumDisplaySettings(NULL, modeNum, &dm)) 
+			{
+				ws::Vec2i res = ws::Vec2i((int)dm.dmPelsWidth,(int)dm.dmPelsHeight);
+				
+				bool duplicate = false;
+				for (const auto& existing : modes) 
+				{
+					if (existing.x == res.x && existing.y == res.y) 
+					{
+						duplicate = true;
+						break;
+					}
+				}
+				if (!duplicate) 
+				{
+					modes.push_back(res);
+				}
+				modeNum++;
+			}
+
+			//sort according to size with smallest first.
+			std::sort(modes.begin(),modes.end(),[](ws::Vec2i &a,ws::Vec2i &b){
+				return a.x * a.y < b.x * b.y; 
+			});
+
+			return modes;		
+		}
+		
+		std::string setSize(int x,int y)
+		{
+			return setSize({x,y});
+		}
+		
+		std::string setSize(ws::Vec2i size)
+		{
+			DEVMODE dm;
+			ZeroMemory(&dm, sizeof(dm));
+			dm.dmSize = sizeof(dm);
+			dm.dmPelsWidth = size.x;
+			dm.dmPelsHeight = size.y;
+			dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
+
+			LONG result = ChangeDisplaySettings(&dm, CDS_UPDATEREGISTRY);
+			switch (result) {
+				case DISP_CHANGE_SUCCESSFUL:   break;
+				case DISP_CHANGE_BADMODE:      /* resolution not supported */ 
+					return "INVALID";
+				case DISP_CHANGE_RESTART:      /* need restart */ 
+					return "NEEDRESTART";
+				default:                       
+					return "ERROR";
+			}
+
+			hdc = GetDC(NULL);
+			if(hdc == NULL)
+				valid = false;	
+			return "SUCCESS";
+		}
+		
+		ws::Vec2i getSize()
+		{
+			int width  = GetDeviceCaps(hdc, HORZRES);
+			int height = GetDeviceCaps(hdc, VERTRES);
+			return ws::Vec2i(width,height);
+		}
+		
+		
+		ws::Hue getPixel(int x,int y)
+		{
+			if(!valid)
+				return ws::Hue::transparent;
+			return getPixel(ws::Vec2i(x,y));
+		}
+
+		ws::Hue getPixel(ws::Vec2i pos)
+		{
+			if(!valid)
+				return ws::Hue::transparent;
+			
+			if(pos.x >= 0 && pos.x < getSize().x && pos.y >= 0 && pos.y < getSize().y)
+				return GetPixel(hdc,pos.x,pos.y);
+			
+			return ws::Hue::transparent;
+		}
+		
+		void setPixel(int x,int y,ws::Hue hue)
+		{
+			if(!valid)
+				return;
+			if(x >= 0 && x < getSize().x && y >= 0 && y < getSize().y)
+				SetPixel(hdc,x,y,hue);
+		}
+		
+		ws::Texture getSnapshot()
+		{
+			ws::Texture texture;
+			if(!texture.create(getSize().x,getSize().y,ws::Hue::transparent))
+				return ws::Texture();
+			
+			HDC hdcTex = texture.getHDC();
+			if(hdcTex)
+				BitBlt(hdcTex, 0, 0, getSize().x, getSize().y, hdc, 0, 0, SRCCOPY);			
+			
+			return texture;
+		}
+		
+		
+	};
 
 
 	class GDIPInit

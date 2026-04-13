@@ -5,6 +5,10 @@
 #include <commctrl.h>   // for common controls (trackbar, etc.)
 #include <shlobj.h>     // for folder browser (BROWSEINFO, etc.)
 
+
+//Controls Linking: -lcomctl32 -lcomdlg32
+
+
 namespace ws
 {
 	class ControlsInit
@@ -810,6 +814,69 @@ namespace ws
 			return true;		
 		}
 	};
+
+
+	class ColorDialog
+	{
+		
+		private:
+		COLORREF customColors[16]; 
+		COLORREF initColor = RGB(0,0,0);
+		ws::Hue chosenColor = ws::Hue::black;
+		ws::Window *parentRef = nullptr;
+		// these flags tell it to show the full dialog and use the initial color.	
+		DWORD flags = CC_FULLOPEN | CC_RGBINIT;
+		
+		public:
+
+		void init(ws::Window &newParent)
+		{ parentRef = &newParent;}
+
+		ws::Window *getParent()
+		{ return parentRef;}
+
+		void addFlag(DWORD newFlag)
+		{ flags |= newFlag; }
+		
+		void removeFlag(DWORD removeFlag)
+		{ flags &= ~removeFlag;}
+		
+		DWORD getFlags()
+		{ return flags; }
+
+		void setInitColor(ws::Hue hue)
+		{ initColor = hue; }
+
+		ws::Hue getInitColor()
+		{ return initColor; }
+
+		ws::Hue getResult()
+		{ return chosenColor; }
+
+		
+		bool open()
+		{
+			CHOOSECOLOR cc;
+			
+			ZeroMemory(&cc, sizeof(cc));
+			cc.lStructSize = sizeof(cc);
+			if(parentRef && parentRef->hwnd)
+				cc.hwndOwner = parentRef->hwnd;
+			cc.lpCustColors = customColors; // point to the custom colors array
+			cc.rgbResult = initColor;      // set the initial color as black
+			cc.Flags = flags; 	
+			
+			//ChooseColor() causes it to show the dialog and it returns whether or not a color was selected.
+			if (ChooseColor(&cc) == TRUE) 
+			{
+				chosenColor = cc.rgbResult;
+				return true;
+			}
+			
+			return false;		
+		}
+		
+	};
 	
 
 	class Dropdown
@@ -934,8 +1001,12 @@ namespace ws
 		{ return flags; }		
 		
 		
-		int getCommand()
-		{return command;}
+		int getResult()
+		{
+			int r = command;
+			command = 0;
+			return r;
+		}
 		
 		std::vector<std::string> getList()
 		{ return list; }
@@ -969,7 +1040,7 @@ namespace ws
 		
 		
 		
-		bool show(ws::Vec2i mouse)
+		bool open(ws::Vec2i mouse)
 		{
 			if(parentRef == nullptr)
 			{
@@ -990,7 +1061,6 @@ namespace ws
             ClientToScreen(parentRef->hwnd, &pt);
 
 
-            // Show context menu and get selection
             command = TrackPopupMenu(
                 hMenu, 
                 flags,
@@ -1003,7 +1073,7 @@ namespace ws
 
 			
 
-            DestroyMenu(hMenu); // Cleanup
+            DestroyMenu(hMenu); 
             
             
             return true;
@@ -1029,12 +1099,12 @@ namespace ws
 	        
 	    }
 	    
-	    void setFileName(std::string file)
+	    void setInitResult(std::string file)
 	    {
 	        fileName = file;
 	    }
 	    
-	    std::string getFileName()
+	    std::string getResult()
 	    {
 	        return fileName;
 	    }
@@ -1229,7 +1299,7 @@ namespace ws
 	        return flags;
 	    }
 	    
-	    std::string getFolderName()
+	    std::string getResult()
 	    { 
 	        return folderName;
 	    }
@@ -1282,7 +1352,7 @@ namespace ws
 	        return false;
 	    }
 	    
-	    void setInitFolder(std::string folder)
+	    void setInitResult(std::string folder)
 	    {
 	        initialFolder = folder;
 	    }
@@ -1336,7 +1406,7 @@ namespace ws
 		}
 		
 		void setTitle(std::string title) {m_title = title;}
-		void setInitFolder(std::string folder) {m_initialFolder = folder;}
+		void setInitResult(std::string folder) {m_initialFolder = folder;}
 		
 		std::string getResult() {return m_resultName;}
 		
@@ -1442,6 +1512,21 @@ namespace ws
 			}
             SendMessageA(hwnd, LB_ADDSTRING, 0, (LPARAM)item.c_str());
         }
+
+		void addItems(const std::vector<std::string>& items)
+		{
+			if (!hwnd) {
+				for (const auto& item : items) pendingItems.push_back(item);
+				return;
+			}
+			for (const auto& item : items) addItem(item);
+		}
+
+		void removeItem(int index)
+		{
+			if (!hwnd) return;
+			SendMessageA(hwnd, LB_DELETESTRING, (WPARAM)index, 0);
+		}
         
 		void clear() 
 		{
@@ -1473,7 +1558,7 @@ namespace ws
             return std::string(buf.data());
         }
         
-		void setSelection(int index) 
+		void setSelectedIndex(int index) 
 		{
             if (hwnd) 
 				SendMessage(hwnd, LB_SETCURSEL, (WPARAM)index, 0);
@@ -1484,7 +1569,7 @@ namespace ws
             return msg.message == WM_COMMAND && HIWORD(msg.wParam) == LBN_SELCHANGE && LOWORD(msg.wParam) == controlID;
         }
         
-		int getCount() 
+		int getItemCount() 
 		{
             return hwnd ? (int)SendMessage(hwnd, LB_GETCOUNT, 0, 0) : 0;
         }
