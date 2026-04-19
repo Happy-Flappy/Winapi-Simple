@@ -2,77 +2,6 @@
 #include "winsimple-controls.hpp"
 
 
-class Screen
-{
-	HDC hdc = nullptr;
-	bool valid = true;
-	
-	public:
-	
-	Screen()
-	{
-		hdc = GetDC(NULL);
-		if(hdc == NULL)
-			valid = false;
-	}
-	
-	~Screen()
-	{
-		ReleaseDC(NULL, hdc);
-	}
-	
-	ws::Vec2i getSize()
-	{
-		int width  = GetDeviceCaps(hdc, HORZRES);
-		int height = GetDeviceCaps(hdc, VERTRES);
-		return ws::Vec2i(width,height);
-	}
-	
-	
-	ws::Hue getPixel(int x,int y)
-	{
-		if(!valid)
-			return ws::Hue::transparent;
-		return getPixel(ws::Vec2i(x,y));
-	}
-
-	ws::Hue getPixel(ws::Vec2i pos)
-	{
-		if(!valid)
-			return ws::Hue::transparent;
-		
-		if(pos.x >= 0 && pos.x < getSize().x && pos.y >= 0 && pos.y < getSize().y)
-			return GetPixel(hdc,pos.x,pos.y);
-		
-		return ws::Hue::transparent;
-	}
-	
-	void setPixel(int x,int y,ws::Hue hue)
-	{
-		if(!valid)
-			return;
-		if(x >= 0 && x < getSize().x && y >= 0 && y < getSize().y)
-			SetPixel(hdc,x,y,hue);
-	}
-	
-	ws::Texture getSnapshot()
-	{
-		ws::Texture texture;
-		if(!texture.create(getSize().x,getSize().y,ws::Hue::transparent))
-			return ws::Texture();
-		
-		HDC hdcTex = texture.getHDC();
-		if(hdcTex)
-			BitBlt(hdcTex, 0, 0, getSize().x, getSize().y, hdc, 0, 0, SRCCOPY);			
-		
-		return texture;
-	}
-	
-	
-};
-
-
-
 int main()
 {
     ws::Window window(960,540, "Warp");
@@ -86,7 +15,7 @@ int main()
 	getColor.init(window);
 	getColor.setInitColor(ws::Hue::green);
 	
-	Screen screen;
+	ws::Screen screen;
 	
 	
 	ws::Texture sky,ground;

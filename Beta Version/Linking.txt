@@ -2,7 +2,16 @@ Core Winsimple Linking:  -lgdi32 -luser32 -lgdiplus -lole32
 
 Audio Linking: -lwinmm
 
-Controls Linking: -lcomctl32 -lcomdlg32
+Controls Linking: -lcomctl32 -lcomdlg32 -luuid -lshell32
 
 Clipboard And DragNDrop Linking: -lole32 -luuid
+
+
+Total Linking: -lgdi32 -luser32 -lgdiplus -lole32 -lwinmm -lcomctl32 -lshell32 -luuid
+
+Note: You must always provide linking for the base of winsimple in order to use the other headers. Audio is an exception to that rule. 
+
+
+
+
 

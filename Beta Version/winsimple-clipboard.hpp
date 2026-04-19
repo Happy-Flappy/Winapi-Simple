@@ -12,6 +12,13 @@
 
 //Clipboard And DragNDrop Linking: -lole32 -luuid
 
+//automated linking for visual studio MSVC
+#ifdef _MSC_VER
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "uuid.lib")
+#endif
+
+
 namespace ws
 {
 	class ClipboardInit
@@ -57,7 +64,7 @@ namespace ws
 		BITMAPINFOHEADER* bih = (BITMAPINFOHEADER*)pDIB;
 		DWORD offset = bih->biSize;
 		if (bih->biBitCount <= 8) {
-			offset += (1 << bih->biBitCount) * sizeof(RGBQUAD);
+			offset += (1ULL << bih->biBitCount) * sizeof(RGBQUAD);
 		}
 		BYTE* bits = (BYTE*)pDIB + offset;
 

@@ -7,6 +7,8 @@
 //Core Winsimple Linking:  -lgdi32 -luser32 -lgdiplus -lole32
 
 
+
+
 // Suppress unnecessary depreciation warnings if any.
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
@@ -67,6 +69,16 @@ typedef unsigned long PROPID;
 #ifndef IDC_PERSON
 #define IDC_PERSON MAKEINTRESOURCE(32672)
 #endif
+
+
+//automated linking for visual studio MSVC
+#ifdef _MSC_VER
+#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "ole32.lib")
+#endif
+
 
 
 namespace ws
@@ -1038,8 +1050,8 @@ namespace ws
 		
 		void move(float dx,float dy)
 		{
-			world.left += dx;
-			world.top += dy;
+			world.left += static_cast<int>(dx);
+			world.top += static_cast<int>(dy);
 		}
 		
 		void move(ws::Vec2f dir)
@@ -1081,12 +1093,12 @@ namespace ws
 											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
 			
 			// Calculate the visible world center
-			float visibleWorldCenterX = world.left + world.width / 2.0f;
-			float visibleWorldCenterY = world.top + world.height / 2.0f;
+			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
 			
 			// Calculate the port center
-			float portCenterX = port.left + port.width / 2.0f;
-			float portCenterY = port.top + port.height / 2.0f;
+			float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+			float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
 			
 			// Calculate scale to fit world into port
 			float scaleX = static_cast<float>(port.width) / world.width;
@@ -1136,12 +1148,12 @@ namespace ws
 	        float zoomFactor = std::pow(2.0f, zoom);
 	        
 	        // Calculate the visible world center
-	        float visibleWorldCenterX = world.left + world.width / 2.0f;
-	        float visibleWorldCenterY = world.top + world.height / 2.0f;
+	        float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+	        float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
 	        
 	        // Calculate the port center
-	        float portCenterX = port.left + port.width / 2.0f;
-	        float portCenterY = port.top + port.height / 2.0f;
+	        float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+	        float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
 	        
 	        // Calculate scale to fit visible world into port
 	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
@@ -1639,10 +1651,10 @@ namespace ws
 			{
 				// direct DIB access. the pixel format is 32bit BGRA
 				BYTE* pixel = static_cast<BYTE*>(m_dibBits) + (yIndex * width + xIndex) * 4;
-				pixel[0] = color.b; // Blue
-				pixel[1] = color.g; // Green
-				pixel[2] = color.r; // Red
-				pixel[3] = color.a; // Alpha
+				pixel[0] = static_cast<BYTE>(color.b); // Blue
+				pixel[1] = static_cast<BYTE>(color.g); // Green
+				pixel[2] = static_cast<BYTE>(color.r); // Red
+				pixel[3] = static_cast<BYTE>(color.a); // Alpha
 			}
 			else if (bitmap)
 			{
@@ -1715,7 +1727,7 @@ namespace ws
 		    std::string ext = path.substr(path.find_last_of(".") + 1);
 		    
 		    // lowercase extension for compare
-		    std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
+		    std::transform(ext.begin(), ext.end(), ext.begin(), [](wint_t c) { return static_cast<char>(::towlower(c)); });
 		    
 		    // Get encoder CLSID based on file extension
 		    if (ext == "png")
@@ -1985,7 +1997,7 @@ namespace ws
 	        
 	        // Apply rotation 
 	        if (rotation != 0.0f) {
-	            float rad = rotation * M_PI / 180.0f;
+	            float rad = static_cast<float>(rotation * M_PI / 180.0);
 	            float cosA = std::cos(rad);
 	            float sinA = std::sin(rad);
 	            
@@ -2029,8 +2041,8 @@ namespace ws
 	            return false;
 	            
 	        if (rotation == 0.0f) {
-	            float localX = (point.x - x) / scale.x + origin.x;
-	            float localY = (point.y - y) / scale.y + origin.y;
+	            float localX = (static_cast<float>(point.x - x)) / scale.x + static_cast<float>(origin.x);
+	            float localY = (static_cast<float>(point.y - y)) / scale.y + static_cast<float>(origin.y);
 	            return (localX >= 0 && localX < width && 
 	                    localY >= 0 && localY < height);
 	        }
@@ -2040,15 +2052,15 @@ namespace ws
 	        float localY = static_cast<float>(point.y - y);
 	        
 	        // Reverse rotation
-	        float rad = -rotation * M_PI / 180.0f;
+	        float rad = static_cast<float>(-rotation * M_PI / 180.0);
 	        float cosA = std::cos(rad);
 	        float sinA = std::sin(rad);
 	        float rotX = localX * cosA - localY * sinA;
 	        float rotY = localX * sinA + localY * cosA;
 	        
 	        // Reverse scale and adjust for origin
-	        rotX = rotX / scale.x + origin.x;
-	        rotY = rotY / scale.y + origin.y;
+	        rotX = rotX / scale.x + static_cast<float>(origin.x);
+	        rotY = rotY / scale.y + static_cast<float>(origin.y);
 						
 			return (point.x >= left && point.x <= right && point.y >= top && point.y <= bottom);
 	    }
@@ -2225,8 +2237,8 @@ namespace ws
 	    
 		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
-	    	Gdiplus::Pen pen(color);
-			canvas->DrawLine(&pen,start.x,start.y,end.x,end.y);
+	    	Gdiplus::Pen pen(color, static_cast<Gdiplus::REAL>(width));
+			canvas->DrawLine(&pen, static_cast<Gdiplus::REAL>(start.x), static_cast<Gdiplus::REAL>(start.y), static_cast<Gdiplus::REAL>(end.x), static_cast<Gdiplus::REAL>(end.y));
 	    }
 	    
 	    
@@ -2390,7 +2402,7 @@ namespace ws
 	            }
 	            
 	            if ((p1.y > point.y) != (p2.y > point.y)) {
-	                double xIntersection = (p2.x - p1.x) * (point.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
+	                double xIntersection = static_cast<double>(p2.x - p1.x) * static_cast<double>(point.y - p1.y) / static_cast<double>(p2.y - p1.y) + static_cast<double>(p1.x);
 	                
 	                if (point.x <= xIntersection) {
 	                    crossings++;
@@ -2589,7 +2601,7 @@ namespace ws
 	            }
 	            
 	            if ((p1.y > p.y) != (p2.y > p.y)) {
-	                double xIntersection = (p2.x - p1.x) * (p.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
+	                double xIntersection = static_cast<double>(p2.x - p1.x) * static_cast<double>(p.y - p1.y) / static_cast<double>(p2.y - p1.y) + static_cast<double>(p1.x);
 	                
 	                if (p.x <= xIntersection) {
 	                    crossings++;
@@ -2617,8 +2629,8 @@ namespace ws
 	            uvs.clear();
 	            for(const auto& vertex : vertices)
 	            {
-	                float u = static_cast<float>(vertex.x - bounds.left) / bounds.width;
-	                float v = static_cast<float>(vertex.y - bounds.top) / bounds.height;
+	                float u = static_cast<float>(vertex.x - bounds.left) / static_cast<float>(bounds.width);
+	                float v = static_cast<float>(vertex.y - bounds.top) / static_cast<float>(bounds.height);
 	                uvs.push_back(ws::Vec2f(u, v));
 	            }
 	            hasUVs = true;
@@ -2637,8 +2649,8 @@ namespace ws
 	                    uv.x = std::max(0.0f, std::min(1.0f, uv.x));
 	                    uv.y = std::max(0.0f, std::min(1.0f, uv.y));
 	                    
-	                    int texX = static_cast<int>(uv.x * (texWidth - 1));
-	                    int texY = static_cast<int>(uv.y * (texHeight - 1));
+	                    int texX = static_cast<int>(uv.x * static_cast<float>(texWidth - 1));
+	                    int texY = static_cast<int>(uv.y * static_cast<float>(texHeight - 1));
 	                    
 	                    Gdiplus::Color texColor = textureRef->getPixel(texX, texY);
 	                    effectTexture.setPixel(x, y, texColor);
@@ -2671,10 +2683,10 @@ namespace ws
 	    
 	    bool pointInTriangle(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c)
 	    {
-	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) /
-	                     ((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
-	        float beta = ((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y)) /
-	                    ((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
+	        float alpha = static_cast<float>(((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y))) /
+	                     static_cast<float>(((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y)));
+	        float beta = static_cast<float>(((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y))) /
+	                    static_cast<float>(((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y)));
 	        float gamma = 1.0f - alpha - beta;
 	        
 	        return (alpha >= 0 && beta >= 0 && gamma >= 0);
@@ -2683,11 +2695,11 @@ namespace ws
 	    ws::Vec2f barycentricUV(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c,
 	                           ws::Vec2f uvA, ws::Vec2f uvB, ws::Vec2f uvC)
 	    {
-	        float denom = (b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y);
+	        float denom = static_cast<float>((b.y - c.y)*(a.x - c.x) + (c.x - b.x)*(a.y - c.y));
 	        if(fabs(denom) < 0.0001f) return uvA;
 	        
-	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) / denom;
-	        float beta = ((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y)) / denom;
+	        float alpha = static_cast<float>(((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y))) / denom;
+	        float beta = static_cast<float>(((c.y - a.y)*(p.x - c.x) + (a.x - c.x)*(p.y - c.y))) / denom;
 	        float gamma = 1.0f - alpha - beta;
 	        
 	        float u = alpha * uvA.x + beta * uvB.x + gamma * uvC.x;
@@ -2869,22 +2881,22 @@ namespace ws
 			
 			path.AddString(
 			ws::WIDE(text).c_str(), 
-			int(text.length()),
+			static_cast<INT>(text.length()),
 			fontRef->getFamilyHandle(), 
 			style, 
-			charSize, 
+			static_cast<Gdiplus::REAL>(charSize), 
 			Gdiplus::PointF(0,0), 
 			&format
 			);
     
-    		Gdiplus::Pen outlinePen(borderColor, borderWidth);
+    		Gdiplus::Pen outlinePen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
     		outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
 		    
 		    Gdiplus::RectF bounds;
 		    path.GetBounds(&bounds, NULL, &outlinePen);
 		    
-		    width = bounds.Width;
-		    height = bounds.Height;
+		    width = static_cast<int>(bounds.Width);
+		    height = static_cast<int>(bounds.Height);
 		    
 		    
 		    Gdiplus::SolidBrush fillBrush(fillColor);
@@ -2939,8 +2951,8 @@ namespace ws
 			for(double a=0;a<(2*M_PI);a+=inc)
 			{
 				double angle = a;
-				int resx = static_cast<int>(std::cos(angle) * float(radius));
-				int resy = static_cast<int>(std::sin(angle) * float(radius));
+				int resx = static_cast<int>(std::cos(angle) * static_cast<double>(radius));
+				int resy = static_cast<int>(std::sin(angle) * static_cast<double>(radius));
 				poly.addVertex(resx + radius, resy + radius);
 			}
 			m_points = points;
@@ -2950,8 +2962,8 @@ namespace ws
 			height = 2 * radius;
 
 			// Update position based on center
-			x = center.x - origin.x;
-			y = center.y - origin.y;
+			x = static_cast<float>(center.x - origin.x);
+			y = static_cast<float>(center.y - origin.y);
 		}
 		
 		
@@ -2959,8 +2971,8 @@ namespace ws
 		void setPosition(int posx,int posy)
 		{
 			center = {posx,posy};
-			x = center.x - origin.x;
-			y = center.y - origin.y;
+			x = static_cast<float>(center.x - origin.x);
+			y = static_cast<float>(center.y - origin.y);
 		}
 		
 		void setPosition(ws::Vec2i pos)
@@ -2974,8 +2986,8 @@ namespace ws
 		{
 			center.x += delta.x;
 			center.y += delta.y;
-			x = center.x - origin.x;
-			y = center.y - origin.y;
+			x = static_cast<float>(center.x - origin.x);
+			y = static_cast<float>(center.y - origin.y);
 		}
 		
 		void move(int deltaX,int deltaY)
@@ -3044,7 +3056,7 @@ namespace ws
 			if (scale.y != 1.0f) localY /= scale.y;
 			
 			// Check if point is within circle
-			return (localX * localX + localY * localY) <= (radius * radius);
+			return (localX * localX + localY * localY) <= static_cast<float>(radius * radius);
 		}	
 		
 	
@@ -3065,9 +3077,8 @@ namespace ws
 	        Gdiplus::Pen borderPen(m_borderColor, static_cast<Gdiplus::REAL>(m_borderWidth));
 	        Gdiplus::SolidBrush fillBrush(m_fillColor);
 			
-			canvas->DrawEllipse(&borderPen,0,0,width,height);
-			canvas->FillEllipse(&fillBrush,0,0,width,height);
-			
+			canvas->DrawEllipse(&borderPen,0.0f,0.0f,static_cast<Gdiplus::REAL>(width),static_cast<Gdiplus::REAL>(height));
+			canvas->FillEllipse(&fillBrush,0.0f,0.0f,static_cast<Gdiplus::REAL>(width),static_cast<Gdiplus::REAL>(height));
 		}
 		
 		
@@ -3090,14 +3101,14 @@ namespace ws
 	        if (scale.y != 1.0f) localY /= scale.y;
 	        
 	        // Adjust for origin
-	        localX += origin.x;
-	        localY += origin.y;
+	        localX += static_cast<float>(origin.x);
+	        localY += static_cast<float>(origin.y);
 	        
 	        // Ellipse equation check
-	        float centerX = width / 2.0f;
-	        float centerY = height / 2.0f;
-	        float radiusX = width / 2.0f;
-	        float radiusY = height / 2.0f;
+	        float centerX = static_cast<float>(width) / 2.0f;
+	        float centerY = static_cast<float>(height) / 2.0f;
+	        float radiusX = static_cast<float>(width) / 2.0f;
+	        float radiusY = static_cast<float>(height) / 2.0f;
 	        
 	        if (radiusX <= 0 || radiusY <= 0) return false;
 	        
@@ -3496,18 +3507,16 @@ namespace ws
 
 		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
-
+			if (hwnd && IsWindow(hwnd)) {
+				DestroyWindow(hwnd);
+				hwnd = nullptr;
+			}
 			
-			//Check if manager is initialized and init if so.
 			WindowManager::init();
-			
 			
 			//Note to self: the style must be set this way because hwnd has not been initialized yet!
 			style |= WS_CLIPCHILDREN;
 			//exStyle |= WS_EX_COMPOSITED;
-			
-			
-
 			
 			
 			view.init({0,0,width,height});
@@ -3972,7 +3981,7 @@ namespace ws
 			addExStyle(WS_EX_LAYERED);
 			
 			if(!legacy)
-				SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
+				SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),static_cast<BYTE>(hue.a),LWA_COLORKEY | LWA_ALPHA);
 		}
 		
 		void disableChromaKey()
@@ -3984,7 +3993,7 @@ namespace ws
 		{
 			addExStyle(WS_EX_LAYERED);
 			if(!m_perPixelAlpha)
-				SetLayeredWindowAttributes(hwnd,0,alpha,LWA_ALPHA);			
+				SetLayeredWindowAttributes(hwnd,0,static_cast<BYTE>(alpha),LWA_ALPHA);			
 		}
 		
 		void disableAlphaOnly()

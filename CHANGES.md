@@ -247,6 +247,9 @@
 * Added setPixel() and getSnapshot() to ws::Screen
 * Added setSize() to ws::Screen - Affects resolution 
 * Added 4 new Demos to  Beta Version 1.6
+* Added automatic linking for visual studio. If you use visual studio with winsimple, you wont have to worry about linking.
+* Fixed warnings of incorrect type conversions in winsimple headers.
+
 
 # New major features to be added. 
 
@@ -258,3 +261,22 @@
 * Texture stretching into polygonal shapes.
 
 * Networking
+
+* ProgressBar
+
+* RadioButton & CheckBox – basic form elements.
+
+* GroupBox – organizes forms visually.
+
+* RichEdit
+
+* TabControl – for multi-page setups without creating new windows.
+
+* ListView (with report view) – for file lists, data grids.
+
+* FontDialog
+
+* NotifyIcon
+
+* Searchbox
+

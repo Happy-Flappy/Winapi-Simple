@@ -8,6 +8,13 @@
 
 //Controls Linking: -lcomctl32 -lcomdlg32
 
+//automated linking for visual studio MSVC
+#ifdef _MSC_VER
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "comdlg32.lib")
+#pragma comment(lib, "uuid.lib")
+#pragma comment(lib, "shell32.lib")
+#endif
 
 namespace ws
 {
