@@ -21,7 +21,7 @@ namespace ws
 	class ControlsInit
 	{
 		public:
-		int maxControlID = 0;
+		int maxControlID = 1000;
 		
 		ControlsInit()
 		{
@@ -48,143 +48,230 @@ namespace ws
 
 
 
-
 	class Child
 	{
+		private:
+
+		HFONT customFont = nullptr;
+		std::string text = "";
+		int x = 0, y = 0, width = 100, height = 100;
+		std::string m_className;               
+
+
 		public:
-		
+
 		HWND hwnd = NULL;
 		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
+		DWORD exStyle = 0;                     // extended style
 		DWORD textStyle = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
-		
 
 		unsigned int controlID = 0;
 		COLORREF backgroundColor = RGB(0,0,0);
 		COLORREF textColor = RGB(255,255,255);
 		COLORREF borderColor = RGB(0,0,0);
-		
-		private:
-		
-		HFONT customFont = nullptr;
-		std::string text = "";
-		int x = 0,y = 0,width = 100,height = 100;		
 
-		public:
 		
-		Child()
+		Child(const std::wstring& className = L"Button") : m_className(ws::SHORT(className))
 		{
-			int &maxControlID = controlsInit.maxControlID;
-			controlID = maxControlID+1;
-			maxControlID++;
+			controlID = controlsInit.maxControlID++;
+		}
+		
+		
+		virtual ~Child()
+		{
+			if (hwnd && IsWindow(hwnd))
+				DestroyWindow(hwnd);
+			if (customFont)
+				DeleteObject(customFont);
 		}
 
-        virtual ~Child()
-        {
-            if (hwnd && IsWindow(hwnd))
-            {
-                DestroyWindow(hwnd);
-            }
-        }				
-		
-		void setPosition(int xPos,int yPos)
+		// init – called by ws::Window::addChild()
+		virtual bool init(ws::Window& parent)
 		{
-			x = xPos;
-			y = yPos;
+			return init(parent.hwnd);
+		}
+		
+		virtual bool init(HWND phwnd)
+		{
+			if (!phwnd) return false;
+
+			if(width <= 0 || height <= 0)
+			{
+				std::cerr << "Error: Attempted to create a child window with an invalid size!" << std::endl;
+				MessageBoxA(NULL,"Error: Attempted to create a child window with an invalid size!","Developer Error",MB_OK);
+			}
 			
-			if (hwnd)
-				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
-		}		
-		
-		void setPosition(ws::Vec2i pos)
-		{
-			setPosition(pos.x, pos.y);
-		}
-		
-		ws::Vec2i getPosition()
-		{
-			return {x,y};
-		}
-		
-		void setSize(int w,int h)
-		{
-			width = w;
-			height = h;
-			
-			if (hwnd)
-				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-		}
-		
-		void setSize(ws::Vec2i size)
-		{
-			setSize(size.x, size.y);
-		}
-		
-		ws::Vec2i getSize()
-		{
-			return {width,height};
-		}
-		
-		void addStyle(DWORD addedStyle)
-		{
-            style |= addedStyle;
-			if (hwnd)
-            {
-                SetWindowLong(hwnd, GWL_STYLE, style);
-                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }
-            
-		}
-		
-		void removeStyle(DWORD removedStyle)
-		{
-			
-			style &= ~removedStyle;
-			if (hwnd)
-            {
-                SetWindowLong(hwnd, GWL_STYLE, style);
-                SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-            }	
-					
-		}
-		
-        bool hasStyle(DWORD checkStyle)
-        {
-            if (hwnd)
-            {
-                DWORD currentStyle = GetWindowLong(hwnd, GWL_STYLE);
-                return (currentStyle & checkStyle) != 0;
-            }
-            return (style & checkStyle) != 0;
-        }
-		
-		void setText(std::string newText)
-		{
-			
-			text = newText;
-			if (hwnd)
-                SetWindowTextA(hwnd, text.c_str());
-            
-		}
-		
-		std::string getText()
-		{
-			if (!hwnd) return text;
+			if (hwnd && IsWindow(hwnd)) 
+			{
+				DestroyWindow(hwnd);
+				// force processing of the destruction message
+				MSG msg;
+				while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+				hwnd = nullptr;
+			}			
 
-			int len = GetWindowTextLengthW(hwnd);
-			if (len == 0) return "";
+			hwnd = CreateWindowExA(
+				exStyle,
+				m_className.c_str(),
+				text.c_str(),
+				style,
+				x, y, width, height,
+				phwnd,
+				(HMENU)(UINT_PTR)controlID,
+				GetModuleHandle(nullptr),
+				nullptr
+			);
 
-			std::wstring wbuf(len + 1, L'\0');
-			GetWindowTextW(hwnd, &wbuf[0], len + 1);
-			wbuf.resize(len); // remove the null terminator
+			if (!hwnd)
+			{
+				std::cerr << "Failed to create child control: " << m_className << std::endl;
+				return false;
+			}
 
-			return ws::SHORT(wbuf);
+			// Apply stored font if any
+			if (customFont)
+				SendMessage(hwnd, WM_SETFONT, (WPARAM)customFont, TRUE);
+
+			ShowWindow(hwnd, SW_SHOW);
+			UpdateWindow(hwnd);
+			return true;			
+		}
+		
+
+		void setClass(const std::wstring& className = L"Button")
+		{
+			m_className = ws::SHORT(className);
+			if(hwnd)
+			{
+				init(GetParent(hwnd));
+			}
+		}
+		
+		std::string getClass()
+		{
+			return m_className;
+		}
+		
+		void setPosition(int xPos, int yPos) 
+		{ 
+			x = xPos; 
+			y = yPos; 
+			if (hwnd) 
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE); 
+		}
+		
+		void setPosition(ws::Vec2i pos) 
+		{ 
+			setPosition(pos.x, pos.y); 
+		}
+		
+		ws::Vec2i getPosition() const 
+		{ 
+			return {x, y}; 
 		}
 
-		void setFont(ws::Font &font, ws::Text &textSettings)
+		void setSize(int w, int h) 
+		{ 
+			width = w; 
+			height = h; 
+			if (hwnd) 
+				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE); 
+		}
+		
+		void setSize(ws::Vec2i size) 
+		{ 
+			setSize(size.x, size.y); 
+		}
+		
+		ws::Vec2i getSize() const 
+		{ 
+			return {width, height}; 
+		}
+		
+		HFONT getFontHandle()
 		{
-			if (!hwnd || !font.isValid()) return;
+			return customFont;
+		}
+
+		void addStyle(DWORD addedStyle) 
+		{ 
+			style |= addedStyle; 
+			if (hwnd) 
+			{ 
+				SetWindowLong(hwnd, GWL_STYLE, style); 
+				SetWindowPos(hwnd, NULL, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED); 
+			} 
+		}
+		
+		void removeStyle(DWORD removedStyle) 
+		{ 
+			style &= ~removedStyle; 
+			if (hwnd) 
+			{ 
+				SetWindowLong(hwnd, GWL_STYLE, style); 
+				SetWindowPos(hwnd, NULL, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED); 
+			} 
+		}
+		
+		bool hasStyle(DWORD checkStyle) const 
+		{ 
+			DWORD current = GetWindowLong(hwnd, GWL_STYLE); 
+			return (current & checkStyle) != 0; 
+		}
+
+
+		void addExStyle(DWORD addedStyle) 
+		{ 
+			exStyle |= addedStyle; 
+			if (hwnd) 
+			{ 
+				SetWindowLong(hwnd, GWL_EXSTYLE, exStyle); 
+				SetWindowPos(hwnd, NULL, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED); 
+			} 
+		}
+		
+		void removeExStyle(DWORD removedStyle) 
+		{ 
+			exStyle &= ~removedStyle; 
+			if (hwnd) 
+			{ 
+				SetWindowLong(hwnd, GWL_EXSTYLE, exStyle); 
+				SetWindowPos(hwnd, NULL, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED); 
+			} 
+		}
+		
+		bool hasExStyle(DWORD checkStyle) const 
+		{ 
+			DWORD current = GetWindowLong(hwnd, GWL_EXSTYLE); 
+			return (current & checkStyle) != 0; 
+		}
+		
+
+		void setText(const std::string& newText) 
+		{ 
+			text = newText; 
+			if (hwnd) 
+				SetWindowTextA(hwnd, text.c_str()); 
+		}
+		
+		std::string getText() const 
+		{ 
+			if (!hwnd) 
+				return text; 
+			int len = GetWindowTextLengthW(hwnd); 
+			if (len == 0) 
+				return ""; 
+			std::wstring wbuf(len+1, L'\0'); 
+			GetWindowTextW(hwnd, &wbuf[0], len+1); 
+			wbuf.resize(len); return ws::SHORT(wbuf); 
+		}
+
+		void setFont(ws::Font& font, ws::Text& textSettings) 
+		{
+			if (!font.isValid()) return;
 			
 			if (customFont)
 			{
@@ -226,42 +313,22 @@ namespace ws
 				familyName                     
 			);
 			
-			if (customFont)
+			if (customFont && hwnd)
 			{
 				SendMessage(hwnd, WM_SETFONT, (WPARAM)customFont, TRUE);
-			}
+			}			
 		}
-		
-		bool contains(ws::Vec2i point)
-		{
-			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
-		}
-		
-		virtual bool init(ws::Window &parent){return false;}
-		
-		void setFillColor(COLORREF color)
-	    {
-	        backgroundColor = color;
-	        if (hwnd)
-	            InvalidateRect(hwnd, NULL, TRUE);
-	    }
-	    
-	    void setTextColor(COLORREF color)
-	    {
-	        textColor = color;
-	        if (hwnd)
-	            InvalidateRect(hwnd, NULL, TRUE);
-	    }
-		
-		void setBorderColor(COLORREF color)
-		{
-			borderColor = color;
-			if (hwnd)
-			    InvalidateRect(hwnd, NULL, TRUE);
-		}
-		
-	};
 
+		bool contains(ws::Vec2i point) const 
+		{ 
+			return (point.x >= x && point.x < x+width && point.y >= y && point.y < y+height); 
+		}
+
+		// For message handling – derived classes can override if needed
+		virtual bool handleCommand(MSG &msg) { return false; }
+		virtual bool handleNotify(NMHDR* pnmh) { return false; }
+	};
+	
 
 	
 	void ws::Window::addChild(ws::Child &child)
@@ -293,73 +360,46 @@ namespace ws
 		}			
 		return false;
 	}	
-	
-	
-	
+
+
 	class ComboBox : public Child
 	{
 		private:
 		std::vector<std::string> pendingItems;
-	    public:
-	    ComboBox()
-	    {
-	    }
-	    
-	    virtual bool init(ws::Window &parent) override
-	    {
-	        if(!parent.hwnd)
-	        {
-	            std::cerr << "Child Error: Selected parent is not valid!\n";
-	            return false;
-	        }
-	        
-			
-	        // Add combo box specific styles
+		
+		public:
+		
+		ComboBox()
+		{
+			setClass(L"COMBOBOX");
 	        addStyle(CBS_DROPDOWN);
-	        addStyle(WS_VSCROLL);
-	        
-	        hwnd = CreateWindowEx(
-	            0,
-	            TEXT("COMBOBOX"),
-	            NULL,
-	            style,
-	            getPosition().x,
-	            getPosition().y,
-	            getSize().x,
-	            getSize().y,  // Dropdown height
-	            parent.hwnd,
-	            (HMENU)(UINT_PTR)controlID,
-	            GetModuleHandle(nullptr),
-	            nullptr);
-	            
-	        if (!hwnd)
-	        {
-	            std::cerr << "Child Error: Failed to create ComboBox!\n";
-	            return false;
-	        }
-	        
-			ws::Font font;
-			font.loadFromSystem("Arial");
-			ws::Text text;
-			text.setCharacterSize(15);
-			setFont(font,text);
+	        addStyle(WS_VSCROLL);			
+		}
+		
+		virtual bool init(ws::Window &parent) override
+		{
+			if (!Child::init(parent)) return false;
 			
-	        // Set extended UI for better appearance
+			if(!getFontHandle())
+			{
+				ws::Font font;
+				font.loadFromSystem("Arial");
+				ws::Text text;
+				text.setCharacterSize(15);
+				setFont(font,text);
+			}
+	        // set extended UI for better appearance
 	        SendMessage(hwnd, CB_SETEXTENDEDUI, (WPARAM)TRUE, 0);
 
 			for (const auto& item : pendingItems)
 			{
 				addItem(item);
 			}
-			pendingItems.clear();
+			pendingItems.clear();	
 
-	        
-	        ShowWindow(hwnd, SW_SHOW);
-	        UpdateWindow(hwnd);
-	        
-	        return true;
-	    }
-	    
+			return true;
+		}
+		
 	    void addItem(const std::string& item)
 	    {
 			if (!hwnd) {
@@ -442,9 +482,9 @@ namespace ws
 	        
 	        return std::string(buffer.data());
 	    }
-	    
-	    bool selectionChanged(MSG &msg)
-	    {
+
+		bool selectionChanged(MSG &msg)
+		{
 	        if (msg.message == WM_COMMAND && HIWORD(msg.wParam) == CBN_SELCHANGE)
 	        {
 	            if (LOWORD(msg.wParam) == controlID)
@@ -452,8 +492,9 @@ namespace ws
 	                return true;
 	            }
 	        }
-	        return false;
-	    }
+	        return false;			
+		}
+		
 	    
 	    void setDropdownStyle(bool allowEdit = true)
 	    {
@@ -495,73 +536,39 @@ namespace ws
 	    {
 	        if (!hwnd) return;
 	        SendMessageA(hwnd, WM_SETTEXT, 0, (LPARAM)text.c_str());
-	    }
+	    }		
 	};
-
-
+	
 	
 	
 	class Button : public Child
 	{
 		public:
 		
-		
 		Button()
-		{	
+		{
+			setClass(L"Button");
 		}
-		
 		
 		virtual bool init(ws::Window &parent) override
 		{
+			if(!Child::init(parent)) return false;
 			
-			if(!parent.hwnd)
+			if(!getFontHandle())
 			{
-				std::cerr << "Child Error: Selected parent is not valid!\n";
-				return false;
+				ws::Font font;
+				font.loadFromSystem("Arial");
+				ws::Text text;
+				text.setCharacterSize(15);
+				setFont(font,text);
 			}
 			
-			
-			
-			
-			
-			hwnd = CreateWindowEx(
-			0,
-			L"BUTTON",
-			ws::WIDE(getText()).c_str(),
-			style,
-			getPosition().x,
-			getPosition().y,
-			getSize().x,
-			getSize().y,
-			parent.hwnd,
-            (HMENU)(UINT_PTR)controlID,
-            GetModuleHandle(nullptr),
-            nullptr);			
-			
-		    if (!hwnd)
-	        {
-	            std::cerr << "Child Error: Failed to create Button!\n";
-	            return false;
-	        }	
-
-			ws::Font font;
-			font.loadFromSystem("Arial");
-			ws::Text text;
-			text.setCharacterSize(15);
-			setFont(font,text);
 		
-			ShowWindow(hwnd,SW_SHOW);
-			UpdateWindow(hwnd);
-		
-			return true;		
+			return true;				
 		}
-		
-		
-		
+
 	    bool isPressed(MSG &msg)
 	    {
-	    	
-	    	
 	        if(msg.message == WM_COMMAND && HIWORD(msg.wParam) == BN_CLICKED)
 	        {
 	            if(LOWORD(msg.wParam) == controlID)
@@ -570,77 +577,49 @@ namespace ws
 	            }
 	        }
 	        return false;
-	    }
-
+	    }		
 	};
 	
-
-
-
+	
+	
 	class Slider : public Child
 	{
 		public:
 		
-		
 		Slider()
 		{
+			setClass(TRACKBAR_CLASS);
+			addStyle(TBS_HORZ);
+			addStyle(TBS_AUTOTICKS);	
+			setRange(0,100);			
 		}
-		
 		
 		virtual bool init(ws::Window &parent) override
 		{
+			if(!Child::init(parent)) return false;
 			
-			if(!parent.hwnd)
+			if(shouldSetRange)
+				setRange(storedMin,storedMax);
+			if(shouldSetPos)
+				setSlidePosition(slidePos);
+
+			if(!getFontHandle())
 			{
-				std::cerr << "Child Error: Selected parent is not valid!\n";
-				return false;
+				ws::Font font;
+				font.loadFromSystem("Arial");
+				ws::Text text;
+				text.setCharacterSize(15);
+				setFont(font,text);
 			}
 			
 			
-			addStyle(TBS_HORZ);
-			addStyle(TBS_AUTOTICKS);
-			
-			
-			hwnd = CreateWindowEx(
-			0,
-			TRACKBAR_CLASS,
-			ws::WIDE(getText()).c_str(),
-			style,
-			getPosition().x,
-			getPosition().y,
-			getSize().x,
-			getSize().y,
-			parent.hwnd,
-            (HMENU)(UINT_PTR)controlID,
-            GetModuleHandle(nullptr),
-            nullptr);			
-			
-		    if (!hwnd)
-	        {
-	            std::cerr << "Child Error: Failed to create Slider!\n";
-	            return false;
-	        }	
-
-			ws::Font font;
-			font.loadFromSystem("Arial");
-			ws::Text text;
-			text.setCharacterSize(15);
-			setFont(font,text);
-
-		
-			ShowWindow(hwnd,SW_SHOW);
-			UpdateWindow(hwnd);
-			
-			setRange(0,100);
-		
-			return true;		
+			return true;
 		}
-		
-		
 		
 	    bool getScroll(MSG &msg)
 	    {
-	    	
+	    	if(!hwnd)
+				return false;
 	        if((msg.message == WM_HSCROLL || msg.message == WM_VSCROLL) && (HWND)msg.lParam == hwnd)
 	        {
 	            slidePos = (int)SendMessage(hwnd, TBM_GETPOS, 0, 0);
@@ -666,14 +645,28 @@ namespace ws
         
 		void setRange(int minimum = 0,int maximum = 100)
 		{
+			storedMin = minimum;
+			storedMax = maximum;
+			if(!hwnd)
+			{
+				shouldSetRange = true;
+				return;
+			}
 			SendMessage(hwnd, TBM_SETRANGEMIN, TRUE, minimum);
 			SendMessage(hwnd, TBM_SETRANGEMAX, TRUE, maximum);
 		}
 		
 		void setSlidePosition(int pos = 0)
 		{
+			slidePos = pos;
+			
+			if(!hwnd)
+			{
+				shouldSetPos = true;
+				return;
+			}
 			SendMessage(hwnd, TBM_SETPOS, TRUE, pos);
-			slidePos = pos; 
+			 
 		}
 		
 		int getSlidePosition()
@@ -684,8 +677,16 @@ namespace ws
 		
 		private:
 			int slidePos = 0;
+			int storedMin = 0;
+			int storedMax = 100;
+			bool shouldSetRange = false;
+			bool shouldSetPos = false;
 		
 	};
+	
+	
+
+
 
 
 
@@ -693,55 +694,32 @@ namespace ws
 	{
 		public:
 		
-		virtual bool init(ws::Window &parent) override
+		TextBox()
 		{
-			
-			if(!parent.hwnd)
-			{
-				std::cerr << "Child Error: Selected parent is not valid!\n";
-				return false;
-			}
-			
-			
-			
+			setClass(L"EDIT");
 			addStyle(ES_AUTOVSCROLL);
 			addStyle(ES_AUTOHSCROLL);
 			addStyle(ES_MULTILINE);
+			addExStyle(WS_EX_CLIENTEDGE);
+		}
+		
+		
+		virtual bool init(ws::Window &parent) override
+		{
 			
-			
-			hwnd = CreateWindowEx(
-			WS_EX_CLIENTEDGE,
-			TEXT("EDIT"),
-			ws::WIDE(getText()).c_str(),
-			style,
-			getPosition().x,
-			getPosition().y,
-			getSize().x,
-			getSize().y,
-			parent.hwnd,
-            (HMENU)(UINT_PTR)controlID,
-            GetModuleHandle(nullptr),
-            nullptr);			
-			
-		    if (!hwnd)
-	        {
-	            std::cerr << "Child Error: Failed to create Textbox!\n";
-	            return false;
-	        }	
+			if(!Child::init(parent)) return false;
 
-
-			ws::Font font;
-			font.loadFromSystem("Arial");
-			ws::Text text;
-			text.setCharacterSize(15);
-			setFont(font,text);
-		
-			SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)char_limit, 0);
-		
-			ShowWindow(hwnd,SW_SHOW);
-			UpdateWindow(hwnd);
+			if(!getFontHandle())
+			{
+				ws::Font font;
+				font.loadFromSystem("Arial");
+				ws::Text text;
+				text.setCharacterSize(15);
+				setFont(font,text);
+			}
 			
-		
+			setCharacterLimit(char_limit);
+			
 			return true;		
 		}		
 		int char_limit = 0;
@@ -766,58 +744,30 @@ namespace ws
 	
 	
 	
-	
 	class Label : public Child
 	{
 		public:
 		Label()
 		{
-			
+			setClass(L"STATIC");
+			addStyle(SS_NOTIFY);
+			addStyle(SS_LEFT);			
 		}
 		
 		virtual bool init(ws::Window &parent) override
 		{
 			
-			if(!parent.hwnd)
-			{
-				std::cerr << "Child Error: Selected parent is not valid!\n";
-				return false;
-			}
-			
-			addStyle(SS_NOTIFY);
-			addStyle(SS_LEFT);
-			
-			
-			
-			hwnd = CreateWindowEx(
-			0,
-			TEXT("STATIC"),
-			ws::WIDE(getText()).c_str(),
-			style,
-			getPosition().x,
-			getPosition().y,
-			getSize().x,
-			getSize().y,
-			parent.hwnd,
-            (HMENU)(UINT_PTR)controlID,
-            GetModuleHandle(nullptr),
-            nullptr);			
-			
-		    if (!hwnd)
-	        {
-	            std::cerr << "Child Error: Failed to create Label!\n";
-	            return false;
-	        }	
+			if(!Child::init(parent)) return false;
 
-			ws::Font font;
-			font.loadFromSystem("Arial");
-			ws::Text text;
-			text.setCharacterSize(15);
-			setFont(font,text);
-		
-			ShowWindow(hwnd,SW_SHOW);
-			UpdateWindow(hwnd);
-		
+			if(!getFontHandle())
+			{
+				ws::Font font;
+				font.loadFromSystem("Arial");
+				ws::Text text;
+				text.setCharacterSize(15);
+				setFont(font,text);
+			}			
+
 			return true;		
 		}
 	};
@@ -885,7 +835,7 @@ namespace ws
 		
 	};
 	
-
+	
 	class Dropdown
 	{
 		public:
@@ -934,7 +884,7 @@ namespace ws
 	    std::string name = "";
 	    bool isPopup = false;
 			
-	};
+	}; 
 	
 	class Menu
 	{
@@ -975,20 +925,6 @@ namespace ws
 		}
 		
 	};
-
-
-	
-	
-	
-	
-	
-	
-
-
-
-
-
-
 
 
 	
@@ -1481,32 +1417,29 @@ namespace ws
         std::vector<std::string> pendingItems;
 		public:
         
-		ListBox() {}
+		ListBox()
+		{
+            addStyle(LBS_STANDARD | WS_VSCROLL | WS_HSCROLL | LBS_NOTIFY);
+			setClass(L"LISTBOX");
+		}
         
 		virtual bool init(ws::Window &parent) override 
 		{
-            if (!parent.hwnd) return false;
-            addStyle(LBS_STANDARD | WS_VSCROLL | WS_HSCROLL | LBS_NOTIFY);
-            hwnd = CreateWindowEx(0, L"LISTBOX", NULL, style, 
-			getPosition().x, getPosition().y,
-            getSize().x, getSize().y,
-            parent.hwnd, (HMENU)(UINT_PTR)controlID,
-            GetModuleHandle(nullptr), nullptr);
-            
-			if (!hwnd) return false;
-            
-			ws::Font font;
-            font.loadFromSystem("Arial");
-            
-			ws::Text textSettings;
-            textSettings.setCharacterSize(15);
-            setFont(font, textSettings);
+			if(!Child::init(parent)) return false;
+
+			if(!getFontHandle())
+			{
+				ws::Font font;
+				font.loadFromSystem("Arial");
+				ws::Text text;
+				text.setCharacterSize(15);
+				setFont(font,text);
+			}
             
 			for (const auto& item : pendingItems) addItem(item);
             
 			pendingItems.clear();
-            ShowWindow(hwnd, SW_SHOW);
-            UpdateWindow(hwnd);
+			
             return true;
         }
 		

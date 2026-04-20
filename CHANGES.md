@@ -249,6 +249,8 @@
 * Added 4 new Demos to  Beta Version 1.6
 * Added automatic linking for visual studio. If you use visual studio with winsimple, you wont have to worry about linking.
 * Fixed warnings of incorrect type conversions in winsimple headers.
+* Fixed Faulty window cleanup in ws::Window::create()
+* Major upgrades to ws::Child so that it can be used to easily do any win32 child control existing. 
 
 
 # New major features to be added. 

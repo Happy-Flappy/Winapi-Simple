@@ -786,7 +786,15 @@ namespace ws
 		{
 			return RGB(r,g,b);
 		}
-		
+
+		bool operator==(const Hue& other) const 
+		{
+			return r == other.r && g == other.g && b == other.b && a == other.a;
+		}
+		bool operator!=(const Hue& other) const 
+		{ 
+			return !(*this == other); 
+		}		
 		
 	};
 	
@@ -3453,7 +3461,7 @@ namespace ws
 		static bool initialized;
 		
 		
-		static void init();		
+		static void init(const std::string& className = "Window");		
 		static LRESULT CALLBACK GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam);
 		static void addWindow(ws::Window* window);
 		static void removeWindow(HWND hwnd);		
@@ -3497,26 +3505,45 @@ namespace ws
 		
 		
 		
-		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
+		Window(int width,int height,std::string title = "",DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0,const std::string& className = "Window")
 		{
-			create(width,height,title,style,exStyle);
+			create(width,height,title,style,exStyle,className);
 		}
 		
 		
 	
 
-		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
+		void create(int width,int height,std::string title = "",DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0,const std::string& className = "Window")
 		{
-			if (hwnd && IsWindow(hwnd)) {
+			if(width <= 0 || height <= 0)
+			{
+				std::cerr << "Error: Attempted to create a window with an invalid size!" << std::endl;
+				MessageBoxA(NULL,"Error: Attempted to create a window with an invalid size!","Developer Error",MB_OK);
+			}
+			
+			if (hwnd && IsWindow(hwnd)) 
+			{
 				DestroyWindow(hwnd);
+				// force processing of the destruction message
+				MSG msg;
+				while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
 				hwnd = nullptr;
 			}
 			
-			WindowManager::init();
+			WindowManager::init(className);
+			
+			
+			if(style == -1)
+				style = WS_OVERLAPPEDWINDOW;
+			if(exStyle == -1)
+				exStyle = 0;
 			
 			//Note to self: the style must be set this way because hwnd has not been initialized yet!
 			style |= WS_CLIPCHILDREN;
-			//exStyle |= WS_EX_COMPOSITED;
+			
 			
 			
 			view.init({0,0,width,height});
@@ -3524,7 +3551,7 @@ namespace ws
 			
 			hwnd = CreateWindowEx(
 			exStyle,
-			L"Window",
+			ws::WIDE(className).c_str(),
 			ws::WIDE(title).c_str(),
 			style,
 			CW_USEDEFAULT,
@@ -4132,7 +4159,7 @@ namespace ws
 	
 	//Window Manager Stuff
 	
-	inline void ws::WindowManager::init()
+	inline void ws::WindowManager::init(const std::string& className)
 	{
 		if(initialized)
 			return;
@@ -4141,7 +4168,7 @@ namespace ws
 		WNDCLASS wc = {};
 		wc.lpfnWndProc = WindowManager::GlobalProc;
 		wc.hInstance = instance;
-		wc.lpszClassName = L"Window";
+		wc.lpszClassName = ws::WIDE(className).c_str();
 		wc.hCursor = NULL;
 		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		

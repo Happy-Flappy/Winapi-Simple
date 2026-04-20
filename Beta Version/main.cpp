@@ -1,56 +1,53 @@
 #include "winsimple.hpp"
+#include "winsimple-controls.hpp"
 
 
 int main()
 {
-	ws::Window window(1200,675,"");
+	ws::Window window(320,200,"");
 	
-	ws::Texture texture;
-	texture.loadFromFile("clouds.png");
+    ws::ComboBox combo;
+    combo.setPosition(50, 50);
+    combo.setSize(200,200);
+    combo.addItem("Apple");
+    combo.addItem("Banana");
+    combo.addItem("Cherry");
+    combo.addItem("Date");
+    combo.setSelectedIndex(0); 
 	
-	ws::Texture drawTex;
-	//drawTex.loadFromFile("");
+	combo.setDropdownStyle(true);
 	
-	window.create(texture.getSize().x,texture.getSize().y,"Warp");
+	window.addChild(combo);
+	
+
+
+	ws::ListBox list;
+    list.addItem("Apple");
+    list.addItem("Banana");
+    list.addItem("Cherry");
+    list.addItem("Date");	
 	
 	
-	ws::Sprite sprite;
-	sprite.setTexture(texture);
-	
-	
-	ws::Timer timer;
-	
-	double amplitude = 5.0;
-	double frequency = 0.005;
-	double speed = 1.0;
-	double time = 0.0;
+	window.addChild(list);
 	
 	
 	while(window.isOpen())
 	{
-		float dt = timer.restart();
-		
-		
-		
-		window.clear(ws::Hue(169 - 20,173 - 20,150 - 20));
-	
-	
-		for(int y=0;y<texture.getSize().y;y++)
-		{
-			float offset = amplitude * std::sin(2 * 3.14 * frequency * (y - speed * time));
-			for(int x=0;x<texture.getSize().x;x++)
-			{
-				if(drawTex.getSize().x == 0 || (drawTex.getSize().x > 0 && drawTex.getPixel(x,y) == ws::Hue::blue))
-					window.setPixel(x + offset,y,texture.getPixel(x,y));
-				else
-					window.setPixel(x,y,texture.getPixel(x,y));
-			}
-			time += dt/14;
-		}
-		
-	
-	
+        window.clear();
+
+        MSG msg;
+        while(window.pollEvent(msg))
+        {
+            if(combo.selectionChanged(msg))
+            {
+                std::string selected = combo.getSelectedText();
+                std::string msgText = "You selected: " + selected;
+                MessageBoxA(window.hwnd, msgText.c_str(), "Selection Changed", MB_OK | MB_ICONINFORMATION);
+            }
+        }
+
+
 		window.display();
 	}
-	return 0;
+	
 }
