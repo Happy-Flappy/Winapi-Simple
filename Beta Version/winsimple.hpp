@@ -1712,6 +1712,40 @@ namespace ws
 			return ws::Vec2i(width,height); 
 		}
 		
+		void setSize(int w,int h)
+		{
+			setSize({w,h});
+		}
+		
+		void setSize(ws::Vec2i s)
+		{
+			if (s.x < 1 || s.y < 1) return;
+
+			Gdiplus::Bitmap scaled(s.x, s.y, PixelFormat32bppARGB);
+			Gdiplus::Graphics g(&scaled);
+			g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+			g.DrawImage(bitmap, 0, 0, s.x, s.y);
+
+			loadFromBitmapPlus(scaled);
+		}
+		
+		void setScale(float s)
+		{
+			if (s <= 0.0f || !bitmap)
+				return;
+
+			int newW = static_cast<int>(width  * s);
+			int newH = static_cast<int>(height * s);
+			if (newW < 1 || newH < 1) return;
+
+			Gdiplus::Bitmap scaled(newW, newH, PixelFormat32bppARGB);
+			Gdiplus::Graphics g(&scaled);
+			g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+			g.DrawImage(bitmap, 0, 0, newW, newH);
+
+			loadFromBitmapPlus(scaled);
+		}
+		
 		
 		bool saveToFile(std::string path)
 		{
@@ -3469,6 +3503,7 @@ namespace ws
 		
 	};
 
+
 	class Window
 	{
 		public:
@@ -3486,7 +3521,11 @@ namespace ws
 
 		ws::Cursor cursor; 
 
-
+		static LRESULT defaultNotifyStub(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			return DefWindowProc(window->hwnd, uMsg, wParam, lParam);
+		}
+		
 		
 		
 		public:		
@@ -4053,7 +4092,8 @@ namespace ws
 		void addChild(ws::Child &child);
 		void removeChild(ws::Child &child);
 		bool hasChild(ws::Child &child);
-		
+		// By default, this points to an empty function. If the child controls header is included, then an alternative definition is provided by the header.
+		static inline LRESULT (*s_handleNotifyForChildren)(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam) = &ws::Window::defaultNotifyStub;  
 		
 		void setCursor(ws::Cursor newcursor)
 		{
@@ -4081,6 +4121,13 @@ namespace ws
 				case WM_CLOSE:
 					DestroyWindow(hwnd);
 					return 0;
+				
+				case WM_NOTIFY:
+				{
+					
+					NMHDR* pnmh = reinterpret_cast<NMHDR*>(lParam);
+					return s_handleNotifyForChildren(this, pnmh, uMsg, wParam, lParam);		
+				}
 
 				case WM_COMMAND:
 				{
@@ -4155,6 +4202,7 @@ namespace ws
 		RECT windowedRect; // Stores window position/size when not fullscreen
     	DWORD windowedStyle; // Stores window style when not fullscreen			
 	};
+	
 	
 	
 	//Window Manager Stuff

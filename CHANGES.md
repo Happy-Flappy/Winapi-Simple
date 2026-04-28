@@ -251,7 +251,9 @@
 * Fixed warnings of incorrect type conversions in winsimple headers.
 * Fixed Faulty window cleanup in ws::Window::create()
 * Major upgrades to ws::Child so that it can be used to easily do any win32 child control existing. 
-
+* Fixed issue where winsimple-controls.hpp was required due to ws::Window::handleNotifyForChildren.
+* Added Steering Behavior Demo
+* Added ws::Texture::setSize() and ws::Texture::setScale for image pixel data resizing.
 
 # New major features to be added. 
 

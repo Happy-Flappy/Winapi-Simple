@@ -18,6 +18,10 @@
 
 namespace ws
 {
+	//this is the real notify handler that ws::Window will point to now that this header is included.
+    LRESULT handleNotifyForChildren(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    
+	
 	class ControlsInit
 	{
 		public:
@@ -28,7 +32,7 @@ namespace ws
 			INITCOMMONCONTROLSEX icex;
 			//This is for initialization of winapi child objects sucg as buttons and textboxes.
 			icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
-			icex.dwICC = ICC_STANDARD_CLASSES;  // Enables a set of common controls.
+			icex.dwICC = ICC_STANDARD_CLASSES | ICC_TAB_CLASSES;  // Enables a set of common controls.
 			InitCommonControlsEx(&icex);
 			///////////////////////////////
 			
@@ -37,6 +41,8 @@ namespace ws
 			if (FAILED(hr)){
 				MessageBoxA(NULL,"Winsimple Failed to call CoInitializeEx() in winsimple-controls!","Winsimple Failure!",MB_OK);
 			}
+			
+			ws::Window::s_handleNotifyForChildren = &handleNotifyForChildren;
 		}
 		
 		~ControlsInit()
@@ -57,11 +63,17 @@ namespace ws
 		int x = 0, y = 0, width = 100, height = 100;
 		std::string m_className;               
 
+		std::vector<ws::Child*> children;
 
+		using DestructorCallback = std::function<void(Child*)>;
+		std::vector<DestructorCallback> m_destructorCallbacks;
+
+		HWND m_currentParent = nullptr;
+		
 		public:
 
 		HWND hwnd = NULL;
-		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD;
+		DWORD style = WS_TABSTOP | WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS;
 		DWORD exStyle = 0;                     // extended style
 		DWORD textStyle = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
 
@@ -79,6 +91,9 @@ namespace ws
 		
 		virtual ~Child()
 		{
+			for(auto& cb : m_destructorCallbacks)
+				cb(this);
+			
 			if (hwnd && IsWindow(hwnd))
 				DestroyWindow(hwnd);
 			if (customFont)
@@ -95,14 +110,18 @@ namespace ws
 		{
 			if (!phwnd) return false;
 
-			if(width <= 0 || height <= 0)
-			{
-				std::cerr << "Error: Attempted to create a child window with an invalid size!" << std::endl;
-				MessageBoxA(NULL,"Error: Attempted to create a child window with an invalid size!","Developer Error",MB_OK);
-			}
 			
 			if (hwnd && IsWindow(hwnd)) 
 			{
+				HWND cParent = GetParent(hwnd);
+				if(cParent && cParent != phwnd)
+				{
+					std::cerr << "Error: Child already parented to a different window. "
+							  << "Remove it from the current container first.\n";
+					MessageBoxA(NULL,"Error: Child already parented to a different window. Remove it from the current container first.\n","Error",MB_OK | MB_ICONINFORMATION);		  
+					return false;					
+				}
+				
 				DestroyWindow(hwnd);
 				// force processing of the destruction message
 				MSG msg;
@@ -137,8 +156,60 @@ namespace ws
 
 			ShowWindow(hwnd, SW_SHOW);
 			UpdateWindow(hwnd);
+
+			for(int a=0;a<children.size();a++)
+			{
+				if(!children[a]->hwnd)
+					children[a]->init(this->hwnd);
+				if(GetParent(children[a]->hwnd) != this->hwnd)
+					children[a]->init(this->hwnd);
+			}
+
 			return true;			
 		}
+
+		void registerDestructorCallback(DestructorCallback callback)
+		{
+			m_destructorCallbacks.push_back(std::move(callback));
+		}
+		void clearDestructorCallbacks() 
+		{
+			m_destructorCallbacks.clear();
+		}
+
+
+		void addChild(ws::Child& child) 
+		{
+			children.push_back(&child);
+
+			
+			if(this->hwnd)
+				child.init(this->hwnd);  
+		}
+
+		void removeChild(ws::Child &child)
+		{
+			for(size_t a=0;a<children.size();a++)
+			{
+				if(&child == children[a])
+				{
+					children.erase(children.begin() + a);
+					break;
+				}
+			}
+		}
+		
+		bool hasChild(ws::Child &child)
+		{
+			for(size_t a=0;a<children.size();a++)
+			{
+				if(&child == children[a])
+				{
+					return true;
+				}
+			}			
+			return false;
+		}			
 		
 
 		void setClass(const std::wstring& className = L"Button")
@@ -154,6 +225,12 @@ namespace ws
 		{
 			return m_className;
 		}
+		
+		void setVisible(bool visible)
+		{
+			ShowWindow(hwnd,(visible) ? SW_SHOW : SW_HIDE);
+		}
+
 		
 		void setPosition(int xPos, int yPos) 
 		{ 
@@ -173,7 +250,7 @@ namespace ws
 			return {x, y}; 
 		}
 
-		void setSize(int w, int h) 
+		virtual void setSize(int w, int h) 
 		{ 
 			width = w; 
 			height = h; 
@@ -181,7 +258,7 @@ namespace ws
 				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE); 
 		}
 		
-		void setSize(ws::Vec2i size) 
+		virtual void setSize(ws::Vec2i size) 
 		{ 
 			setSize(size.x, size.y); 
 		}
@@ -333,8 +410,20 @@ namespace ws
 	
 	void ws::Window::addChild(ws::Child &child)
 	{
+		//prevent duplicate child addition
+		if (std::find(children.begin(), children.end(), &child) != children.end())
+			return;
+	
 		children.push_back(&child);
+		
+		child.registerDestructorCallback([this](Child* dyingChild) {
+			auto it = std::find(children.begin(), children.end(), dyingChild);
+			if (it != children.end())
+				children.erase(it);
+		});		
+		
 		child.init(*this);
+
 	}
 	
 	void ws::Window::removeChild(ws::Child &child)
@@ -360,6 +449,207 @@ namespace ws
 		}			
 		return false;
 	}	
+
+	LRESULT handleNotifyForChildren(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam)
+    {
+        for (Child* child : window->children)
+        {
+            if (child && child->handleNotify(pnmh))
+                return 0;
+        }
+        return DefWindowProc(window->hwnd, uMsg, wParam, lParam);
+    }
+
+
+	class Tabs : public ws::Child
+	{
+		private:
+		
+		struct PendingPage
+		{
+			std::string title = "";
+			ws::Child *child;
+		};
+		
+		std::vector<ws::Child*> pages;
+		std::vector<PendingPage> pendingPages;
+		int selected = 0;
+		
+		public:
+		
+		Tabs()
+		{
+			setClass(L"SysTabControl32");
+			addStyle(TCS_FIXEDWIDTH | TCS_RIGHTJUSTIFY  | WS_CLIPSIBLINGS);			
+		}
+		
+		virtual bool init(ws::Window& parent) override
+		{
+			if (!Child::init(parent))
+				return false;
+
+			if (!getFontHandle())
+			{
+				ws::Font font;
+				font.loadFromSystem("Segoe UI");
+				ws::Text text;
+				text.setCharacterSize(14);
+				setFont(font, text);
+			}
+
+			for (auto& pending : pendingPages) 
+			{
+				addPage(pending.title,*pending.child);
+			}
+			pendingPages.clear();
+
+			updatePagePositions();
+			
+			if (!pages.empty())
+				setSelected(selected);
+
+			return true;
+		}		
+		
+		void addPage(const std::string& title, ws::Child& page)
+		{
+			if(!hwnd)
+			{
+				PendingPage p;
+				p.title = title;
+				p.child = &page;
+				pendingPages.push_back(p);
+				return;
+			}
+			
+			HWND parentHwnd = GetParent(hwnd);
+			if (!page.hwnd)
+				page.init(parentHwnd);
+			else
+				SetParent(page.hwnd, parentHwnd);
+			
+			page.setVisible(false);
+			pages.push_back(&page);
+
+			
+			TCITEM tie = {0};
+			tie.mask = TCIF_TEXT;
+			
+			std::wstring wtitle = ws::WIDE(title);
+			tie.pszText = const_cast<LPWSTR>(wtitle.c_str());
+			TabCtrl_InsertItem(hwnd, (int)pages.size() - 1, &tie);
+
+			// Reposition all pages to fit the current display area
+			updatePagePositions();
+
+			if(pages.size() == 1)
+				setSelected(0);
+		}
+
+		void removePage(ws::Child &child)
+		{
+			for(size_t a=0;a<pages.size();a++)
+			{
+				if(&child == pages[a])
+				{
+					pages.erase(pages.begin() + a);
+					break;
+				}
+			}
+		}
+		
+		bool hasPage(ws::Child &child)
+		{
+			for(size_t a=0;a<pages.size();a++)
+			{
+				if(&child == pages[a])
+				{
+					return true;
+				}
+			}			
+			return false;
+		}	
+		
+		void setSelected(int index)
+		{
+			if(!hwnd)
+			{
+				selected = index;
+				return;
+			}
+			if (index < 0 || index >= (int)pages.size())
+				return;
+
+			TabCtrl_SetCurSel(hwnd, index);
+
+			for (int i = 0; i < (int)pages.size(); ++i)
+				pages[i]->setVisible(i == index);
+
+			updatePagePositions();
+		}
+
+		int getSelected() const
+		{
+			return TabCtrl_GetCurSel(hwnd);
+		}
+
+		virtual void setSize(int w, int h) override
+		{
+			Child::setSize(w, h);
+			updatePagePositions();
+		}
+		
+		
+		virtual bool handleNotify(NMHDR* pnmh) override
+		{
+			if (pnmh->hwndFrom == hwnd && pnmh->code == TCN_SELCHANGE)
+			{
+				int newSel = TabCtrl_GetCurSel(hwnd);
+				
+				for(int a=0;a<pages.size();a++)
+					pages[a]->setVisible((a == newSel));
+				
+				
+				return true;
+			}
+			return false;      // not handled, let parent process
+		}
+
+
+
+		void updatePagePositions()
+		{
+			if (!hwnd) return;
+
+			HWND parentHwnd = GetParent(hwnd);
+			if (!parentHwnd) return;
+
+			RECT rcTab;
+			GetWindowRect(hwnd, &rcTab);
+
+			MapWindowPoints(HWND_DESKTOP, parentHwnd, (LPPOINT)&rcTab, 2);
+
+			RECT rcDisplay = rcTab;
+			MapWindowPoints(parentHwnd, hwnd, (LPPOINT)&rcDisplay, 2);
+			TabCtrl_AdjustRect(hwnd, FALSE, &rcDisplay);
+			MapWindowPoints(hwnd, parentHwnd, (LPPOINT)&rcDisplay, 2);
+
+			// position each page to exactly fill that display area
+			for(auto* page : pages)
+			{
+				if(page && page->hwnd)
+				{
+					SetWindowPos(page->hwnd, NULL,
+					rcDisplay.left, rcDisplay.top,
+					rcDisplay.right - rcDisplay.left,
+					rcDisplay.bottom - rcDisplay.top,
+					SWP_NOZORDER | SWP_NOACTIVATE);
+				}
+			}
+		}
+
+		
+	};
 
 
 	class ComboBox : public Child
@@ -1514,6 +1804,8 @@ namespace ws
             return hwnd ? (int)SendMessage(hwnd, LB_GETCOUNT, 0, 0) : 0;
         }
     };	
+	
+
 }
 
 #endif
