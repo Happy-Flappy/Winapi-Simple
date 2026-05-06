@@ -6,10 +6,10 @@ Controls Linking: -lcomctl32 -lcomdlg32 -luuid -lshell32
 
 Clipboard And DragNDrop Linking: -lole32 -luuid
 
+Shader Linking: -ld3d11 -ld3dcompiler
 
-Total Linking: -lgdi32 -luser32 -lgdiplus -lole32 -lwinmm -lcomctl32 -lshell32 -luuid
 
-Note: You must always provide linking for the base of winsimple in order to use the other headers. Audio is an exception to that rule. 
+Total Linking: -lgdi32 -luser32 -lgdiplus -lole32 -lwinmm -lcomctl32 -lshell32 -luuid -ld3d11 -ld3dcompiler
 
 
 

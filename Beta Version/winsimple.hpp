@@ -49,6 +49,7 @@
 #include <type_traits>   // std::enable_if, std::is_arithmetic, etc.
 #include <utility>       // std::move, std::pair
 #include <mutex>         // std::mutex
+#include <set>
 
 // Define missing Windows types for GDI+
 #ifndef SHORT
@@ -1276,6 +1277,15 @@ namespace ws
 
 		public:
 
+		enum class ScaleMode {
+			NearestNeighbor,   // sharp edges, pixelated
+			Bilinear,          // smooth, linear filter
+			Bicubic,           // smoother, slightly more expensive
+			HighQualityBicubic // best quality, slowest
+		};
+		
+		ScaleMode scaleMode = ScaleMode::HighQualityBicubic;
+		
 		
 		Gdiplus::Bitmap* bitmap;
 		
@@ -1380,6 +1390,7 @@ namespace ws
 			  m_isFast(false)
 		{
 			copyFrom(other);
+			scaleMode = other.scaleMode;
 		}
 
 		// Copy assignment
@@ -1392,6 +1403,7 @@ namespace ws
 				width  = 0;
 				height = 0;
 				copyFrom(other);
+				scaleMode = other.scaleMode;
 			}
 			return *this;
 		}
@@ -1406,7 +1418,8 @@ namespace ws
 			  m_hDIB(other.m_hDIB),
 			  m_hOldBmp(other.m_hOldBmp),
 			  m_dibBits(other.m_dibBits),
-			  m_isFast(other.m_isFast)
+			  m_isFast(other.m_isFast),
+			  scaleMode(other.scaleMode)
 		{
 			// Null out the source so its destructor does nothing
 			other.bitmap    = nullptr;
@@ -1417,6 +1430,7 @@ namespace ws
 			other.m_isFast  = false;
 			other.width     = 0;
 			other.height    = 0;
+			
 		}
 
 		// Move assign
@@ -1435,6 +1449,7 @@ namespace ws
 				m_hOldBmp   = other.m_hOldBmp;
 				m_dibBits   = other.m_dibBits;
 				m_isFast    = other.m_isFast;
+				scaleMode = other.scaleMode;
 
 				// null out the source
 				other.bitmap    = nullptr;
@@ -1491,6 +1506,8 @@ namespace ws
 			g.Clear(color);
 
 			m_isFast = true;
+			
+			scaleMode = ScaleMode::HighQualityBicubic;
 			return true;
 		}
 	
@@ -1638,7 +1655,10 @@ namespace ws
 	    
 	    
 	    
-	    
+		void setScaleMode(ScaleMode mode) 
+		{ scaleMode = mode; }
+		ScaleMode getScaleMode() const 
+		{ return scaleMode; }
 	    
 	    
 	    
@@ -2073,6 +2093,16 @@ namespace ws
 	        bottom = static_cast<int>(maxY);
 	    }
 	    
+		
+		
+		ws::IntRect getBounds() const
+	    {
+	    	int left,top,right,bottom;
+			getBounds(left,top,right,bottom);
+			return ws::IntRect(left,top,right,bottom);
+	    }
+	    
+		
 	    //Visually contains
 		virtual bool contains(ws::Vec2i point)
 	    {
@@ -2198,10 +2228,31 @@ namespace ws
 	        
 	        Gdiplus::Rect destRect(0,0, width, height);
 	        Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+			
+			Gdiplus::InterpolationMode oldMode = graphics->GetInterpolationMode();
+			
+			switch(textureRef->getScaleMode()) 
+			{
+				case Texture::ScaleMode::NearestNeighbor:
+					graphics->SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+					break;
+				case Texture::ScaleMode::Bilinear:
+					graphics->SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
+					break;
+				case Texture::ScaleMode::Bicubic:
+					graphics->SetInterpolationMode(Gdiplus::InterpolationModeBicubic);
+					break;
+				case Texture::ScaleMode::HighQualityBicubic:
+					graphics->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+					break;
+			}			
+			
 	        
 	        graphics->DrawImage(textureRef->bitmap, destRect,
 	                           srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
 	                           Gdiplus::UnitPixel);
+							   
+			graphics->SetInterpolationMode(oldMode);				   
 	    }	    
 
 		
@@ -3490,12 +3541,12 @@ namespace ws
 	class WindowManager
 	{
 		public:
+		static std::set<std::wstring> registeredClasses; 
 		static std::map<HWND, ws::Window*> windows;
 		static std::mutex windowsMutex;
-		static bool initialized;
 		
-		
-		static void init(const std::string& className = "Window");		
+		static bool registerClass(const std::string& className);
+				
 		static LRESULT CALLBACK GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam);
 		static void addWindow(ws::Window* window);
 		static void removeWindow(HWND hwnd);		
@@ -3572,7 +3623,8 @@ namespace ws
 				hwnd = nullptr;
 			}
 			
-			WindowManager::init(className);
+			if(!WindowManager::registerClass(className))
+				return;
 			
 			
 			if(style == -1)
@@ -3580,7 +3632,7 @@ namespace ws
 			if(exStyle == -1)
 				exStyle = 0;
 			
-			//Note to self: the style must be set this way because hwnd has not been initialized yet!
+			//Note to self: the style must be set manually this way because hwnd has not been initialized yet!
 			style |= WS_CLIPCHILDREN;
 			
 			
@@ -4206,27 +4258,39 @@ namespace ws
 	
 	
 	//Window Manager Stuff
+
+	std::set<std::wstring> ws::WindowManager::registeredClasses;
+	std::map<HWND, ws::Window*> ws::WindowManager::windows;
+	std::mutex ws::WindowManager::windowsMutex;
 	
-	inline void ws::WindowManager::init(const std::string& className)
+	bool ws::WindowManager::registerClass(const std::string& className)
 	{
-		if(initialized)
-			return;
-		HINSTANCE instance = GetModuleHandle(nullptr);
+		std::wstring wclassName = ws::WIDE(className);
 		
+		// Check if already registered
+		if (registeredClasses.find(wclassName) != registeredClasses.end())
+			return true;   // already exists, nothing to do
+
+		HINSTANCE instance = GetModuleHandle(nullptr);
 		WNDCLASS wc = {};
 		wc.lpfnWndProc = WindowManager::GlobalProc;
 		wc.hInstance = instance;
-		wc.lpszClassName = ws::WIDE(className).c_str();
+		wc.lpszClassName = wclassName.c_str();
 		wc.hCursor = NULL;
 		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-		
-		if(!RegisterClass(&wc))
+
+		if (!RegisterClass(&wc))
 		{
-			std::cerr << "Failed to initialize Window"<<std::endl;
-			exit(-1);
+			std::cerr << "Failed to register window class: " << className << std::endl;
+			return false;
 		}
-		initialized = true;
+
+		registeredClasses.insert(wclassName);
+		return true;
 	}
+
+
+
 	
 	inline LRESULT CALLBACK ws::WindowManager::GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	{
@@ -4278,11 +4342,7 @@ namespace ws
 		return nullptr;
 	}		
 	
-	
-	
-	std::map<HWND, ws::Window*> ws::WindowManager::windows;
-	std::mutex ws::WindowManager::windowsMutex;
-    bool ws::WindowManager::initialized = false;	
+
 	
 
 	//=========== GLOBAL INPUT ===========
