@@ -255,7 +255,8 @@
 * Added Steering Behavior Demo
 * Added ws::Texture::setSize() and ws::Texture::setScale for image pixel data resizing.
 * Fixed Custom window class crashing.
- 
+* Added option to insert custom handling for internal window messages. 
+* window.addMessageHandler([&window](MSG msg) -> LRESULT{//handle a message here and return LRESULT});
 
 # New major features to be added. 
 

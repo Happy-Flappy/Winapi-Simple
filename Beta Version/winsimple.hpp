@@ -4156,11 +4156,32 @@ namespace ws
 			return cursor;
 		}
 		
-		private:
+		
+		void addMessageHandler(std::function<LRESULT(MSG msg)> handler)
+		{
+			customHandlers.push_back(std::move(handler));
+		}
 
+		void clearMessageHandlers() {
+			customHandlers.clear();
+		}
+		
+		private:
+		std::vector<std::function<LRESULT(MSG msg)>> customHandlers;
 		
 		LRESULT handleMessage(UINT uMsg,WPARAM wParam,LPARAM lParam)
 		{
+			for(auto& handler : customHandlers)
+			{
+				MSG msg;
+				msg.message = uMsg;
+				msg.lParam = lParam;
+				msg.wParam = wParam;
+				
+				LRESULT lresult = handler(msg);
+				if(lresult != 0)
+					return lresult;//if result is not zero that means that the message was handled.
+			}			
 
             switch (uMsg) {
 	            case WM_DESTROY:
@@ -4238,6 +4259,7 @@ namespace ws
 	            }
 				case WM_ERASEBKGND:
 					return 1;
+			
 				default:
 				{
 					return DefWindowProc(hwnd, uMsg, wParam, lParam);					
