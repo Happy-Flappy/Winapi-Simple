@@ -1,0 +1,15 @@
+Core Winsimple Linking:  -lgdi32 -luser32 -lgdiplus -lole32
+
+Audio Linking: -lwinmm
+
+Controls Linking: -lcomctl32 -lcomdlg32 -luuid -lshell32
+
+Clipboard And DragNDrop Linking: -lole32 -luuid
+
+
+Total Linking: -lgdi32 -luser32 -lgdiplus -lole32 -lwinmm -lcomctl32 -lshell32 -luuid
+
+
+
+
+

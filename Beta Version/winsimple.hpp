@@ -2,18 +2,9 @@
 #define WINSIMPLE_HPP
 
 
-// winsimple.hpp – Core Windows GDI+ graphics library (header‑only core)
-
-//Core Winsimple Linking:  -lgdi32 -luser32 -lgdiplus -lole32
-
-
-
-
-// Suppress unnecessary depreciation warnings if any.
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
-
 
 #ifndef UNICODE
 #define UNICODE
@@ -29,29 +20,27 @@
 #define STRICT
 #endif
 
-// Windows headers
 #include <windows.h>
 #include <windowsx.h>
 #include <gdiplus.h>
 
-// Standard C++ headers needed for core classes
-#include <iostream>      // std::cerr
+#include <iostream>
 #include <string>
-#include <cstdlib>       // std::atoi, etc.
+#include <cstdlib>
 #include <map>
 #include <queue>
-#include <iomanip>       // std::quoted
-#include <cmath>         // std::cos, std::sin, std::pow
-#include <filesystem>    // std::filesystem::path
-#include <cwchar>        // wcsrchr, etc.
-#include <algorithm>     // std::transform, std::min, std::max
-#include <functional>    // std::function
-#include <type_traits>   // std::enable_if, std::is_arithmetic, etc.
-#include <utility>       // std::move, std::pair
-#include <mutex>         // std::mutex
+#include <iomanip>
+#include <cmath>
+#include <cwchar>
+#include <algorithm>
+#include <functional>
+#include <type_traits>
+#include <utility>
+#include <mutex>
 #include <set>
+#include <memory>
+#include <vector>
 
-// Define missing Windows types for GDI+
 #ifndef SHORT
 typedef short SHORT;
 #endif
@@ -63,7 +52,6 @@ typedef unsigned long PROPID;
 #define M_PI 3.14159265358979323846
 #endif
 
-// Some system cursor IDs that are not always defined
 #ifndef IDC_PIN
 #define IDC_PIN MAKEINTRESOURCE(32671)
 #endif
@@ -71,16 +59,12 @@ typedef unsigned long PROPID;
 #define IDC_PERSON MAKEINTRESOURCE(32672)
 #endif
 
-
-//automated linking for visual studio MSVC
 #ifdef _MSC_VER
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "ole32.lib")
 #endif
-
-
 
 namespace ws
 {
@@ -199,15 +183,15 @@ namespace ws
     }
     inline bool ResolveRelativePath(std::string& path)
     {
-        std::filesystem::path filePath(path);
-        if (filePath.is_relative())
-        {
-            char exePath[MAX_PATH];
-            GetModuleFileNameA(NULL, exePath, MAX_PATH);
-            std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-            filePath = exeDir / filePath;
-        }
-        path = filePath.string();
+        if (path.empty()) return false;
+        if ((path.size() > 1 && path[1] == ':') || path[0] == '\\' || path[0] == '/')
+            return true;
+        char exePath[MAX_PATH];
+        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+        char* lastSlash = strrchr(exePath, '\\');
+        if (lastSlash) *lastSlash = '\0';
+        std::string dir(exePath);
+        path = dir + "\\" + path;
         return true;
     }
 	
@@ -796,6 +780,106 @@ namespace ws
 		{ 
 			return !(*this == other); 
 		}		
+		
+		
+		struct HSV {
+			float h;  
+			float s; 
+			float v; 
+			
+		};
+		
+		static Hue fromHSV(float h, float s, float v, int alpha = 255) {
+			// h: 0..360 degrees, s: 0..1, v: 0..1
+			float c = v * s;
+			float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
+			float m = v - c;
+
+			float r1 = 0, g1 = 0, b1 = 0;
+			if (h < 60) {
+				r1 = c; g1 = x; b1 = 0;
+			} else if (h < 120) {
+				r1 = x; g1 = c; b1 = 0;
+			} else if (h < 180) {
+				r1 = 0; g1 = c; b1 = x;
+			} else if (h < 240) {
+				r1 = 0; g1 = x; b1 = c;
+			} else if (h < 300) {
+				r1 = x; g1 = 0; b1 = c;
+			} else {
+				r1 = c; g1 = 0; b1 = x;
+			}
+
+			int r = static_cast<int>((r1 + m) * 255);
+			int g = static_cast<int>((g1 + m) * 255);
+			int b = static_cast<int>((b1 + m) * 255);
+
+			return Hue(r, g, b, alpha);
+		}		
+		
+		
+		static Hue fromHSV(HSV hsv,int alpha = 255)
+		{
+			return fromHSV(hsv.h,hsv.s,hsv.v,alpha);
+		}
+		
+
+		HSV toHSV() const {
+			float rNorm = r / 255.0f;
+			float gNorm = g / 255.0f;
+			float bNorm = b / 255.0f;
+
+			float maxVal = std::max({rNorm, gNorm, bNorm});
+			float minVal = std::min({rNorm, gNorm, bNorm});
+			float delta = maxVal - minVal;
+
+			float hue = 0.0f;
+			if (delta > 0.0f) {
+				if (maxVal == rNorm)
+					hue = 60.0f * (fmod(((gNorm - bNorm) / delta), 6.0f));
+				else if (maxVal == gNorm)
+					hue = 60.0f * (((bNorm - rNorm) / delta) + 2.0f);
+				else if (maxVal == bNorm)
+					hue = 60.0f * (((rNorm - gNorm) / delta) + 4.0f);
+			}
+			if (hue < 0.0f) hue += 360.0f;
+
+			float saturation = (maxVal == 0.0f) ? 0.0f : delta / maxVal;
+			float value = maxVal;
+
+			return {hue, saturation, value};
+		}	
+
+
+		static bool inHueRange(float hue,ws::Hue::HSV hsv,float tolerance = 60,float minSaturation = 0.1,float minValue = 0.2)
+		{
+			float lower = hue - tolerance;
+			float upper = hue + tolerance;
+
+			bool hueInRange = false;
+			if (lower < 0) {
+				hueInRange = (hsv.h >= (360.0f + lower) || hsv.h <= upper);
+			} else if (upper > 360) {
+				hueInRange = (hsv.h >= lower || hsv.h <= (upper - 360.0f));
+			} else {
+				hueInRange = (hsv.h >= lower && hsv.h <= upper);
+			}
+
+
+			return (hueInRange && (hsv.s >= minSaturation) && (hsv.v >= minValue));				
+		}
+		
+		static ws::Hue replaceHue(float hue,float replacement,ws::Hue rgb)
+		{
+			HSV hsv = rgb.toHSV();
+			
+			if(ws::Hue::inHueRange(hue,hsv))
+			{
+				ws::Hue rgb2 = fromHSV(replacement,hsv.s,hsv.v,rgb.a);
+				return rgb2;
+			}
+			return fromHSV(hsv.h,hsv.s,hsv.v,rgb.a);
+		}
 		
 	};
 	
@@ -2017,7 +2101,7 @@ namespace ws
 	    ws::Vec2f getScale() { return scale; }
 	    ws::Vec2i getOrigin() { return origin; }
 	    float getRotation() { return rotation; }
-			    
+		
 	    
 	    void setSize(ws::Vec2i size) {width = size.x;height = size.y;}
 	    void setSize(int w,int h) {width = w;height = h;}
@@ -2099,7 +2183,7 @@ namespace ws
 	    {
 	    	int left,top,right,bottom;
 			getBounds(left,top,right,bottom);
-			return ws::IntRect(left,top,right,bottom);
+			return ws::IntRect(left,top,right - left,bottom - top);
 	    }
 	    
 		
@@ -2194,7 +2278,7 @@ namespace ws
 	    ws::Texture* textureRef = nullptr;
 	    int texLeft = 0, texTop = 0;  // Texture coordinates
 	    int texWidth = 0, texHeight = 0;  // Texture dimensions			
-		
+
 		
 		public:
 		
@@ -2247,15 +2331,13 @@ namespace ws
 					break;
 			}			
 			
-	        
-	        graphics->DrawImage(textureRef->bitmap, destRect,
-	                           srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-	                           Gdiplus::UnitPixel);
-							   
+			graphics->DrawImage(textureRef->bitmap, destRect,
+								srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+								Gdiplus::UnitPixel);
+		
 			graphics->SetInterpolationMode(oldMode);				   
 	    }	    
 
-		
 		
 	    void setTexture(ws::Texture& texture,bool resize = true) {
 	        textureRef = &texture;
@@ -3968,12 +4050,12 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
 		}
 
-		DWORD getExStyle()
+		DWORD getExStyle() const
 		{	
 			return GetWindowLong(hwnd, GWL_EXSTYLE);
 		}
 	    
-	    DWORD getStyle()
+	    DWORD getStyle() const
 	    {
 	    	return GetWindowLong(hwnd, GWL_STYLE);
             
@@ -4012,7 +4094,7 @@ namespace ws
             
 		}
 		
-		ws::Vec2i getSize()
+		ws::Vec2i getSize() const
 		{
 			RECT rect;
 			GetClientRect(hwnd, &rect);
@@ -4039,20 +4121,72 @@ namespace ws
 			SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);			
 		}
 		
-		ws::Vec2i getPosition()
+		ws::Vec2i getPosition() const
 		{
 			if(!hwnd)
 				return ws::Vec2i(0,0);
-				
+			
+			RECT windowRect;
+			GetWindowRect(hwnd, &windowRect);
+			return ws::Vec2i(windowRect.left, windowRect.top);		
+		}
+		
+		ws::Vec2i getTotalSize() const
+		{
             RECT rect;
             GetWindowRect(hwnd, &rect);
-						
-            // Remove window decorations for size calculation
-            RECT clientRect;
-            GetClientRect(hwnd, &clientRect);
-            
-			return ws::Vec2i(clientRect.left,clientRect.top);			
+			
+			return ws::Vec2i(rect.right - rect.left,rect.bottom - rect.top);
 		}
+		
+		ws::Vec2i getClientPosition() const
+		{
+			if (!hwnd)
+				return ws::Vec2i(0, 0);
+			
+			POINT clientOrigin = {0, 0};
+			ClientToScreen(hwnd, &clientOrigin);
+			return ws::Vec2i(clientOrigin.x, clientOrigin.y);
+		}		
+
+		int getBorderWidth() const
+		{
+			int border = 0;
+			DWORD style = getStyle();
+			if(style & WS_THICKFRAME)
+				border = GetSystemMetrics(SM_CYFRAME);
+			else if(style & WS_BORDER)
+				border = GetSystemMetrics(SM_CYEDGE);
+			return border;
+		}
+
+		ws::IntRect getCaptionRect(bool excludeBorder = false) const
+		{
+			if(!hwnd) 
+				return {0, 0, 0, 0};
+
+			DWORD style = getStyle();
+			if(!(style & WS_CAPTION))
+				return {0, 0, 0, 0};
+
+			RECT winRect;
+			GetWindowRect(hwnd, &winRect);
+			
+			int border = 0;
+			if(excludeBorder)
+				border = getBorderWidth();
+			
+			int captionHeight = GetSystemMetrics(SM_CYCAPTION);
+			return ws::IntRect(
+				winRect.left,
+				winRect.top + border,
+				winRect.right - winRect.left,
+				captionHeight - border
+			);
+		}
+		
+		
+		
 
 		void setFullscreen(bool fullscreen = true) 
 		{
@@ -4421,6 +4555,8 @@ namespace ws
 		
 	}
 
+
+
 	class Screen
 	{
 		HDC hdc = nullptr;
@@ -4560,6 +4696,23 @@ namespace ws
 		}
 		
 		
+		float getDPI()
+		{
+			SetProcessDPIAware();			
+			HDC hdc = GetDC(nullptr);
+			if (!hdc) return 1.0f;
+			int dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+			ReleaseDC(nullptr, hdc);
+			return static_cast<float>(dpi) / 96.0f;
+		}
+
+		ws::IntRect getWorkArea()
+		{
+			RECT area;
+			SystemParametersInfo(SPI_GETWORKAREA, 0, &area, 0);
+			return { area.left, area.top, area.right - area.left, area.bottom - area.top };
+		}
+		
 	};
 
 
@@ -4579,6 +4732,7 @@ namespace ws
 		{
 			//GDI+
 			Gdiplus::GdiplusStartup(&gdiplustoken,&gdiplusstartup,nullptr);	
+			SetProcessDPIAware();
 		}
 		
 		~GDIPInit()

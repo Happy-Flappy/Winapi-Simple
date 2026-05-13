@@ -213,7 +213,7 @@
 * Added ws::DropEffect for ws::DropTarget enums.
 
 
-## V1.6 - Beta
+## V1.6
 
 * Changed Drawable Transform so that position is always translated to origin point.
 * Changed ws::Texture to use ws::Hue in the set and get pixel functions instead of Gdiplus::Color. 
@@ -233,6 +233,8 @@
 * winsimple.hpp - Core
 * winsimple-clipboard.hpp - clipboard and dragdrop
 * winsimple-controls.hpp - winapi controls such as buttons and save dialog
+* winsimple-animate.hpp - animation helper class and ws::GIF.
+* winsimple-audio.hpp
 
 * Added new control child - ws::ListBox
 * Added legacy transparency option in ws::Window::setChromaKey(ws::Hue hue,bool legacy = false) - Legacy uses per pixel alpha and the winapi UpdateLayeredWindow() function.
@@ -257,6 +259,18 @@
 * Fixed Custom window class crashing.
 * Added option to insert custom handling for internal window messages. 
 * window.addMessageHandler([&window](MSG msg) -> LRESULT{//handle a message here and return LRESULT});
+* Added ws::Hue::toHSV()
+* Added ws::Hue::fromHSV()
+* Fixed ws::Window::getPosition() to actually return the screen position.
+* Added ws::Window::getBorderWidth()
+* Added ws::Window::getCaptionRect(bool excludeBorder = false)
+* Added SetProcessDPIAware() to the GDI+ initializer. With DPI awareness, screen.getSize() will be accurate.
+
+
+## V1.7 - Beta
+
+* ...
+
 
 # New major features to be added. 
 
