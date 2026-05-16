@@ -87,8 +87,6 @@ typedef unsigned long PROPID;
 #define IDC_PERSON MAKEINTRESOURCE(32672) // available since Windows 8
 #endif
 
-
-
 // ========== CORE UTILITIES ==========
 namespace ws
 {
@@ -96,8 +94,7 @@ namespace ws
 	{
 		public:
 		
-		
-		
+		// Default constructor: initializes high‑performance timer and starts timing.
 		Timer()
 		{
 			LARGE_INTEGER freq;
@@ -106,10 +103,12 @@ namespace ws
 			restart();
 		}
 		
+		// Destructor: does nothing special.
 		~Timer()
 		{
 		}
 		
+		// Restarts the timer and returns the elapsed seconds since the previous start.
 		double restart()
 		{
 	        double seconds = getSeconds();
@@ -120,7 +119,7 @@ namespace ws
             return seconds;
 		}
 		
-		
+		// Returns the elapsed time in seconds since the last restart.
 	    double getSeconds() const
 	    {
 	        LARGE_INTEGER currentTime;
@@ -129,11 +128,13 @@ namespace ws
 	      
 	    }
 	    
+		// Returns the elapsed time in milliseconds.
 	    double getMilliSeconds() const
 	    {
 	        return getSeconds() * 1000.0;
 	    }
 	    
+		// Returns the elapsed time in microseconds.
 	    double getMicroSeconds() const
 	    {
 	        return getMilliSeconds() * 1000.0;
@@ -147,7 +148,7 @@ namespace ws
 	};
 	
 	
-	
+	// Resolves a relative path to an absolute path using the executable directory.
 	bool ResolveRelativePath(std::string path)
 	{
 		// Convert to absolute path to ensure proper resolution
@@ -168,7 +169,7 @@ namespace ws
 	    return true;
 	}
 
-
+	// Converts a UTF‑8 or ANSI string to a wide (UTF‑16) string.
 	std::wstring WIDE(std::string str)
 	{
 	    // Try UTF-8 first
@@ -185,7 +186,7 @@ namespace ws
 	    return wstr;
 	}
 
-	
+	// Converts a wide string to a UTF‑8 narrow string.
 	std::string SHORT(const std::wstring& wstr) {
 	    // Determine the size of the required buffer
 	    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
@@ -201,21 +202,19 @@ namespace ws
 	}
 	
 	
-	
-	
+	// Converts a std::string to a LPCSTR (C‑style string pointer).
 	LPCSTR TO_LPCSTR(std::string str)
 	{
 		return LPCSTR(str.c_str());
 	}
 	
+	// Converts a std::string to a LPCWSTR (wide C‑style string pointer).
 	LPCWSTR TO_LPCWSTR(std::string str)
 	{
 	    return WIDE(str).c_str();
 	}	
 	
-
-
-
+	// Returns the short (8.3) path name for a given long path, or empty on failure.
 	std::wstring GetShortPathNameSafe(const std::wstring& longPath) 
 	{
 	    // Pass NULL for the buffer to get the required size.
@@ -238,8 +237,7 @@ namespace ws
 	    return shortPath;
 	}
 
-
-	//A microsoft function that I just copied. It is required for the saving of images to file.
+	// Helper function: retrieves the CLSID of an image encoder from a MIME type.
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 	{
 	    UINT  num = 0;          // number of image encoders
@@ -292,7 +290,7 @@ namespace ws
 	
 	// ==================== TYPE TRAITS ====================
 	
-	// Vector type traits
+	// Trait to detect presence of x and y members.
 	template<typename T, typename = void>
 	struct has_xy_members : std::false_type {};
 	
@@ -302,6 +300,7 @@ namespace ws
 	    decltype(std::declval<T>().y)>>
 	    : std::true_type {};
 	
+	// Trait to detect presence of x, y and z members.
 	template<typename T, typename = void>
 	struct has_xyz_members : std::false_type {};
 	
@@ -312,7 +311,7 @@ namespace ws
 	    decltype(std::declval<T>().z)>>
 	    : std::true_type {};
 	
-	// Rect type traits
+	// Trait to detect left/top/width/height rectangle style.
 	template<typename T, typename = void>
 	struct has_width_height_style : std::false_type {};
 	
@@ -324,6 +323,7 @@ namespace ws
 	    decltype(std::declval<T>().height)>> 
 	    : std::true_type {};
 	
+	// Trait to detect left/top/right/bottom rectangle style.
 	template<typename T, typename = void>
 	struct has_right_bottom_style : std::false_type {};
 	
@@ -335,6 +335,7 @@ namespace ws
 	    decltype(std::declval<T>().bottom)>>
 	    : std::true_type {};
 	
+	// Trait that detects any rectangle‑like type.
 	template<typename T>
 	struct is_rect_like : std::integral_constant<bool, 
 	    has_width_height_style<T>::value || has_right_bottom_style<T>::value> {};
@@ -344,9 +345,10 @@ namespace ws
 	struct Vec2i {
 	    int x, y;
 	    
+		// Default constructor: zero‑initialises members.
 	    Vec2i() = default;
 	    
-	    // Constructor for any two arithmetic types
+		// Construct from two arithmetic values (converted to int).
 	    template<typename T, typename U,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
 	                                         std::is_arithmetic_v<U>>>
@@ -354,14 +356,14 @@ namespace ws
 	        : x(static_cast<int>(x_val)), 
 	          y(static_cast<int>(y_val)) {}
 	    
-	    // Constructor for any type with .x and .y members
+		// Construct from any type with .x and .y members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xy_members<T>::value>>
 	    Vec2i(const T& other) 
 	        : x(static_cast<int>(other.x)), 
 	          y(static_cast<int>(other.y)) {}
 	    
-	    // Conversion operator to any type with .x and .y members
+		// Convert to any type with .x and .y members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xy_members<T>::value>>
 	    operator T() const {
@@ -371,11 +373,12 @@ namespace ws
 	        return result;
 	    }
 	    
-	    // Special POINT pointer conversions (only if layout matches!)
+		// Reinterpret cast to POINTER to POINT (raw pointer).
 	    operator POINT*() { 
 	        return reinterpret_cast<POINT*>(this); 
 	    }
 	    
+		// Reinterpret cast to const POINTER to POINT.
 	    operator const POINT*() const { 
 	        return reinterpret_cast<const POINT*>(this); 
 	    }
@@ -386,9 +389,10 @@ namespace ws
 	struct Vec2f {
 	    float x, y;
 	    
+		// Default constructor: zero‑initialises members.
 	    Vec2f() = default;
 	    
-	    // Constructor for any two arithmetic types
+		// Construct from two arithmetic values (converted to float).
 	    template<typename T, typename U,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
 	                                         std::is_arithmetic_v<U>>>
@@ -396,14 +400,14 @@ namespace ws
 	        : x(static_cast<float>(x_val)), 
 	          y(static_cast<float>(y_val)) {}
 	    
-	    // Constructor for any type with .x and .y members
+		// Construct from any type with .x and .y members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xy_members<T>::value>>
 	    Vec2f(const T& other) 
 	        : x(static_cast<float>(other.x)), 
 	          y(static_cast<float>(other.y)) {}
 	    
-	    // Conversion operator to any type with .x and .y members
+		// Convert to any type with .x and .y members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xy_members<T>::value>>
 	    operator T() const {
@@ -413,11 +417,12 @@ namespace ws
 	        return result;
 	    }
 	    
-	    // Special POINT pointer conversions
+		// Reinterpret cast to POINTER to POINT.
 	    operator POINT*() { 
 	        return reinterpret_cast<POINT*>(this); 
 	    }
 	    
+		// Reinterpret cast to const POINTER to POINT.
 	    operator const POINT*() const { 
 	        return reinterpret_cast<const POINT*>(this); 
 	    }
@@ -428,9 +433,10 @@ namespace ws
 	struct Vec2d {
 	    double x, y;
 	    
+		// Default constructor: zero‑initialises members.
 	    Vec2d() = default;
 	    
-	    // Constructor for any two arithmetic types
+		// Construct from two arithmetic values (converted to double).
 	    template<typename T, typename U,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
 	                                         std::is_arithmetic_v<U>>>
@@ -438,14 +444,14 @@ namespace ws
 	        : x(static_cast<double>(x_val)), 
 	          y(static_cast<double>(y_val)) {}
 	    
-	    // Constructor for any type with .x and .y members
+		// Construct from any type with .x and .y members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xy_members<T>::value>>
 	    Vec2d(const T& other) 
 	        : x(static_cast<double>(other.x)), 
 	          y(static_cast<double>(other.y)) {}
 	    
-	    // Conversion operator to any type with .x and .y members
+		// Convert to any type with .x and .y members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xy_members<T>::value>>
 	    operator T() const {
@@ -455,11 +461,12 @@ namespace ws
 	        return result;
 	    }
 	    
-	    // Special POINT pointer conversions
+		// Reinterpret cast to POINTER to POINT.
 	    operator POINT*() { 
 	        return reinterpret_cast<POINT*>(this); 
 	    }
 	    
+		// Reinterpret cast to const POINTER to POINT.
 	    operator const POINT*() const { 
 	        return reinterpret_cast<const POINT*>(this); 
 	    }
@@ -470,9 +477,10 @@ namespace ws
 	struct Vec3i {
 	    int x, y, z;
 	    
+		// Default constructor: zero‑initialises members.
 	    Vec3i() = default;
 	    
-	    // Constructor for any three arithmetic types
+		// Construct from three arithmetic values (converted to int).
 	    template<typename T, typename U, typename V,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
 	                                         std::is_arithmetic_v<U> &&
@@ -482,7 +490,7 @@ namespace ws
 	          y(static_cast<int>(y_val)), 
 	          z(static_cast<int>(z_val)) {}
 	    
-	    // Constructor for any type with .x, .y and .z members
+		// Construct from any type with .x, .y and .z members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xyz_members<T>::value>>
 	    Vec3i(const T& other) 
@@ -490,7 +498,7 @@ namespace ws
 	          y(static_cast<int>(other.y)), 
 	          z(static_cast<int>(other.z)) {}
 	    
-	    // Conversion operator to any type with .x, .y and .z members
+		// Convert to any type with .x, .y and .z members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xyz_members<T>::value>>
 	    operator T() const {
@@ -507,9 +515,10 @@ namespace ws
 	struct Vec3f {
 	    float x, y, z;
 	    
+		// Default constructor: zero‑initialises members.
 	    Vec3f() = default;
 	    
-	    // Constructor for any three arithmetic types
+		// Construct from three arithmetic values (converted to float).
 	    template<typename T, typename U, typename V,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
 	                                         std::is_arithmetic_v<U> &&
@@ -519,7 +528,7 @@ namespace ws
 	          y(static_cast<float>(y_val)), 
 	          z(static_cast<float>(z_val)) {}
 	    
-	    // Constructor for any type with .x, .y and .z members
+		// Construct from any type with .x, .y and .z members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xyz_members<T>::value>>
 	    Vec3f(const T& other) 
@@ -527,7 +536,7 @@ namespace ws
 	          y(static_cast<float>(other.y)), 
 	          z(static_cast<float>(other.z)) {}
 	    
-	    // Conversion operator to any type with .x, .y and .z members
+		// Convert to any type with .x, .y and .z members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xyz_members<T>::value>>
 	    operator T() const {
@@ -544,9 +553,10 @@ namespace ws
 	struct Vec3d {
 	    double x, y, z;
 	    
+		// Default constructor: zero‑initialises members.
 	    Vec3d() = default;
 	    
-	    // Constructor for any three arithmetic types
+		// Construct from three arithmetic values (converted to double).
 	    template<typename T, typename U, typename V,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
 	                                         std::is_arithmetic_v<U> &&
@@ -556,7 +566,7 @@ namespace ws
 	          y(static_cast<double>(y_val)), 
 	          z(static_cast<double>(z_val)) {}
 	    
-	    // Constructor for any type with .x, .y and .z members
+		// Construct from any type with .x, .y and .z members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xyz_members<T>::value>>
 	    Vec3d(const T& other) 
@@ -564,7 +574,7 @@ namespace ws
 	          y(static_cast<double>(other.y)), 
 	          z(static_cast<double>(other.z)) {}
 	    
-	    // Conversion operator to any type with .x, .y and .z members
+		// Convert to any type with .x, .y and .z members.
 	    template<typename T,
 	             typename = std::enable_if_t<has_xyz_members<T>::value>>
 	    operator T() const {
@@ -581,9 +591,10 @@ namespace ws
 	struct IntRect {
 	    int left, top, width, height;
 	    
+		// Default constructor: zero‑initialises members.
 	    IntRect() = default;
 	    
-	    // Constructor for any four arithmetic types
+		// Construct from four arithmetic values (converted to int).
 	    template<typename T1, typename T2, typename T3, typename T4,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
 	                                         std::is_arithmetic_v<T2> &&
@@ -595,7 +606,7 @@ namespace ws
 	          width(static_cast<int>(w)), 
 	          height(static_cast<int>(h)) {}
 	    
-	    // Constructor for any rect-like type
+		// Construct from any rectangle‑like type (supports both styles).
 	    template<typename T,
 	             typename = std::enable_if_t<is_rect_like<T>::value>>
 	    IntRect(const T& other) {
@@ -614,7 +625,7 @@ namespace ws
 	        }
 	    }
 	    
-	    // Conversion operator to any rect-like type
+		// Convert to any rectangle‑like type (supports both output styles).
 	    template<typename T,
 	             typename = std::enable_if_t<is_rect_like<T>::value>>
 	    operator T() const {
@@ -643,9 +654,10 @@ namespace ws
 	struct FloatRect {
 	    float left, top, width, height;
 	    
+		// Default constructor: zero‑initialises members.
 	    FloatRect() = default;
 	    
-	    // Constructor for any four arithmetic types
+		// Construct from four arithmetic values (converted to float).
 	    template<typename T1, typename T2, typename T3, typename T4,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
 	                                         std::is_arithmetic_v<T2> &&
@@ -657,7 +669,7 @@ namespace ws
 	          width(static_cast<float>(w)), 
 	          height(static_cast<float>(h)) {}
 	    
-	    // Constructor for any rect-like type
+		// Construct from any rectangle‑like type.
 	    template<typename T,
 	             typename = std::enable_if_t<is_rect_like<T>::value>>
 	    FloatRect(const T& other) {
@@ -674,7 +686,7 @@ namespace ws
 	        }
 	    }
 	    
-	    // Conversion operator to any rect-like type
+		// Convert to any rectangle‑like type.
 	    template<typename T,
 	             typename = std::enable_if_t<is_rect_like<T>::value>>
 	    operator T() const {
@@ -701,9 +713,10 @@ namespace ws
 	struct DoubleRect {
 	    double left, top, width, height;
 	    
+		// Default constructor: zero‑initialises members.
 	    DoubleRect() = default;
 	    
-	    // Constructor for any four arithmetic types
+		// Construct from four arithmetic values (converted to double).
 	    template<typename T1, typename T2, typename T3, typename T4,
 	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
 	                                         std::is_arithmetic_v<T2> &&
@@ -715,7 +728,7 @@ namespace ws
 	          width(static_cast<double>(w)), 
 	          height(static_cast<double>(h)) {}
 	    
-	    // Constructor for any rect-like type
+		// Construct from any rectangle‑like type.
 	    template<typename T,
 	             typename = std::enable_if_t<is_rect_like<T>::value>>
 	    DoubleRect(const T& other) {
@@ -732,7 +745,7 @@ namespace ws
 	        }
 	    }
 	    
-	    // Conversion operator to any rect-like type
+		// Convert to any rectangle‑like type.
 	    template<typename T,
 	             typename = std::enable_if_t<is_rect_like<T>::value>>
 	    operator T() const {
@@ -780,9 +793,10 @@ namespace ws
 	    static const Hue white;
 		
 		
-		
+		// Default constructor: initialises to black (0,0,0,255).
 		Hue() = default;
 		
+		// Construct from a Gdiplus::Color object.
 		Hue(Gdiplus::Color &color)
 		{
 			r = color.GetR();
@@ -791,6 +805,7 @@ namespace ws
 			a = color.GetA();
 		}
 
+		// Construct from a Windows COLORREF (RGB, alpha = 255).
 	    Hue(COLORREF color)
 	    {
 	        r = GetRValue(color);
@@ -799,6 +814,7 @@ namespace ws
 	        a = 255;  // COLORREF doesn't have alpha
 	    }
 		
+		// Construct from individual RGBA components.
 		Hue(int r1,int g1,int b1,int a1=255)
 		{
 			r = r1;
@@ -807,12 +823,13 @@ namespace ws
 			a = a1;
 		}
 		
-		
+		// Convert to Gdiplus::Color.
 		operator Gdiplus::Color() const
 		{
 			return Gdiplus::Color(a,r,g,b); 
 		}
 		
+		// Convert to COLORREF (RGB, discards alpha).
 		operator COLORREF() const
 		{
 			return RGB(r,g,b);
@@ -856,7 +873,7 @@ namespace ws
 		std::string extension = "none";
 			
 			
-			
+		// Destructor: closes the MCI device if it was opened.
 		~Wav()
 		{
 		    // Clean up
@@ -870,6 +887,7 @@ namespace ws
 			}
 		}
 
+		// Constructor: stores the audio file path, channel, and blocking flag.
 		Wav(std::string path = "",int channel = 0,bool blocking = true)
 		{
 			this->path = path;
@@ -882,6 +900,7 @@ namespace ws
 
 		private:
 		
+		// Sends an MCI command and optionally reports errors; returns success.
 		static bool mciSimple(std::string command,bool sendError = true)
 		{
 			MCIERROR err = mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
@@ -899,9 +918,7 @@ namespace ws
 		}
 		
 		
-		
-		
-		
+		// Checks file extension and warns about potentially unsupported formats.
 		static void isSupported(std::string m_path)
 		{
 			std::filesystem::path p(m_path);
@@ -928,7 +945,7 @@ namespace ws
 		
 		public:
 
-
+		// Finds and returns an available MCI channel index (0‑99).
 		static int getFreeChannel()
 		{
 			int channel = -1;
@@ -951,7 +968,7 @@ namespace ws
 			return channel;
 		}
 
-
+		// Retrieves the current status ("playing", "stopped", etc.) of an MCI channel.
 		static std::string getChannelStatus(int m_channel)
 		{
 			
@@ -975,7 +992,7 @@ namespace ws
 		}
 		
 
-		
+		// Plays a sound file on a given channel without opening it first.
 		static bool PlayFree(std::string m_path,int m_channel,bool m_blocking = false)
 		{
 			
@@ -1021,10 +1038,7 @@ namespace ws
 		}
 		
 		
-		
-		
-		
-		
+		// Opens a sound file on a specific channel, preparing it for playback.
 		bool open(std::string m_path,int m_channel,bool m_blocking = true)
 		{
 			isSupported(m_path);
@@ -1073,6 +1087,7 @@ namespace ws
 			return true;
 		}
 		
+		// Starts playback of the currently opened audio file.
 		void play()
 		{
 
@@ -1098,7 +1113,7 @@ namespace ws
 		}
 		
 		
-		
+		// Static method: pauses playback on the given channel.
 		static void stop(int m_channel)
 		{
 			std::string m_ID = std::to_string(m_channel);
@@ -1108,6 +1123,7 @@ namespace ws
 			mciSimple(command);
 		}
 		
+		// Pauses playback of the currently opened audio on its channel.
 		void stop()
 		{
 			std::string command = "pause "+ ID;
@@ -1116,8 +1132,7 @@ namespace ws
 		}
 		
 		
-		
-		
+		// Sets the playback volume as a percentage (0‑100); returns success.
 	    bool setVolume(int percent)
 	    {
 	    	
@@ -1158,6 +1173,7 @@ namespace ws
 	        return false;
 	    }
 	    
+		// Returns the current volume as a percentage (0‑100).
 	    int getVolume()
 	    {
 
@@ -1193,7 +1209,7 @@ namespace ws
 	        return (volume * 100) / 1000;
 	    }
 		
-		
+		// Seeks to a specific time position in seconds; returns success.
 		bool setProgress(long seconds)
 		{
 			std::string status = getChannelStatus(channel);
@@ -1213,7 +1229,7 @@ namespace ws
 			return mciSimple(command);
 		}
 		
-		
+		// Returns the current playback position in seconds.
 		long getProgress()
 		{
 	    	if(getChannelStatus(channel) == "error")
@@ -1249,8 +1265,7 @@ namespace ws
 	        return result / 1000;//return in seconds
 		}	
 		
-		
-		
+		// Returns the total length of the audio file in seconds.
 		long getLength()
 		{
 	    	if(getChannelStatus(channel) == "error")
@@ -1273,8 +1288,7 @@ namespace ws
 		    
 		}
 		
-		
-		
+		// Returns true if playback has reached the end of the file.
 		bool isFinished()
 		{
 			if(getChannelStatus(channel) == "error")
@@ -1325,14 +1339,13 @@ namespace ws
 
 		public:
 		
-		
+		// Default constructor.
 		View()
 		{
 			
 		}
 		
-		
-		//Matrix does not have normal copy constructor so the view class has to do this in a custom way so that View can be copied to another view like view = v;
+		// Copy constructor (handles Gdiplus::Matrix copy properly).
 		View(const View& other) : 
 			rotation(other.rotation),
 			port(other.port),
@@ -1344,9 +1357,7 @@ namespace ws
 			setTransform(other.matrix);
 		}
 	    
-	  
-		//move constructor
-		
+		// Move constructor.
 		View(View&& other) noexcept :
 	        rotation(other.rotation),
 	        port(std::move(other.port)),
@@ -1360,8 +1371,7 @@ namespace ws
 	        other.zoom = 0.0f;
 	    }	  
 	  
-	  
-	    
+		// Copy assignment operator.
 		View& operator=(const View& other)
 		{
 		    if (this != &other) {
@@ -1375,7 +1385,7 @@ namespace ws
 		    return *this;
 		}
 		
-		
+		// Move assignment operator.
 	    View& operator=(View&& other) noexcept
 	    {
 	        if (this != &other) {
@@ -1392,11 +1402,10 @@ namespace ws
 	        return *this;
 	    }		
 		
-		
+		// Destructor (default).
 		~View() = default;
 		
-		
-
+		// Initialises the view with a port rectangle (screen region).
 		void init(int portLeft,int portTop,int portWidth,int portHeight)
 		{
 			port.left = portLeft;
@@ -1407,169 +1416,177 @@ namespace ws
 			world = port;
 		}
 		
-
+		// Initialises the view with an IntRect port.
 		void init(ws::IntRect rect)
 		{	
 			init(rect.left,rect.top,rect.width,rect.height);
 		}
 		
-		
-		
+		// Returns the world rectangle (visible area in world coordinates).
 		[[nodiscard]] ws::IntRect getRect()
 		{
 			return world;
 		}
 		
+		// Sets the world rectangle.
 		void setRect(ws::IntRect rect)
 		{
 			world = rect;
 		}
-
+		
+		// Sets the world rectangle using individual components.
 		void setRect(int left,int top,int width,int height)
 		{
 			setRect(ws::IntRect(left,top,width,height));
 		}
 		
-		
+		// Returns the port rectangle (screen region).
 		[[nodiscard]] ws::IntRect getPortRect()
 		{
 			return port;
 		}
 		
+		// Sets the port rectangle.
 		void setPortRect(ws::IntRect rect)
 		{
 			port = rect;
 		}
 		
+		// Sets the port rectangle using individual components.
 		void setPortRect(int left,int top,int width,int height)
 		{
 			setPortRect(ws::IntRect(left,top,width,height));
 		}
 		
-		
+		// Sets the size (width/height) of the world rectangle.
 		void setSize(ws::Vec2i size)
 		{
 			world.width = size.x;
 			world.height = size.y;
 		}
 		
+		// Returns the size of the world rectangle.
 		[[nodiscard]] ws::Vec2i getSize()
 		{
 			return ws::Vec2i(world.width,world.height);
 		}
 		
+		// Sets the size of the port rectangle.
 		void setPortSize(ws::Vec2i size)
 		{
 			port.width = size.x;
 			port.height = size.y;
 		}
 		
+		// Returns the size of the port rectangle.
 		[[nodiscard]] ws::Vec2i getPortSize()
 		{
 			return ws::Vec2i(port.width,port.height);
 		}
 		
-		
-		
+		// Returns the center of the world rectangle.
 		[[nodiscard]] ws::Vec2i getCenter()
 		{
 			return ws::Vec2i(world.left + (world.width/2),world.top + (world.height/2));
 		}
 
+		// Sets the world center using coordinates.
 		void setCenter(int cx,int cy)
 		{
 			world.left = cx - (world.width/2);
 			world.top = cy - (world.height/2);
 		}
-
+		
+		// Sets the world center using a Vec2i.
 		void setCenter(ws::Vec2i pos)
 		{
 			setCenter(pos.x,pos.y);
 		}
-
-
 		
+		// Returns the center of the port rectangle.
 		[[nodiscard]] ws::Vec2i getPortCenter()
 		{
 			return ws::Vec2i(port.left + (port.width/2),port.top + (port.height/2));
 		}
 
+		// Sets the port center using coordinates.
 		void setPortCenter(int cx,int cy)
 		{
 			ws::Vec2i pos = ws::Vec2i(cx - (port.width/2),cy - (port.height/2));
 			port.left = pos.x;
 			port.top = pos.y;
 		}
-
-
+		
+		// Sets the port center using a Vec2i.
 		void setPortCenter(ws::Vec2i pos)
 		{
 			setPortCenter(pos.x,pos.y);
 		}
 		
-		
-		
+		// Sets the rotation origin point for the port.
 		void setPortRotatePoint(int ox,int oy)
 		{
 			portOrigin.x = ox;
 			portOrigin.y = oy;
 		}
 		
+		// Sets the rotation origin point using a Vec2i.
 		void setPortRotatePoint(ws::Vec2i pos)
 		{
 			setPortRotatePoint(pos.x,pos.y);
 		}
 		
-		
+		// Sets the rotation origin to the centre of the port.
 		void setPortRotatePointCenter()
 		{
 			portOrigin = ws::Vec2i(port.left + (port.width/2), port.top + (port.height/2));
 		}
 		
-		
-		
+		// Returns the current rotation angle in degrees.
 		[[nodiscard]] float getRotation() 
 		{
 		    return rotation;
 		}
 		
-		
+		// Sets the rotation angle in degrees.
 		void setRotation(float angle) 
 		{
 		    rotation = angle;
 		}
 		
-		
-		
+		// Sets the zoom factor (log2 scale: 0 = no zoom, positive = zoom in).
 		void setZoom(float val)
 		{
 			zoom = val;
 		}
 		
-		
+		// Returns the current zoom factor.
 		[[nodiscard]] float getZoom()
 		{
 			return zoom;
 		}
 		
-		
+		// Moves the world rectangle by a delta (float).
 		void move(float dx,float dy)
 		{
 			world.left += dx;
 			world.top += dy;
 		}
 		
+		// Moves the world rectangle by a Vec2f.
 		void move(ws::Vec2f dir)
 		{
 			move(dir.x,dir.y);
 		}
-
+		
+		// Moves the world rectangle by integer deltas.
 		void move(int dx,int dy)
 		{
 			world.left += dx;
 			world.top += dy;
 		}		
 		
+		// Copies the current transformation matrix into the given matrix.
 	    void getTransform(Gdiplus::Matrix &m) const
 	    {
 	        Gdiplus::REAL elements[6];
@@ -1578,6 +1595,7 @@ namespace ws
 	                     elements[3], elements[4], elements[5]);
 	    }
 		
+		// Sets the transformation matrix from another matrix.
 		void setTransform(const Gdiplus::Matrix &m)
 	    {
 	        Gdiplus::REAL elements[6];
@@ -1587,9 +1605,7 @@ namespace ws
 	        
 	    }
 		
-		
-		
-		
+		// Converts a screen position to world coordinates.
 		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
 		{
 			// First account for window stretching
@@ -1642,12 +1658,13 @@ namespace ws
 			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
 		}
 	    
+		// Converts screen coordinates (x,y) to world coordinates.
 	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
 	    {
 	        return toWorld(ws::Vec2i(x,y),screenSize);
 	    }
 	    
-	
+		// Converts a world position to screen coordinates.
 	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
 	    {
 		        
@@ -1702,16 +1719,13 @@ namespace ws
 	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
 	    }
 	
-	    
+	    // Converts world coordinates (x,y) to screen coordinates.
 	    [[nodiscard]] ws::Vec2i toScreen(int x,int y,ws::Vec2i screenSize) 
 	    {
 	        return toScreen(ws::Vec2i(x,y),screenSize);
 	    }       		
 
-
-
-		
-		
+		// Applies the view transformation to a Gdiplus::Graphics object.
 		void apply(Gdiplus::Graphics &graphics)
 		{
 			updateMatrix();
@@ -1727,7 +1741,7 @@ namespace ws
 			
 		private:
 			
-			
+		// Updates the internal transformation matrix based on current parameters.
 		void updateMatrix()			
 		{
 			matrix.Reset();
@@ -1786,17 +1800,16 @@ namespace ws
 		Gdiplus::Bitmap* bitmap;
 		
 		
-		
-		
+		// Default constructor: creates an empty texture.
 		Texture() : bitmap(nullptr) {}
 		
-		
+		// Constructor: loads a texture from a file path.
 		Texture(std::string path)
 		{
 			loadFromFile(path);
 		}
 		
-		
+		// Destructor: deletes the underlying GDI+ bitmap.
 	    ~Texture()
 	    {
 			
@@ -1809,9 +1822,7 @@ namespace ws
 			height = 0;
 	    }		
 		
-
-
-		//move
+		// Move constructor: transfers ownership of the bitmap.
 	    Texture(Texture&& other) noexcept
 	        : width(other.width), height(other.height),bitmap(other.bitmap)
 	    {
@@ -1820,7 +1831,7 @@ namespace ws
 	        other.height = 0;
 	    }
 
-		//copy
+		// Copy constructor: clones the bitmap.
 	    Texture(const Texture& other) : width(0), height(0), bitmap(nullptr)
 	    {
 	        if (other.bitmap && other.width > 0 && other.height > 0) {
@@ -1830,8 +1841,7 @@ namespace ws
 	        }
 	    }
 
-
-		//Copy assignment
+		// Copy assignment operator: clones the source bitmap.
 	    Texture& operator=(const Texture& other)
 	    {
 	        if (this != &other)
@@ -1860,7 +1870,7 @@ namespace ws
 	        return *this;
 	    }
 
-		//move assignment
+		// Move assignment operator: transfers ownership.
 	    Texture& operator=(Texture&& other) noexcept
 	    {
 	        if (this != &other)
@@ -1881,9 +1891,8 @@ namespace ws
 	        }
 	        return *this;
 	    }		
-		
-
 	
+		// Creates a blank texture of given size and optional clear colour.
 		bool create(int w,int h,Gdiplus::Color color = {0,0,0,0})
 		{
 			if (bitmap != nullptr) {
@@ -1911,9 +1920,7 @@ namespace ws
 			return true;
 		}
 	
-	
-		
-		
+		// Loads an image from a file into the texture.
 		bool loadFromFile(std::string path)
 		{
 
@@ -1953,7 +1960,7 @@ namespace ws
 			return true;
 		}
 
-
+		// Loads an image from a memory buffer.
 		bool loadFromMemory(const void* buffer,size_t bufferSize)
 		{
 		    // create a global memory object
@@ -1996,8 +2003,7 @@ namespace ws
 		    return true;
 		}
 
-		
-		
+		// Loads the texture from an existing Gdiplus::Bitmap (clones it).
 		bool loadFromBitmapPlus(Gdiplus::Bitmap &pBitmap)
 		{
 			UINT width = pBitmap.GetWidth();
@@ -2006,26 +2012,13 @@ namespace ws
 			return true;
 		}
 		
-		
-		
-		
-		
-		
-
-
-		
+		// Checks if the texture contains a valid bitmap.
 	    bool isValid() const
 	    {
 	        return bitmap != nullptr;
 	    }		
 	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
+		// Sets a pixel by linear index (row‑major).
 		void setPixel(int index,Gdiplus::Color color)
 		{
 			int x = index % width;
@@ -2033,12 +2026,13 @@ namespace ws
 			setPixel(x,y,color);
 		}
 	    
+		// Sets a pixel at (xIndex, yIndex).
 	    void setPixel(int xIndex,int yIndex,Gdiplus::Color color)
 	    {
 			bitmap->SetPixel(xIndex, yIndex, color);
 		}
 	    
-	    
+		// Gets a pixel by linear index.
 	    Gdiplus::Color getPixel(int index)
 		{
 			int x = index % width;
@@ -2046,7 +2040,7 @@ namespace ws
 			return getPixel(x,y);
 		}
 	    
-	    
+		// Gets a pixel at (xIndex, yIndex).
 	    Gdiplus::Color getPixel(int xIndex,int yIndex)
 	    {
 	    	Gdiplus::Color color;
@@ -2054,15 +2048,13 @@ namespace ws
 			return color;
 		}
 	    
-	    
-	    
-	    
+		// Returns the size of the texture as a Vec2i.
 	    ws::Vec2i getSize()
 		{
 			return ws::Vec2i(width,height); 
 		}
 		
-		
+		// Saves the texture to a file (format determined by extension).
 		bool saveToFile(std::string path)
 		{
 		    if (!bitmap || width <= 0 || height <= 0)
@@ -2142,21 +2134,19 @@ namespace ws
 		int height = 0;
 		
 		
-		
-		
-		
+		// Default constructor.
 		GIF()
 		{
 			
 		}
 		
+		// Destructor: releases GIF textures and delay data.
 		~GIF() {
 		    textures.clear();
 		    delays.clear();
 		}
 		
-		
-		
+		// Loads an animated GIF from a file path and decodes all frames.
 		bool loadFromFile(std::string path)
 		{
 			
@@ -2245,8 +2235,7 @@ namespace ws
 			return true;
 		}
 		
-		
-		
+		// Adds a single frame with a millisecond delay to the GIF animation.
 		void addFrame(ws::Texture &newFrame,double millisecondDelay)
 		{
 			
@@ -2261,15 +2250,13 @@ namespace ws
 			totalFrames++;
 		}
 		
-		
-		
-		
+		// Returns a reference to the current displayed texture frame.
 		ws::Texture& getTexture()
 		{
 			return currentTexture;
 		}
 		
-		
+		// Returns a pointer to the texture at the given frame index.
 		ws::Texture* getFrame(int index)
 		{
 			if(index < 0 || index > int(textures.size()))
@@ -2281,7 +2268,7 @@ namespace ws
 			return &textures[index];
 		}
 		
-		
+		// Retrieves the delay in milliseconds for a specific frame index.
 		double getFrameDelay(int index)
 		{
 			if(index <= 0 || index > int(textures.size()))
@@ -2292,7 +2279,7 @@ namespace ws
 			return delays[index];
 		}
 		
-		
+		// Sets the delay for a given frame index; returns true on success.
 		bool setFrameDelay(int index,double newDelay)
 		{	
 			if(index <= 0 || index > int(textures.size()))
@@ -2300,6 +2287,7 @@ namespace ws
 			delays[index] = newDelay;		
 		}
 		
+		// Replaces the texture at a given frame index; returns true on success.
 		bool setFrame(int index,ws::Texture &newTexture)
 		{
 			if(index <= 0 || index > int(textures.size()))
@@ -2308,30 +2296,31 @@ namespace ws
 			return true;
 		}
 		
-		
-		
+		// Returns whether the GIF will loop when playback reaches the end.
 		bool getLoop()
 		{
 			return loop;
 		}
 		
+		// Enables or disables looping of the GIF animation.
 		void setLoop(bool trueFalse = true)
 		{
 			loop = trueFalse;
 		}
 		
-		
+		// Returns the total number of frames in the GIF.
 		int getFrameCount()
 		{
 			return totalFrames;
 		}
 		
+		// Returns the index of the currently displayed frame.
 		int getCurrentFrame()
 		{
 			return currentFrame;
 		}
 		
-		
+		// Starts or resumes playback of the GIF animation.
 		void play()
 		{
 			if(status == "stopped")
@@ -2347,28 +2336,26 @@ namespace ws
 			
 		}
 		
-		
+		// Pauses the GIF animation at the current frame.
 		void pause()
 		{
 			status = "paused";
 		}
 		
-		
+		// Stops the GIF animation and resets to the first frame.
 		void stop()
 		{
 			currentFrame = 0;
 			status = "stopped";
 		}
 		
-		
+		// Returns the current playback status as a string.
 		std::string getStatus()
 		{
 			return status;
 		}
 		
-		
-		
-		
+		// Updates the animation timer and advances frames; returns the current texture.
 		ws::Texture& update()
 		{
 			
@@ -2434,11 +2421,13 @@ namespace ws
 		std::vector <ws::IntRect> rect;
 		ws::Timer timer;
 		
+		// Adds a rectangle region to the shift animation sequence.
 		void add(int left,int top,int width,int height)
 		{
 			rect.push_back({left,top,width,height});
 		}
 		
+		// Adds a rectangle region using an existing IntRect structure.
 		void add(ws::IntRect rect)
 		{
 			add(rect.left,rect.top,rect.width,rect.height);
@@ -2446,7 +2435,7 @@ namespace ws
 		
 	};
 	
-	
+	// Advances a shift animation and returns the current rectangle region.
 	ws::IntRect Shift(ShiftData &shift) 
 	{
 		if(shift.start && !shift.ended)
@@ -2504,34 +2493,47 @@ namespace ws
 	    float rotation = 0.0f;
 	    
 
-
-
+		// Returns the size of the drawable.
 	    ws::Vec2i getSize() {return ws::Vec2i(width,height);}
+		// Returns the position (x,y) of the drawable.
 	    ws::Vec2i getPosition() {return ws::Vec2i(x,y);}
+		// Returns the scale factor.
 	    ws::Vec2f getScale() { return scale; }
+		// Returns the origin point.
 	    ws::Vec2i getOrigin() { return origin; }
+		// Returns the rotation angle.
 	    float getRotation() { return rotation; }
 			    
-	    
+		// Sets the size from a Vec2i.
 	    void setSize(ws::Vec2i size) {width = size.x;height = size.y;}
+		// Sets the size from individual integers.
 	    void setSize(int w,int h) {width = w;height = h;}
+		// Sets the position from a Vec2i.
 	    void setPosition(ws::Vec2i pos) {x = pos.x;y = pos.y;}
+		// Sets the position from individual integers.
 	    void setPosition(int xpos,int ypos) {x = xpos;y = ypos;}
+		// Sets the scale from a Vec2f.
 	    void setScale(ws::Vec2f s) { scale = s; }
+		// Sets the scale from individual floats.
 	    void setScale(float sx, float sy) { scale.x = sx; scale.y = sy; }
+		// Sets the origin from a Vec2i.
 	    void setOrigin(ws::Vec2i pos) { origin = pos; }
+		// Sets the origin from individual integers.
 	    void setOrigin(int posx, int posy) { origin.x = posx; origin.y = posy; }
+		// Sets the rotation angle in degrees.
 	    void setRotation(float degrees) { rotation = degrees; }
 	    
+		// Returns the visual width after scaling.
 	    int getVisualWidth() const {
 	        return static_cast<int>(std::abs(width * scale.x));
 	    }
 	    
+		// Returns the visual height after scaling.
 	    int getVisualHeight() const {
 	        return static_cast<int>(std::abs(height * scale.y));
 	    }
 	    
-	    //Visual bounds
+		// Computes the axis‑aligned bounding rectangle after transformation.
 	    void getBounds(int& left, int& top, int& right, int& bottom) const
 	    {
 	    	
@@ -2584,7 +2586,7 @@ namespace ws
 	        bottom = static_cast<int>(maxY);
 	    }
 	    
-	    //Visually contains
+		// Checks whether a point (in world coordinates) lies inside the transformed drawable.
 		virtual bool contains(ws::Vec2i point)
 	    {
 	        int left, top, right, bottom;
@@ -2619,7 +2621,7 @@ namespace ws
 	                rotY >= 0 && rotY < height);
 	    }
 	    
-	    
+		// Draws the object using the global transformation (called by Window).
 		virtual void drawGlobal(Gdiplus::Graphics* graphics)
 	    {
 	        // Save current state
@@ -2660,9 +2662,10 @@ namespace ws
 	        graphics->Restore(state);
 	    }
 	    
-	    // Pure virtual - draw the content in local space
+		// Pure virtual: draws the content in local space.
 	    virtual void draw(Gdiplus::Graphics* graphics) = 0;
 	    
+		// Virtual destructor.
 	    virtual ~Drawable() = default;
 	};
 	
@@ -2682,21 +2685,20 @@ namespace ws
 		
 		public:
 		
-		
-		
+		// Default constructor.
 		Sprite()
 		{
 			
 		}
 		
-		
+		// Constructor that takes a texture and sets its full rectangle.
 		Sprite(ws::Texture &texture)
 		{
 			textureRef = &texture;
 			setTextureRect({0,0,texture.getSize().x,texture.getSize().y});
 		}
 		
-		
+		// Checks if a point lies inside the sprite (based on transformed bounds).
 	    virtual bool contains(ws::Vec2i pos) override
 	    {
 	        int left, top, right, bottom;
@@ -2705,6 +2707,8 @@ namespace ws
 	        return (pos.x >= left && pos.x < right &&
 	                pos.y >= top && pos.y < bottom);
 	    }
+	    
+		// Draws the sprite using the assigned texture.
 	    virtual void draw(Gdiplus::Graphics* graphics) override
 	    {
 	        if (!textureRef || !textureRef->isValid()) 
@@ -2718,14 +2722,14 @@ namespace ws
 	                           Gdiplus::UnitPixel);
 	    }	    
 
-		
-		
+		// Assigns a texture and optionally resizes the sprite to match.
 	    void setTexture(ws::Texture& texture,bool resize = true) {
 	        textureRef = &texture;
 	        if(resize)
 	        	setTextureRect({0,0,texture.getSize().x,texture.getSize().y});
 	    }
 	    
+		// Sets the texture rectangle (which part of the texture to display).
 	    void setTextureRect(ws::IntRect rect) {
 	        // Assuming rect.left, rect.top are coordinates
 	        // rect.right is width, rect.bottom is height
@@ -2739,22 +2743,24 @@ namespace ws
 	        height = texHeight;
 	    }
 	    
+		// Returns the current texture rectangle.
 	    ws::IntRect getTextureRect() const {
 	        return {texLeft, texTop, texWidth, texHeight};
 	    }
 		
+		// Returns a reference to the assigned texture.
 		Texture &getTexture()
 		{
 			return *textureRef;
 		}
 		
-		
+		// Returns a const pointer to the assigned texture.
 	    const Texture* getTexture() const
 	    {
 	        return textureRef;
 	    }		
 		
-		
+		// Checks whether a texture has been assigned.
 	    bool hasTexture() const
 	    {
 	        return textureRef != nullptr;
@@ -2792,8 +2798,7 @@ namespace ws
 		Gdiplus::Color color = {255,0,0,255};
 		
 	    
-	    
-	    
+		// Constructor: creates a line with start and end points, width, and colour.
 	    Line(ws::Vec2i start = {0,0},ws::Vec2i end = {0,0},int thewidth = 2,Gdiplus::Color color = {255,0,0,255})
 	    {
 	    	this->start = start;
@@ -2802,14 +2807,14 @@ namespace ws
 	    	this->color = color;
 		}
 	    
-	    
+		// Draws the line on the given GDI+ canvas.
 		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
 	    	Gdiplus::Pen pen(color);
 			canvas->DrawLine(&pen,start.x,start.y,end.x,end.y);
 	    }
 	    
-	    
+		// Point containment is not implemented for lines (always returns false).
 	    private:
 	    virtual bool contains(ws::Vec2i pos) override
 	    { 
@@ -2818,7 +2823,7 @@ namespace ws
 		
 		
 		public:
-			
+		// Checks if point q lies on segment pr.
 		bool onSegment(ws::Vec2i p, ws::Vec2i q, ws::Vec2i r)
 	    {
 	        if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
@@ -2827,7 +2832,7 @@ namespace ws
 	        return false;
 	    }
 		
-		// Returns: 0 = collinear, 1 = clockwise, 2 = counterclockwise
+		// Returns orientation of three points: 0 = collinear, 1 = clockwise, 2 = counter‑clockwise.
 	    int orientation(ws::Vec2i p, ws::Vec2i q, ws::Vec2i r)
 	    {
 	        long long val = (long long)(q.y - p.y) * (r.x - q.x) - 
@@ -2837,6 +2842,7 @@ namespace ws
 	        return (val > 0) ? 1 : 2; // Clockwise or counterclockwise
 	    }			
 		
+		// Checks whether this line intersects another line.
 	    bool intersects(Line &otherLine)
 	    {
 	        ws::Vec2i p1 = this->start;
@@ -2876,9 +2882,7 @@ namespace ws
 		
 		public:
 		
-		
-		
-		
+		// Default constructor: loads system font "Arial".
 		Font()
 		{
 			family = std::make_unique<Gdiplus::FontFamily>(L"Arial");
@@ -2886,6 +2890,7 @@ namespace ws
 			loadFromSystem("Arial");
 		}
 		
+		// Destructor: releases allocated GDI+ resources.
 		~Font()
 		{
 			gdiFont.reset();
@@ -2893,30 +2898,27 @@ namespace ws
 		    fontCollection.reset();
 		}
 		
-		
-		
+		// Returns the Gdiplus::Font pointer.
 		Gdiplus::Font* getFontHandle()
 		{ return gdiFont.get(); }
 		
+		// Returns the Gdiplus::FontFamily pointer.
 		Gdiplus::FontFamily* getFamilyHandle()
 		{ return family.get(); }
 		
-
-		
-		
+		// Returns true if this is a system font (not loaded from file).
 		bool isSystemFont()
 		{ return isCustomFont; }
 		
+		// Returns the file path if the font was loaded from file.
 		std::string getFilePath()
 		{ return fontFilePath; }
 		
-		
+		// Returns the font family name.
 		std::string getName()
 		{ return fontName; }
 		
-		
-
-		
+		// Loads a system font by name.
 		bool loadFromSystem(std::string name)
 		{
 			fontFilePath.clear();
@@ -2930,7 +2932,7 @@ namespace ws
 			
 		}
 		
-		
+		// Loads a font from a file (.ttf, .otf, etc.).
 		bool loadFromFile(std::string path)
 		{	
 			//reset the font collection to be empty and then add a single font.
@@ -2980,8 +2982,7 @@ namespace ws
 			return update();
 		}
 		
-		
-		
+		// Returns true if the font is valid and ready to use.
 		bool isValid()
 	    {
 	        return gdiFont && gdiFont->GetLastStatus() == Gdiplus::Ok;
@@ -2990,7 +2991,7 @@ namespace ws
 		
 		
 		private:
-			
+		// Updates the internal Gdiplus::Font object after a load.
 		bool update()
 		{
 
@@ -3037,74 +3038,78 @@ namespace ws
 	{
 		public:
 		
-		
-		
-		
+		// Default constructor.
 		Text(){}
+		// Destructor.
 		~Text(){}
 		
-		
-		
-		
+		// Constructor that sets the font.
 		Text(ws::Font &newfont)
 		{ fontRef = &newfont; }
 		
-		
-		
+		// Sets the font used for the text.
 		void setFont(ws::Font &newFont)
 		{ fontRef = &newFont; }
 		
+		// Returns a pointer to the current font.
 		ws::Font* getFont()
 		{ return fontRef; }
 		
+		// Sets the text string to be drawn.
 		void setString(std::string str)
 		{ text = str; }
 		
+		// Returns the current text string.
 		std::string getString()
 		{ return text; }
 		
-		
+		// Sets the character size (height in pixels).
 		void setCharacterSize(int size)
 		{ charSize = size;}
 		
+		// Returns the character size.
 		int getCharacterSize()
 		{ return charSize; }	
 		
+		// Sets the font style (regular, bold, italic, etc.).
 		void setStyle(Gdiplus::FontStyle fontStyle)
 		{ style = fontStyle;}
 		
+		// Returns the current font style.
 		Gdiplus::FontStyle getStyle()
 		{ return style; }		
 		
+		// Sets the fill colour of the text.
 		void setFillColor(Gdiplus::Color color)
 		{ fillColor = color; }
 		
+		// Returns the fill colour.
 		Gdiplus::Color getFillColor()
 		{ return fillColor; }
 		
+		// Sets the border (outline) colour.
 		void setBorderColor(Gdiplus::Color color)
 		{ borderColor = color; }
 		
+		// Returns the border colour.
 		Gdiplus::Color getBorderColor()
 		{ return borderColor; }
 		
+		// Sets the border (outline) width in pixels.
 		void setBorderWidth(int w)
 		{ borderWidth = w; }
 		
+		// Returns the border width.
 		int getBorderWidth()
 		{ return borderWidth; }
 		
-		
-		
-
-		
-		
-		
+		// Checks if a point lies within the text area (uses Drawable::contains).
 		virtual bool contains(ws::Vec2i pos) override
 		{
 			return Drawable::contains(pos);
 		}
 		
+		// Draws the text using the assigned font and styles.
 		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
 			
@@ -3199,9 +3204,10 @@ namespace ws
 	    
 	    public:
 	        
+		// Default constructor.
 	    Poly() = default;
 	    
-	    
+		// Constructor with vertices, fill, border, width, and filled flag.
 	    Poly(std::vector<ws::Vec2i>& vertices, Gdiplus::Color fillColor = {255,255,0,0}, Gdiplus::Color borderColor = {255,255,0,255}, int borderWidth = 2, bool filled = true)
 	    {
 	        this->vertices = vertices;
@@ -3211,7 +3217,7 @@ namespace ws
 	        this->filled = filled;
 	    }
 	    
-	    
+		// Adds a vertex using a Vec2i.
 	    void addVertex(ws::Vec2i vertex) 
 	    {
 	        vertices.push_back(vertex);
@@ -3219,6 +3225,7 @@ namespace ws
 	        textureNeedsUpdate = true;
 	    }
 	    
+		// Adds a vertex using individual coordinates.
 	    void addVertex(int x, int y) 
 	    {
 	        vertices.push_back({x, y});
@@ -3226,6 +3233,7 @@ namespace ws
 	        textureNeedsUpdate = true;
 	    }
 	    
+		// Clears all vertices and UVs.
 	    void clear() 
 	    {
 	        vertices.clear();
@@ -3234,18 +3242,19 @@ namespace ws
 	        textureNeedsUpdate = true;
 	    }
 	    
+		// Returns the number of vertices.
 	    size_t vertexCount() 
 	    {
 	        return vertices.size();
 	    }
 	    
-	    
+		// Returns true if the polygon has at least 3 vertices.
 	    bool isValid() 
 	    {
 	        return vertices.size() >= 3;
 	    }
 	    
-	    
+		// Computes and returns the centroid of the polygon.
 	    ws::Vec2i getCentroid() 
 	    {
 	        if (vertices.empty()) return {0, 0};
@@ -3260,7 +3269,7 @@ namespace ws
 	                static_cast<int>(sumY / vertices.size())};
 	    }
 	    
-	    
+		// Checks if a point lies inside the polygon.
 	    virtual bool contains(ws::Vec2i point) override 
 	    {
 	        if (vertices.size() < 3) return false;
@@ -3292,7 +3301,7 @@ namespace ws
 	        return (crossings % 2 == 1);
 	    }
 	    
-	    
+		// Checks if the polygon intersects a line.
 	    bool intersects(Line &line) 
 	    {
 	        if (vertices.size() < 2) return false;
@@ -3314,7 +3323,7 @@ namespace ws
 	        return false;
 	    }
 	    
-	    
+		// Checks if this polygon intersects another polygon.
 	    bool intersects(Poly &other) 
 	    {
 	        for (const auto& vertex : other.vertices) 
@@ -3350,7 +3359,7 @@ namespace ws
 	        return false;
 	    }
 	    
-	    
+		// Returns the bounding rectangle of the polygon.
 	    ws::IntRect getBoundingRect() 
 	    {
 	        if (vertices.empty()) return {0, 0, 0, 0};
@@ -3370,23 +3379,26 @@ namespace ws
 	        return rect;
 	    }
 	    
-	    
+		// Sets a texture for filling the polygon (perspective‑correct mapping).
 	    void setTexture(ws::Texture &tex)
 	    {
 	        textureRef = &tex;
 	        textureNeedsUpdate = true;
 	    }   
 	    
+		// Removes the texture, reverting to solid fill.
 	    void removeTexture()
 	    {
 	        textureRef = nullptr;
 	    }
 	    
+		// Returns a pointer to the current texture.
 	    ws::Texture* getTexture()
 	    {
 	        return textureRef;
 	    }
 	    
+		// Sets UV coordinates for a specific vertex.
 	    void setUV(size_t vertexIndex, float u, float v)
 	    {
 	        if(vertexIndex >= 0 && vertexIndex < vertices.size())
@@ -3401,57 +3413,67 @@ namespace ws
 	        }
 	    }
 	    
+		// Marks the texture as needing an update (e.g., after changing UVs).
 	    void updateTexture()
 	    {
 	        textureNeedsUpdate = true;
 	    }
 	    
+		// Sets the fill colour.
 	    void setFillColor(Gdiplus::Color color)    
 	    {
 	        fillColor = color;
 	    }
 	    
+		// Sets the border colour.
 	    void setBorderColor(Gdiplus::Color color)
 	    {
 	        borderColor = color;
 	    }
 	    
+		// Returns the fill colour.
 	    Gdiplus::Color getFillColor()
 	    {
 	        return fillColor;
 	    }
 	    
+		// Returns the border colour.
 	    Gdiplus::Color getBorderColor()
 	    {
 	        return borderColor;
 	    }
 	    
-	    
+		// Sets the border width.
 	    void setBorderWidth(int w)
 	    {
 	        borderWidth = w;
 	    }
 	    
+		// Returns the border width.
 	    int getBorderWidth()
 	    {
 	        return borderWidth;
 	    }
 	    
+		// Sets whether the polygon is filled (true) or just outlined (false).
 	    void setFilled(bool b = true)
 	    {
 	        filled = b;
 	    }
 	    
+		// Sets whether the polygon is closed (last vertex connects to first).
 	    void setClosed(bool b = true)
 	    {
 	        closed = b;
 	    }
 	    
+		// Returns true if the polygon is filled.
 	    bool getFilled()
 	    {
 	        return filled;
 	    }
 	    
+		// Returns true if the polygon is closed.
 	    bool getClosed()
 	    {
 	        return closed;
@@ -3460,6 +3482,7 @@ namespace ws
 	    
 	    private:
 	    
+		// Helper: point‑in‑polygon test for a single point.
 	    bool pointInPolygon(ws::Vec2i p) 
 	    {
 	        if (vertices.size() < 3) return false;
@@ -3491,6 +3514,7 @@ namespace ws
 	        return (crossings % 2 == 1);
 	    }
 	    
+		// Generates an effect texture used for texture mapping.
 	    void generateEffectTexture()
 	    {
 	        if(!textureRef || !textureRef->isValid()) return;
@@ -3540,6 +3564,7 @@ namespace ws
 	        textureNeedsUpdate = false;
 	    }
 	    
+		// Returns UV coordinates for a given world point using barycentric interpolation.
 	    ws::Vec2f getUVForPoint(ws::Vec2i point, ws::IntRect bounds)
 	    {
 	        if(vertices.size() == 3)
@@ -3560,6 +3585,7 @@ namespace ws
 	        return ws::Vec2f(0, 0);
 	    }
 	    
+		// Checks if a point is inside a triangle.
 	    bool pointInTriangle(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c)
 	    {
 	        float alpha = ((b.y - c.y)*(p.x - c.x) + (c.x - b.x)*(p.y - c.y)) /
@@ -3571,6 +3597,7 @@ namespace ws
 	        return (alpha >= 0 && beta >= 0 && gamma >= 0);
 	    }
 	    
+		// Barycentric interpolation of UV coordinates for a point inside a triangle.
 	    ws::Vec2f barycentricUV(ws::Vec2i p, ws::Vec2i a, ws::Vec2i b, ws::Vec2i c,
 	                           ws::Vec2f uvA, ws::Vec2f uvB, ws::Vec2f uvC)
 	    {
@@ -3588,6 +3615,7 @@ namespace ws
 	    }
 	    
 	    public:
+		// Draws the polygon (filled, outlined, or textured).
 	    virtual void draw(Gdiplus::Graphics* canvas) override 
 	    {
 	        if (vertices.size() < 2) return;
@@ -3670,6 +3698,7 @@ namespace ws
 		public:
 		Poly poly;
 		
+		// Default constructor: creates a regular polygon approximating a circle.
 		Radial()
 		{
 			poly.setFillColor(Gdiplus::Color(255,100,200,100));
@@ -3682,6 +3711,7 @@ namespace ws
 			origin.y = radius;
 		}
 		
+		// Creates the polygon mesh for the radial shape.
 		void make(int points = 8)
 		{
 			poly.clear();
@@ -3706,8 +3736,7 @@ namespace ws
 			y = center.y - origin.y;
 		}
 		
-		
-		
+		// Sets the position of the radial (centre point).
 		void setPosition(int posx,int posy)
 		{
 			center = {posx,posy};
@@ -3715,13 +3744,13 @@ namespace ws
 			y = center.y - origin.y;
 		}
 		
+		// Sets the position using a Vec2i.
 		void setPosition(ws::Vec2i pos)
 		{
 			setPosition(pos.x, pos.y);
 		}
 		
-		
-		
+		// Moves the radial by a delta vector.
 		void move(ws::Vec2i delta)
 		{
 			center.x += delta.x;
@@ -3730,61 +3759,69 @@ namespace ws
 			y = center.y - origin.y;
 		}
 		
+		// Moves the radial by integer deltas.
 		void move(int deltaX,int deltaY)
 		{
 			move(ws::Vec2i(deltaX, deltaY));
 		}
 		
-		
+		// Sets the number of points (sides) used to approximate the circle.
 		void setPointCount(int count)
 		{
 			m_points = count;
 			make(m_points);
 		}
 		
+		// Sets the radius of the radial.
 		void setRadius(int size)
 		{
 			radius = size;
 			make(m_points);
 		}
 		
+		// Sets the fill colour.
 		void setFillColor(Gdiplus::Color color)
 		{
 			poly.setFillColor(color); 
 		}
 		
+		// Sets the border colour.
 		void setBorderColor(Gdiplus::Color color)
 		{
 			poly.setBorderColor(color);
 		}
 		
+		// Sets the border width.
 		void setBorderWidth(int size)
 		{
 			poly.setBorderWidth(size);
 		}
 		
-		
+		// Returns the radius.
 		int getRadius()
 		{
 			return radius;
 		}
 		
+		// Returns the centre position.
 		ws::Vec2i getPosition()
 		{
 			return center;
 		}
 		
+		// Returns the number of points used.
 		int getPointCount()
 		{
 			return m_points;
 		}
 		
-		
+		// Draws the radial (delegates to its internal poly).
 		virtual void draw(Gdiplus::Graphics* canvas) override
 		{
 			poly.draw(canvas);
 		}
 		
+		// Checks if a point is inside the radial (circular test).
 		virtual bool contains(ws::Vec2i pos) override
 		{
 			// Convert to local coordinates
@@ -3815,7 +3852,7 @@ namespace ws
 	{
 		public:
 			
-		
+		// Draws an ellipse (circle/oval) using the current dimensions.
 		virtual void draw(Gdiplus::Graphics* canvas) override
 		{
 	        Gdiplus::Pen borderPen(m_borderColor, static_cast<Gdiplus::REAL>(m_borderWidth));
@@ -3826,14 +3863,13 @@ namespace ws
 			
 		}
 		
-		
-		
+		// Checks if a point (px,py) is inside the ellipse.
 		bool contains(int px,int py)
 		{
 			return contains(ws::Vec2i(px,py));
 		}
 		
-		//STILL DOES NOT WORK!!!!
+		// Checks if a point is inside the ellipse (supports scaling and rotation).
 		virtual bool contains(ws::Vec2i p) override
 		{
 			
@@ -3864,13 +3900,17 @@ namespace ws
 			
 		}
 		
-		
-		
+		// Sets the border colour.
 		void setBorderColor(Gdiplus::Color color){m_borderColor = color;}
+		// Sets the fill colour.
 		void setFillColor(Gdiplus::Color color){m_fillColor = color;}
+		// Sets the border width.
 		void setBorderWidth(int w){m_borderWidth = w;}
+		// Returns the border colour.
 		Gdiplus::Color getBorderColor() {return m_borderColor;}
+		// Returns the fill colour.
 		Gdiplus::Color getFillColor() {return m_fillColor;}
+		// Returns the border width.
 		int getBorderWidth() {return m_borderWidth;}
 		
 		
@@ -4036,31 +4076,37 @@ namespace ws
 		
 		public:
 		
+		// Default constructor.
 		ClipData()
 		{
 		}
 		
-		
+		// Sets the texture data for this clipboard content.
 		void setTexture(ws::Texture tex)
 		{
 			texture = tex;
 		}
+		// Sets the text data for this clipboard content.
 		void setText(std::string str)
 		{
 			text = str;
 		}
+		// Sets the list of file paths for this clipboard content.
 		void setFiles(std::vector<std::string> FilesVector)
 		{
 			files = FilesVector;
 		}
+		// Returns the stored texture.
 		ws::Texture getTexture()
 		{
 			return texture;
 		}
+		// Returns the stored text string.
 		std::string getText()
 		{
 			return text;
 		}
+		// Returns the stored list of file paths.
 		std::vector<std::string>& getFiles()
 		{
 			return files;
@@ -4236,10 +4282,7 @@ namespace ws
 	    }
 	
 	
-	
-	
-	
-	
+		// Opens the Windows clipboard; returns true on success.
 		bool OpenClipboardCheck()
 		{
 	        if (!OpenClipboard(NULL)) {
@@ -4253,9 +4296,11 @@ namespace ws
 	
 	
 	public:
+		// Default constructor.
 	    Clipboard()
 		{}
 
+		// Retrieves all available data (text, files, image) from the clipboard.
 	    ClipData paste() 
 	    {
 	        if (!OpenClipboardCheck()) {
@@ -4290,7 +4335,7 @@ namespace ws
 	        return data;
 	    }
 
-	    
+		// Copies a string of text to the clipboard; returns success.
 	    bool copyText(const std::string& str) 
 	    {
 	        const std::wstring text = ws::WIDE(str);
@@ -4323,8 +4368,7 @@ namespace ws
 	        return true;
 	    }
 	    
-
-	    
+		// Copies a texture (optionally a cropped rectangle) to the clipboard.
 	    bool copyTexture(ws::Texture &texture, ws::IntRect rect = {0,0,0,0}) 
 	    {
 	        if (!texture.isValid()) return false;
@@ -4367,6 +4411,7 @@ namespace ws
 	    }
 	    
 	    private:
+		// Internal method: pastes an image from the clipboard, optionally cropping it.
 	    ws::Texture pasteTexture(ws::IntRect rect = {0,0,0,0}) 
 	    {
 	        ws::Texture tex;
@@ -4441,6 +4486,7 @@ namespace ws
 	    }
 		public:
 
+		// Copies a single file path to the clipboard; returns success.
 	    bool copyFile(const std::string& filePath)
 	    {
 	        std::wstring widePath = ws::WIDE(filePath);
@@ -4496,7 +4542,7 @@ namespace ws
 	        return success;
 	    }
 	    
-
+		// Copies multiple file paths to the clipboard; returns success.
 	    bool copyFiles(const std::vector<std::string>& filePaths)
 	    {
 	        if (filePaths.empty()) {
@@ -4567,7 +4613,7 @@ namespace ws
 	    }
 	    
 		private:
-
+		// Retrieves a list of file paths from the clipboard.
 	    std::vector<std::string> pasteFiles()
 	    {
 	        std::vector<std::string> filePaths;
@@ -4605,6 +4651,7 @@ namespace ws
 	        return filePaths;
 	    }
 	    
+		// Retrieves the first file path from the clipboard, or an empty string.
 	    std::string pasteFile()
 	    {
 	        auto files = pasteFiles();
@@ -4617,8 +4664,7 @@ namespace ws
 		
 		public:
 	    
-		
-
+		// Checks if the clipboard currently contains file data.
 	    bool hasFiles()
 	    {
 	        if (!OpenClipboardCheck()) {
@@ -4629,8 +4675,7 @@ namespace ws
 	        return hasFiles;
 	    }
 
-
-	    
+		// Checks if the clipboard currently contains text data.
 	    bool hasText() 
 	    {
 	        if (!OpenClipboardCheck()) {
@@ -4641,6 +4686,7 @@ namespace ws
 	        return hasText;
 	    }
 	    
+		// Checks if the clipboard currently contains an image.
 	    bool hasTexture() 
 	    {
 	        if (!OpenClipboardCheck()) {
@@ -4651,8 +4697,7 @@ namespace ws
 	        return hasImage;
 	    }
 	    
-		
-		
+		// Empties the clipboard; returns success.
 	    bool clear() 
 	    {
 	        if (!OpenClipboardCheck()) {
@@ -4663,8 +4708,6 @@ namespace ws
 	        return success;
 	    }
 	    
-		
-		
 		
 	}clipboard;
 	
@@ -4681,8 +4724,7 @@ namespace ws
 		//WSADATA data;
 		int maxControlID = 0;
 		
-		
-		
+		// Constructor: initialises GDI+, OLE, and common controls.
 		InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
 		{
 			//GDI+
@@ -4705,6 +4747,7 @@ namespace ws
 			OleInitialize(nullptr);							
 		}
 		
+		// Destructor: shuts down GDI+ and OLE.
 		~InitializerAndReallyReallyLongNameSoThatItWontCauseANamingConflict()
 		{
 			//Gdi+
@@ -4745,6 +4788,7 @@ namespace ws
 
 		public:
 		
+		// Constructor: assigns a unique control ID.
 		Child()
 		{
 			int &maxControlID = initializerandreallyreallylongnamesothatitwontcauseanamingconflict.maxControlID;
@@ -4752,6 +4796,7 @@ namespace ws
 			maxControlID++;
 		}
 
+		// Destructor: destroys the child window if it exists.
         virtual ~Child()
         {
             if (hwnd && IsWindow(hwnd))
@@ -4760,6 +4805,7 @@ namespace ws
             }
         }				
 		
+		// Moves the child control to new coordinates.
 		void setPosition(int xPos,int yPos)
 		{
 			x = xPos;
@@ -4769,16 +4815,19 @@ namespace ws
 				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 		}		
 		
+		// Moves the child control using a Vec2i.
 		void setPosition(ws::Vec2i pos)
 		{
 			setPosition(pos.x, pos.y);
 		}
 		
+		// Returns the current position of the child control.
 		ws::Vec2i getPosition()
 		{
 			return {x,y};
 		}
 		
+		// Resizes the child control.
 		void setSize(int w,int h)
 		{
 			width = w;
@@ -4788,16 +4837,19 @@ namespace ws
 				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 		}
 		
+		// Resizes the child control using a Vec2i.
 		void setSize(ws::Vec2i size)
 		{
 			setSize(size.x, size.y);
 		}
 		
+		// Returns the current size of the child control.
 		ws::Vec2i getSize()
 		{
 			return {width,height};
 		}
 		
+		// Adds a window style flag.
 		void addStyle(DWORD addedStyle)
 		{
             style |= addedStyle;
@@ -4810,6 +4862,7 @@ namespace ws
             
 		}
 		
+		// Removes a window style flag.
 		void removeStyle(DWORD removedStyle)
 		{
 			
@@ -4823,6 +4876,7 @@ namespace ws
 					
 		}
 		
+		// Checks if a given style flag is currently set.
         bool hasStyle(DWORD checkStyle)
         {
             if (hwnd)
@@ -4833,6 +4887,7 @@ namespace ws
             return (style & checkStyle) != 0;
         }
 		
+		// Sets the text of the child control.
 		void setText(std::string newText)
 		{
 			
@@ -4842,6 +4897,7 @@ namespace ws
             
 		}
 		
+		// Retrieves the current text of the child control.
 		std::string getText()
 		{
 			if (!hwnd) return text;
@@ -4856,6 +4912,7 @@ namespace ws
 			return ws::SHORT(wbuf);
 		}
 
+		// Applies a ws::Font and ws::Text style to the control.
 		void setFont(ws::Font &font, ws::Text &textSettings)
 		{
 			if (!hwnd || !font.isValid()) return;
@@ -4906,28 +4963,24 @@ namespace ws
 			}
 		}
 		
-		
+		// Checks if a point (relative to parent) lies inside the control.
 		bool contains(ws::Vec2i point)
 		{
 			return (point.x >= x  && point.x < x + width && point.y >= 0 && point.y < y + height);
 		}
 		
-		
-		
+		// Virtual initialisation method (to be overridden).
 		virtual bool init(ws::Window &parent){return false;}
 		
-		
-		
-		
-		
-		
-		void setFillColor(COLORREF color)
+		// Sets the fill (background) colour.
+	    void setFillColor(COLORREF color)
 	    {
 	        backgroundColor = color;
 	        if (hwnd)
 	            InvalidateRect(hwnd, NULL, TRUE);
 	    }
 	    
+		// Sets the text colour.
 	    void setTextColor(COLORREF color)
 	    {
 	        textColor = color;
@@ -4935,14 +4988,13 @@ namespace ws
 	            InvalidateRect(hwnd, NULL, TRUE);
 	    }
 		
+		// Sets the border colour.
 		void setBorderColor(COLORREF color)
 		{
 			borderColor = color;
 			if (hwnd)
 			    InvalidateRect(hwnd, NULL, TRUE);
 		}
-		
-		
 		
 		
 	};
@@ -4957,11 +5009,15 @@ namespace ws
 		static std::mutex windowsMutex;
 		static bool initialized;
 		
-		
+		// Initialises the window class (called once).
 		static void init();		
+		// Global window procedure that dispatches messages.
 		static LRESULT CALLBACK GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam);
+		// Adds a window to the manager's map.
 		static void addWindow(ws::Window* window);
+		// Removes a window from the manager's map.
 		static void removeWindow(HWND hwnd);		
+		// Retrieves the ws::Window pointer associated with an HWND.
 		static Window* GetWindow(HWND hwnd);
 		
 	};
@@ -5001,20 +5057,23 @@ namespace ws
 			Link            // resource ID 4
 		};
 		
+		// Returns the underlying HCURSOR handle.
 		HCURSOR getHandle()
 		{
 			return handle;
 		}
 
-		
+		// Default constructor.
 		Cursor()
 		{}
 		
+		// Constructor that loads a built‑in cursor type.
 		Cursor(Type type)
 		{
 			loadAs(type);
 		}
 		
+		// Loads a built‑in cursor type.
 		void loadAs(Type type)
 		{
 			animated = false;
@@ -5072,6 +5131,7 @@ namespace ws
 			}
 		}
 
+		// Creates a custom cursor from a ws::Texture (with optional hot‑spot).
 		bool loadFromTexture(const ws::Texture& texture, int hotSpotX = 0, int hotSpotY = 0)
 		{
 			animated = false;
@@ -5152,6 +5212,7 @@ namespace ws
 			return true;
 		}
 
+		// Loads a cursor from a file (.cur or .ani).
 		bool loadFromFile(const std::string& filename)
 		{
 			animated = false;
@@ -5192,13 +5253,14 @@ namespace ws
 			return true;
 		}
 
-
+		// Destructor: destroys the cursor handle if present.
 		~Cursor()
 		{
 			if (handle)
 				DestroyCursor(handle);
 		}
 
+		// Copy constructor: creates a copy of another cursor.
 		Cursor(const Cursor& other) : animated(other.animated), srcPath(other.srcPath)
 		{
 			if (other.handle)
@@ -5217,6 +5279,7 @@ namespace ws
 			}
 		}
 
+		// Copy assignment operator.
 		Cursor& operator=(const Cursor& other)
 		{
 			if (this != &other)
@@ -5245,6 +5308,7 @@ namespace ws
 			return *this;
 		}
 
+		// Move constructor.
 		Cursor(Cursor&& other) noexcept
 			: handle(other.handle), animated(other.animated), srcPath(std::move(other.srcPath))
 		{
@@ -5252,6 +5316,7 @@ namespace ws
 			other.animated = false;
 		}
 
+		// Move assignment operator.
 		Cursor& operator=(Cursor&& other) noexcept
 		{
 			if (this != &other)
@@ -5295,22 +5360,20 @@ namespace ws
 		ws::Texture backBuffer;
 	    Gdiplus::Graphics* canvas;
 		
+		// Default constructor.
 		Window()
 		{
 			canvas = nullptr;
         	hwnd = nullptr;
 		}
 		
-		
-		
+		// Constructor that creates a window with given parameters.
 		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
 			create(width,height,title,style,exStyle);
 		}
 		
-		
-	
-
+		// Creates a window with the specified dimensions, title, and styles.
 		void create(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0)
 		{
 
@@ -5380,6 +5443,7 @@ namespace ws
 			
 		}
 
+		// Destructor: cleans up resources and destroys the window.
         ~Window()
         {
 			RevokeDragDrop(hwnd);
@@ -5399,7 +5463,7 @@ namespace ws
 				
         }
 		
-		
+		// Closes the window (destroys the HWND).
 		void close()
 		{
 		    if (hwnd && IsWindow(hwnd)) {
@@ -5408,6 +5472,7 @@ namespace ws
 		    isRunning = false;
 		}
 		
+		// Returns true if the window is still open and processing messages.
 		bool isOpen()
 		{
 			if(!isRunning || !hwnd)
@@ -5445,6 +5510,7 @@ namespace ws
 			return isRunning && hwnd;
 		}
 		
+		// Pops one message from the internal queue; returns true if there was one.
 	    bool pollEvent(MSG &message) {
 	        if (msgQ.empty()) {
 	            return false;
@@ -5455,6 +5521,7 @@ namespace ws
 	        return true;
 	    }	
 		
+		// Clears the back buffer with a colour.
 	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
 		{
 			if(!hwnd)
@@ -5482,6 +5549,7 @@ namespace ws
 			canvas->Clear(color);			
 	    }
 		
+		// Draws a Drawable object using the current view transformation.
 		void draw(Drawable &draw)
 		{
 			if(!canvas || !hwnd) return;
@@ -5509,6 +5577,7 @@ namespace ws
 			canvas->SetClip(&originalClip);//restore the original clip boundary.
 		}
 		
+		// Presents the back buffer to the screen.
 	    void display() 
 		{
 			if(!hwnd)
@@ -5517,19 +5586,19 @@ namespace ws
 		    UpdateWindow(hwnd);
 	    }		
 		
-		
-		
-		
+		// Sets a pixel in the back buffer.
 		void setPixel(int x,int y,ws::Hue hue)
 		{
 			backBuffer.setPixel(x,y,hue);
 		}
 		
+		// Gets a pixel from the back buffer.
 		ws::Hue getPixel(int x,int y)
 		{
 			return backBuffer.getPixel(x,y).GetValue();
 		}
 		
+		// Returns the current window title.
 		std::string getTitle()
 		{
 			if(!hwnd)
@@ -5540,6 +5609,7 @@ namespace ws
 			return std::string(title);			
 		}
 		
+		// Sets the window title.
 		void setTitle(std::string title)
 		{
 			if(!hwnd)
@@ -5547,16 +5617,19 @@ namespace ws
 			SetWindowTextA(hwnd,ws::TO_LPCSTR(title));
 		}
 		
+		// Sets the view transformation.
 		void setView(ws::View &v)
 		{
 			view = v;
 		}
 		
+		// Returns a copy of the current view.
 		ws::View getView()
 		{
 			return view;
 		}
 		
+		// Shows or hides the window.
 		void setVisible(bool val)
 		{
 			if(!hwnd)
@@ -5568,6 +5641,7 @@ namespace ws
 				ShowWindow(hwnd, SW_SHOW);
 		}
 		
+		// Returns true if the window is visible.
 		bool getVisible()
 		{
 			if(!hwnd)
@@ -5575,22 +5649,26 @@ namespace ws
 			return IsWindowVisible(hwnd);
 		}
 		
+		// Sets keyboard focus to this window.
 		void setFocus()
 		{
 			SetFocus(hwnd);
 		}
 		
+		// Returns true if this window has keyboard focus.
 		bool hasFocus()
 		{
 			HWND focus = GetFocus();
 			return (focus == hwnd);
 		}
 		
+		// Places the window behind the given HWND in Z‑order.
 		void setLayerAfter(HWND lastHwnd)
 		{
 			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
 		}
 		
+		// Adds a window style flag.
 		void addStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5603,6 +5681,7 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_STYLE,s);		
 		}
 		
+		// Removes a window style flag.
 		void removeStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5615,6 +5694,7 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_STYLE,s);			
 		}
 		
+		// Replaces all window styles with the given value.
 		void setAllStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5625,6 +5705,7 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_STYLE,style);			
 		}
 
+		// Adds an extended window style flag.
 		void addExStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5637,6 +5718,7 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,s);		
 		}
 		
+		// Removes an extended window style flag.
 		void removeExStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5649,6 +5731,7 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,s);			
 		}
 		
+		// Replaces all extended window styles with the given value.
 		void setAllExStyle(DWORD style)
 		{
 			if(!hwnd)
@@ -5659,32 +5742,38 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
 		}
 
+		// Returns the current extended window style.
 		DWORD getExStyle()
 		{	
 			return GetWindowLong(hwnd, GWL_EXSTYLE);
 		}
 	    
+		// Returns the current window style.
 	    DWORD getStyle()
 	    {
 	    	return GetWindowLong(hwnd, GWL_STYLE);
             
 		}
 	    
+		// Checks if a given style flag is set.
 	    bool hasStyle(DWORD checkStyle)
 	    {
 	    	return (getStyle() & checkStyle);
 		}
 		
+		// Checks if a given extended style flag is set.
 		bool hasExStyle(DWORD checkStyle)
 	    {
 	    	return (getExStyle() & checkStyle);
 		}
 		
+		// Sets the window size.
 		void setSize(ws::Vec2i size)
 		{
 			setSize(size.x,size.y);
 		}
 	    
+		// Sets the window size using width and height.
 	    void setSize(int screenWidth,int screenHeight)
 	    {
 	    	if(screenWidth <= 0 || screenHeight <= 0)
@@ -5703,6 +5792,7 @@ namespace ws
             
 		}
 		
+		// Returns the client size of the window.
 		ws::Vec2i getSize()
 		{
 			RECT rect;
@@ -5714,11 +5804,13 @@ namespace ws
 			return ws::Vec2i(width,height);			
 		}
 		
+		// Sets the window position.
 		void setPosition(ws::Vec2i pos)
 		{
 			setPosition(pos.x,pos.y);
 		}
 		
+		// Sets the window position using coordinates.
 		void setPosition(int posx,int posy)
 		{
 	    	SetWindowPos(hwnd, 
@@ -5730,6 +5822,7 @@ namespace ws
 			SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);			
 		}
 		
+		// Returns the window position (client area top‑left).
 		ws::Vec2i getPosition()
 		{
 			if(!hwnd)
@@ -5745,6 +5838,7 @@ namespace ws
 			return ws::Vec2i(clientRect.left,clientRect.top);			
 		}
 
+		// Toggles fullscreen mode.
 		void setFullscreen(bool fullscreen = true) 
 		{
 			if (fullscreen == isFullscreen) return;
@@ -5779,42 +5873,50 @@ namespace ws
 			}
 		}
 	    
+		// Returns true if the window is currently fullscreen.
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
 
-		void setChromaKey(ws::Hue hue)//losing window control for some reason
+		// Sets a chroma key (transparent colour) for the window.
+		void setChromaKey(ws::Hue hue)
 		{
 			addExStyle(WS_EX_LAYERED);
 			SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),hue.a,LWA_COLORKEY | LWA_ALPHA);
 		}
 		
+		// Converts screen coordinates to world coordinates using the view.
 		ws::Vec2i toWorld(int x,int y)
 		{
 			return view.toWorld(x,y,getSize());
 		}
 		
+		// Converts a Vec2i screen position to world coordinates.
 		ws::Vec2i toWorld(ws::Vec2i pos)
 		{
 			return toWorld(pos.x,pos.y);
 		}
 		
+		// Converts world coordinates to screen coordinates.
 		ws::Vec2i toScreen(int x,int y)
 		{
 			return view.toScreen(x,y,getSize());
 		}
 		
+		// Converts a Vec2i world position to screen coordinates.
 		ws::Vec2i toScreen(ws::Vec2i pos)
 		{
 			return toScreen(pos.x,pos.y);
 		}
 
+		// Adds a child control to the window.
 		void addChild(ws::Child &child)
 		{
 			children.push_back(&child);
 			child.init(*this);
 		}
 		
+		// Removes a child control from the window.
 		void removeChild(ws::Child &child)
 		{
 			for(size_t a=0;a<children.size();a++)
@@ -5827,6 +5929,7 @@ namespace ws
 			}
 		}
 		
+		// Checks if a child control is owned by this window.
 		bool hasChild(ws::Child &child)
 		{
 			for(size_t a=0;a<children.size();a++)
@@ -5839,11 +5942,12 @@ namespace ws
 			return false;
 		}		
 		
-		
+		// Sets the cursor for this window.
 		void setCursor(ws::Cursor newcursor)
 		{
 			cursor = newcursor;
 		}
+		// Returns the current cursor.
 		ws::Cursor getCursor()
 		{
 			return cursor;
@@ -5851,6 +5955,7 @@ namespace ws
 		
 		private:
 		
+		// Handles window messages and forwards them appropriately.
 		LRESULT handleMessage(UINT uMsg,WPARAM wParam,LPARAM lParam)
 		{
 
@@ -5966,6 +6071,7 @@ namespace ws
 	
 	//Window Manager Stuff
 	
+	// Static initialisation: registers the window class.
 	inline void ws::WindowManager::init()
 	{
 		if(initialized)
@@ -5987,6 +6093,7 @@ namespace ws
 		initialized = true;
 	}
 	
+	// Global window procedure: retrieves the ws::Window instance and forwards the message.
 	inline LRESULT CALLBACK ws::WindowManager::GlobalProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam)
 	{
 		//std::lock_guard<std::mutex> lock(windowsMutex);
@@ -6016,17 +6123,20 @@ namespace ws
 	}
 	
 	
+	// Adds a window to the manager's map.
 	inline void ws::WindowManager::addWindow(ws::Window* window)
 	{
 		//std::lock_guard<std::mutex> lock(windowsMutex);
 		windows[window->hwnd] = window;			
 	}
+	// Removes a window from the manager's map.
 	inline void ws::WindowManager::removeWindow(HWND hwnd)
 	{
 		//std::lock_guard<std::mutex> lock(windowsMutex);
 		windows.erase(hwnd);//hwnd is a pointer to a location. Therefore, it may be used to point to my ws::Window.
 	}
 	
+	// Retrieves the ws::Window pointer for a given HWND.
 	inline ws::Window* ws::WindowManager::GetWindow(HWND hwnd)
 	{
 		//std::lock_guard<std::mutex> lock(windowsMutex);
@@ -6072,19 +6182,21 @@ namespace ws
 		
 		std::queue<std::pair<ws::ClipData, DWORD>> m_dropQueue;
 		
-
+		// Checks if the data object contains file drop data.
 		bool hasFiles(IDataObject* pData) const {
 			if (!pData) return false;
 			FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 			return SUCCEEDED(pData->QueryGetData(&fmt));
 		}
 
+		// Checks if the data object contains Unicode text.
 		bool hasText(IDataObject* pData) const {
 			if (!pData) return false;
 			FORMATETC fmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 			return SUCCEEDED(pData->QueryGetData(&fmt));
 		}
 
+		// Checks if the data object contains an image in any common format.
 		bool hasImage(IDataObject* pData) const 
 		{
 			if (!pData) return false;
@@ -6182,7 +6294,7 @@ namespace ws
 
 		public:
 		
-		
+		// Enables acceptance of a specific drag type with the given drop effect.
 		void acceptType(std::string type,ws::DropEffect effect = ws::DropEffect::Copy)
 		{
 			DWORD dwEffect = static_cast<DWORD>(effect); 
@@ -6206,6 +6318,7 @@ namespace ws
 			}		
 		}
 
+		// Disables acceptance of a specific drag type.
 		void rejectType(std::string type)
 		{
 			if(type == "images")
@@ -6216,12 +6329,14 @@ namespace ws
 				m_files.enabled = false;							
 		}
 		
+		// Rejects all drag types.
 		void rejectAll()
 		{
 			m_files.enabled = m_text.enabled = m_images.enabled = false;
 			m_files.effect = m_text.effect = m_images.effect = static_cast<DWORD>(ws::DropEffect::Copy);
 		}
 
+		// Sets a conditional acceptance rule for a given drag type.
 		void onlyAcceptIf(std::string droptype,std::function<bool()> function)
 		{
 			if (droptype == "images")
@@ -6241,9 +6356,7 @@ namespace ws
 			}
 		}
 
-
-
-
+		// Retrieves a pending drop event from the queue; returns true if available.
 		bool pollDrop(ws::ClipData& outData, DropEffect& outEffect) 
 		{
 			if(!windowRef)return false;
@@ -6273,7 +6386,7 @@ namespace ws
 		ULONG STDMETHODCALLTYPE AddRef()  override { return 1; }
 		ULONG STDMETHODCALLTYPE Release() override { return 1; }
 
-		// IDropTarget
+		// IDropTarget::DragEnter: called when a drag enters the window.
 		HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState,POINTL pt, DWORD* pdwEffect) override 
 		{ 
 			if(!windowRef)return S_OK;
@@ -6316,6 +6429,7 @@ namespace ws
 			return S_OK;
 		}
 		
+		// IDropTarget::DragOver: updates cursor and effect as drag moves.
 		HRESULT STDMETHODCALLTYPE DragOver (DWORD grfKeyState, POINTL pt,DWORD* pdwEffect) override 
 		{ 
 			if(!windowRef)return S_OK;
@@ -6355,6 +6469,7 @@ namespace ws
 			
 			return S_OK;
 		}
+		// IDropTarget::DragLeave: resets cursor when drag leaves the window.
 		HRESULT STDMETHODCALLTYPE DragLeave() override 
 		{ 
 			if(!windowRef)return S_OK;
@@ -6365,7 +6480,7 @@ namespace ws
 			return S_OK;
 		}
 
-
+		// IDropTarget::Drop: processes the dropped data and queues it.
 		HRESULT STDMETHODCALLTYPE Drop(IDataObject* obj, DWORD, POINTL, DWORD* e) override
 		{
 			if(!windowRef)return S_OK;
@@ -6547,6 +6662,7 @@ namespace ws
 			return S_OK;
 		}
 		
+		// Registers this drop target with a window.
 		void setWindow(ws::Window &window)
 		{
 			RegisterDragDrop(window.hwnd, this);	
@@ -6567,7 +6683,7 @@ namespace ws //GLOBAL INPUT
     
 	namespace Global
 	{
-	
+		// Returns the mouse position relative to the given window.
 		ws::Vec2i getMousePos(ws::Window &window)
 		{
 			
@@ -6583,6 +6699,7 @@ namespace ws //GLOBAL INPUT
 		    return p;
 		}
 		
+		// Returns the global mouse position (screen coordinates).
 		ws::Vec2i getMousePos()
 		{
 				
@@ -6596,7 +6713,7 @@ namespace ws //GLOBAL INPUT
 		
 		}
 		
-		
+		// Checks if a virtual key or mouse button is currently pressed.
 		bool getButton(int button)
 		{
 			if ((GetAsyncKeyState(button) & 0x8000) != 0)
@@ -6604,11 +6721,12 @@ namespace ws //GLOBAL INPUT
 			return false;			
 		}
 		
-		//depreciated functions. Avoid using these!
+		// Deprecated: use getButton instead.
 		bool getMouseButton(int vmButton)
 		{
 			return getButton(vmButton);
 		}
+		// Deprecated: use getButton instead.
 		bool getKey(int vmKey)
 		{
 			return getButton(vmKey);
@@ -6634,6 +6752,7 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 	    
+		// Constructor: creates a popup menu for the dropdown.
 		Dropdown(int newID, std::string newName)
 	    {
 	        if (newID != 0) // Leaf items don't need a menu handle
@@ -6643,12 +6762,14 @@ namespace ws //CHILD WINDOW API
 	        isPopup = (newID != 0);
 	    }
 	    
+		// Adds a menu item with an ID, type, and name.
 	    void addItem(int id,DWORD type, std::string itemName)
 	    {
 	        if (isPopup)
 	            AppendMenuA(handle, type, id, ws::TO_LPCSTR(itemName));
 	    }
 	    
+		// Adds a submenu (another Dropdown) to this dropdown.
 	    void addSubmenu(Dropdown &submenu)
 	    {
 	        if (isPopup && submenu.isPopup)
@@ -6656,15 +6777,19 @@ namespace ws //CHILD WINDOW API
 	                       ws::TO_LPCSTR(submenu.getName()));
 	    }
 		
+		// Returns the underlying HMENU handle.
 		HMENU getHandle()
 		{ return handle; }
 		
+		// Returns the name of the dropdown.
 		std::string getName()
 		{ return name;}
 		
+		// Returns the menu item ID.
 		int getID()
 		{ return ID;}
 		
+		// Adds another dropdown as a menu item.
 		void addItem(Dropdown drop)
 		{
 			if (isPopup)
@@ -6690,11 +6815,13 @@ namespace ws //CHILD WINDOW API
 
 		public:
 		
+		// Constructor: creates an empty menu bar.
 		Menu()
 		{
 			bar = CreateMenu();
 		}
 		
+		// Adds a Dropdown (popup menu) to the menu bar.
 		void addDropdown(ws::Dropdown &drop)
 		{
 			AppendMenuA(bar, MF_POPUP, (UINT_PTR)drop.getHandle(), ws::TO_LPCSTR(drop.getName()));
@@ -6702,6 +6829,7 @@ namespace ws //CHILD WINDOW API
 				windowRef->setSize(windowRef->getSize());
 		}
 		
+		// Attaches the menu bar to a ws::Window.
 		void setWindow(ws::Window &window)
 		{
 			SetMenu(window.hwnd, bar);	
@@ -6710,8 +6838,8 @@ namespace ws //CHILD WINDOW API
 				windowRef->setSize(windowRef->getSize());
 		}
 		
-		
-		int getEvent(MSG &m)//You can use this for readability or you can use the normal way.
+		// Extracts the menu command ID from a WM_COMMAND message.
+		int getEvent(MSG &m)
 		{
 			if(m.message == WM_COMMAND)
 				return LOWORD(m.wParam);
@@ -6740,30 +6868,35 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		
-		
-		
+		// Adds a flag to the popup menu's behaviour.
 		void addFlag(DWORD newFlag)
 		{ flags |= newFlag; }
 		
+		// Removes a flag from the popup menu's behaviour.
 		void removeFlag(DWORD removeFlag)
 		{ flags &= ~removeFlag;}
 		
+		// Returns the current flags.
 		DWORD getFlags()
 		{ return flags; }		
 		
-		
+		// Returns the command ID of the selected menu item.
 		int getCommand()
 		{return command;}
 		
+		// Returns the list of menu item strings.
 		std::vector<std::string> getList()
 		{ return list; }
 		
+		// Sets the list of menu item strings.
 		void setList(std::vector<std::string> newList)
 		{ list = newList; }
 		
+		// Adds a single menu item string to the list.
 		void addItem(std::string item)
 		{ list.push_back(item);}
 		
+		// Removes a menu item string from the list.
 		void removeItem(std::string item)
 		{	
 			for(size_t a=0;a<list.size();a++)
@@ -6777,16 +6910,15 @@ namespace ws //CHILD WINDOW API
 			
 		}
 		
+		// Sets the parent window that will own the context menu.
 		void init(ws::Window &newParent)
 		{ parentRef = &newParent;}
 		
+		// Returns the parent window pointer.
 		ws::Window *getParent()
 		{ return parentRef;}
 		
-		
-		
-		
-		
+		// Shows the context menu at the given mouse position; returns true.
 		bool show(ws::Vec2i mouse)
 		{
 			if(parentRef == nullptr)
@@ -6842,46 +6974,55 @@ namespace ws //CHILD WINDOW API
 	{
 	    public:
 	    
+		// Default constructor.
 	    FileWindow()
 	    {
 	        
 	    }
 	    
+		// Sets the initial filename to be shown in the dialog.
 	    void setFileName(std::string file)
 	    {
 	        fileName = file;
 	    }
 	    
+		// Returns the filename selected by the user.
 	    std::string getFileName()
 	    {
 	        return fileName;
 	    }
 	    
+		// Sets the dialog window title.
 	    void setTitle(std::string name)
 	    { 
 	        title = name; 
 	    }
 	    
+		// Returns the dialog window title.
 	    std::string getTitle()
 	    { 
 	        return title; 
 	    }
 	    
+		// Adds a flag to the dialog's behaviour.
 	    void addFlag(DWORD newFlag)
 	    { 
 	        flags |= newFlag; 
 	    }
 	    
+		// Removes a flag from the dialog's behaviour.
 	    void removeFlag(DWORD removeFlag)
 	    { 
 	        flags &= ~removeFlag;
 	    }
 	    
+		// Returns the current dialog flags.
 	    DWORD getFlags()
 	    { 
 	        return flags; 
 	    }
 	    
+		// Opens the file selection dialog; returns true if a file was chosen.
 	    bool open(ws::Window *parent = nullptr)
 	    {
 			
@@ -6938,6 +7079,7 @@ namespace ws //CHILD WINDOW API
 	        }
 	    }
 	    
+		// Opens the file save dialog; returns true if a file was chosen.
 	    bool save(ws::Window *parent = nullptr)
 	    {
 	        std::wstring wtitle = ws::WIDE(title);
@@ -7012,46 +7154,55 @@ namespace ws //CHILD WINDOW API
 	{
 	    public:
 	    
+		// Default constructor.
 	    FolderWindow()
 	    {
 	        
 	    }
 	    
+		// Sets the title of the folder selection dialog.
 	    void setTitle(std::string name)
 	    {
 	        title = name;
 	    }
 	    
+		// Returns the title of the folder selection dialog.
 	    std::string getTitle()
 	    {
 	        return title;
 	    }
 	    
+		// Adds a flag to the dialog's behaviour.
 	    void addFlag(DWORD flag)
 	    { 
 	        flags |= flag;
 	    }
 	    
+		// Replaces all flags with the given value.
 	    void setFlags(DWORD allFlags)
 	    { 
 	        flags = allFlags;
 	    }
 	    
+		// Removes a flag from the dialog's behaviour.
 	    void removeFlag(DWORD flag)
 	    { 
 	        flags &= ~flag;
 	    }
 	    
+		// Returns the current flags.
 	    DWORD getFlags()
 	    {
 	        return flags;
 	    }
 	    
+		// Returns the selected folder path after dialog closes.
 	    std::string getFolderName()
 	    { 
 	        return folderName;
 	    }
 	    
+		// Opens the folder selection dialog; returns true if a folder was chosen.
 	    bool open(ws::Window *parent = nullptr)
 	    {
 	        std::wstring wtitle = ws::WIDE(title);
@@ -7100,6 +7251,7 @@ namespace ws //CHILD WINDOW API
 	        return false;
 	    }
 	    
+		// Sets the initial folder to be displayed when the dialog opens.
 	    void setInitialFolder(std::string folder)
 	    {
 	        initialFolder = folder;
@@ -7111,7 +7263,7 @@ namespace ws //CHILD WINDOW API
 	    std::string folderName = "";
 	    std::string initialFolder = "";
 	    
-	    // callback function for setting initial folder
+	    // Callback function used to set the initial folder in the browser dialog.
 	    static int __stdcall BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
 	    {
 	        if (uMsg == BFFM_INITIALIZED) {
@@ -7128,10 +7280,12 @@ namespace ws //CHILD WINDOW API
 		private:
 		std::vector<std::string> pendingItems;
 	    public:
+		// Default constructor.
 	    ComboBox()
 	    {
 	    }
 	    
+		// Initialises the combo box control.
 	    virtual bool init(ws::Window &parent) override
 	    {
 	        if(!parent.hwnd)
@@ -7187,6 +7341,7 @@ namespace ws //CHILD WINDOW API
 	        return true;
 	    }
 	    
+		// Adds a string item to the combo box drop‑down list.
 	    void addItem(const std::string& item)
 	    {
 			if (!hwnd) {
@@ -7197,6 +7352,7 @@ namespace ws //CHILD WINDOW API
 	        SendMessageA(hwnd, CB_ADDSTRING, 0, (LPARAM)item.c_str());
 	    }
 	    
+		// Adds multiple string items to the combo box.
 	    void addItems(const std::vector<std::string>& items)
 	    {
 			if (!hwnd) {
@@ -7211,30 +7367,35 @@ namespace ws //CHILD WINDOW API
 	        }
 	    }
 	    
+		// Removes the item at the specified index.
 	    void removeItem(int index)
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_DELETESTRING, (WPARAM)index, 0);
 	    }
 	    
+		// Clears all items from the combo box.
 	    void clear()
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
 	    }
 	    
+		// Returns the index of the currently selected item.
 	    int getSelectedIndex()
 	    {
 	        if (!hwnd) return -1;
 	        return (int)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
 	    }
 	    
+		// Selects the item at the given index.
 	    void setSelectedIndex(int index)
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_SETCURSEL, (WPARAM)index, 0);
 	    }
 	    
+		// Returns the text of the currently selected item.
 	    std::string getSelectedText()
 	    {
 	        if (!hwnd) return "";
@@ -7251,12 +7412,14 @@ namespace ws //CHILD WINDOW API
 	        return std::string(buffer.data());
 	    }
 	    
+		// Returns the total number of items in the combo box.
 	    int getItemCount()
 	    {
 	        if (!hwnd) return 0;
 	        return (int)SendMessage(hwnd, CB_GETCOUNT, 0, 0);
 	    }
 	    
+		// Returns the text of the item at the given index.
 	    std::string getItemText(int index)
 	    {
 	        if (!hwnd || index < 0) return "";
@@ -7270,6 +7433,7 @@ namespace ws //CHILD WINDOW API
 	        return std::string(buffer.data());
 	    }
 	    
+		// Checks if a WM_COMMAND message indicates a selection change.
 	    bool selectionChanged(MSG &msg)
 	    {
 	        if (msg.message == WM_COMMAND && HIWORD(msg.wParam) == CBN_SELCHANGE)
@@ -7282,6 +7446,7 @@ namespace ws //CHILD WINDOW API
 	        return false;
 	    }
 	    
+		// Switches between editable and read‑only dropdown styles.
 	    void setDropdownStyle(bool allowEdit = true)
 	    {
 	        if (!hwnd) return;
@@ -7303,6 +7468,7 @@ namespace ws //CHILD WINDOW API
 	                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 	    }
 	    
+		// Returns the text currently typed in the editable edit field.
 	    std::string getEditText()
 	    {
 	        if (!hwnd) return "";
@@ -7318,6 +7484,7 @@ namespace ws //CHILD WINDOW API
 	        return std::string(buffer.data());
 	    }
 	    
+		// Sets the text in the editable edit field.
 	    void setEditText(const std::string& text)
 	    {
 	        if (!hwnd) return;
@@ -7332,12 +7499,12 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		
-		
+		// Default constructor.
 		Button()
 		{	
 		}
 		
-		
+		// Initialises the button control.
 		virtual bool init(ws::Window &parent) override
 		{
 			
@@ -7383,8 +7550,7 @@ namespace ws //CHILD WINDOW API
 			return true;		
 		}
 		
-		
-		
+		// Checks if a WM_COMMAND message indicates this button was clicked.
 	    bool isPressed(MSG &msg)
 	    {
 	    	
@@ -7408,12 +7574,12 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		
-		
+		// Default constructor.
 		Slider()
 		{
 		}
 		
-		
+		// Initialises the slider control.
 		virtual bool init(ws::Window &parent) override
 		{
 			
@@ -7463,8 +7629,7 @@ namespace ws //CHILD WINDOW API
 			return true;		
 		}
 		
-		
-		
+		// Checks scroll messages and updates the stored position; returns true if moved.
 	    bool getScroll(MSG &msg)
 	    {
 	    	
@@ -7477,32 +7642,35 @@ namespace ws //CHILD WINDOW API
 	        return false;
 	    }
 	    
-	    
+		// Makes the slider horizontal.
 	    void setHorizontal()
 	    {
 	    	removeStyle(TBS_VERT);
 	    	addStyle(TBS_HORZ);
 		}
 		
+		// Makes the slider vertical.
 		void setVertical()
 		{
 	    	removeStyle(TBS_HORZ);
 	    	addStyle(TBS_VERT);
 		}
 		
-        
-		void setRange(int minimum = 0,int maximum = 100)
+		// Sets the range (minimum and maximum) of the slider.
+        void setRange(int minimum = 0,int maximum = 100)
 		{
 			SendMessage(hwnd, TBM_SETRANGEMIN, TRUE, minimum);
 			SendMessage(hwnd, TBM_SETRANGEMAX, TRUE, maximum);
 		}
 		
+		// Sets the current slider position.
 		void setSlidePosition(int pos = 0)
 		{
 			SendMessage(hwnd, TBM_SETPOS, TRUE, pos);
 			slidePos = pos; 
 		}
 		
+		// Returns the current slider position.
 		int getSlidePosition()
 		{
 			return slidePos;
@@ -7520,6 +7688,7 @@ namespace ws //CHILD WINDOW API
 	{
 		public:
 		
+		// Initialises the text box control.
 		virtual bool init(ws::Window &parent) override
 		{
 			
@@ -7572,7 +7741,8 @@ namespace ws //CHILD WINDOW API
 			return true;		
 		}		
 		int char_limit = 0;
-		void setCharacterLimit(int max_chars = 0)//0 is infinite
+		// Sets the maximum number of characters (0 = infinite).
+		void setCharacterLimit(int max_chars = 0)
 		{
 			if(!hwnd)
 				char_limit = max_chars;
@@ -7580,7 +7750,7 @@ namespace ws //CHILD WINDOW API
 				SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)max_chars, 0);			
 		}
 		
-		
+		// Returns true if this text box currently has keyboard focus.
 		bool getFocus()
 		{
 	        if (!hwnd) return false;
@@ -7597,11 +7767,13 @@ namespace ws //CHILD WINDOW API
 	class Label : public Child
 	{
 		public:
+		// Default constructor.
 		Label()
 		{
 			
 		}
 		
+		// Initialises the label control.
 		virtual bool init(ws::Window &parent) override
 		{
 			
@@ -7648,9 +7820,6 @@ namespace ws //CHILD WINDOW API
 			return true;		
 		}
 				
-		
-		
-		
 	};
 	
 	

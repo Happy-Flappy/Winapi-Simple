@@ -1,0 +1,5 @@
+site_name: Winsimple API
+nav:
+  - Home: index.md
+
+theme: material

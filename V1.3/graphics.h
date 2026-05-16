@@ -44,6 +44,7 @@ namespace ws // - Win32 Simple
 
 
 	
+	// Converts a UTF-8 std::string to std::wstring.
 	std::wstring WIDE(std::string str)
 	{
 	    int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
@@ -52,15 +53,14 @@ namespace ws // - Win32 Simple
 	    return wstr;
 	}
 	
+	// Converts a wide string to a UTF-8 std::string.
 	std::string SHORT(const std::wstring& wstr) {
-	    // Determine the size of the required buffer
 	    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
 	    if (bufferSize == 0) {
 	        return "";
 	    }
 	
-	    // Create the string and perform the conversion
-	    std::string str(bufferSize - 1, '\0'); // Subtract 1 for the null terminator
+	    std::string str(bufferSize - 1, '\0');
 	    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, str.data(), bufferSize, NULL, NULL);
 	
 	    return str;
@@ -69,6 +69,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+	// Returns c_str() cast to LPCSTR.
 	LPCSTR TO_LPCSTR(std::string &str)
 	{
 		return LPCSTR(str.c_str());
@@ -76,24 +77,21 @@ namespace ws // - Win32 Simple
 		
 
 
+	// Returns the short path name of a given long path; returns empty on failure.
 	std::wstring GetShortPathNameSafe(const std::wstring& longPath) 
 	{
-	    // Pass NULL for the buffer to get the required size.
 	    DWORD bufferSize = GetShortPathNameW(longPath.c_str(), NULL, 0);
 	    if (bufferSize == 0) {
-	        return L""; // Return empty on failure
+	        return L""; 
 	    }
 	
-	    // Allocate the buffer
 	    std::wstring shortPath(bufferSize, L'\0');
 	
-	    // Call again with the allocated buffer
 	    bufferSize = GetShortPathNameW(longPath.c_str(), shortPath.data(), bufferSize);
 	    if (bufferSize == 0) {
-	        return L""; // Return empty on failure
+	        return L""; 
 	    }
 	    
-	    // Resize to the actual length and return
 	    shortPath.resize(bufferSize);
 	    return shortPath;
 	}
@@ -156,9 +154,9 @@ namespace ws // - Win32 Simple
 			
 			
 			
+		// Cleans up MCI channel if ID is set.
 		~Wav()
 		{
-		    // Clean up
 		    if(!ID.empty())
 		    {
 		        std::string status = getChannelStatus(channel);
@@ -169,6 +167,7 @@ namespace ws // - Win32 Simple
 			}
 		}
 
+		// Initializes Wav object; does not open the file.
 		Wav(std::string path = "",int channel = 0,bool blocking = true)
 		{
 			this->path = path;
@@ -181,6 +180,7 @@ namespace ws // - Win32 Simple
 
 		private:
 		
+		// Sends an MCI command string; optionally prints error.
 		static bool mciSimple(std::string command,bool sendError = true)
 		{
 			MCIERROR err = mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
@@ -201,6 +201,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Checks if file extension is supported by MCI; warns for uncommon types.
 		static void isSupported(std::string m_path)
 		{
 			std::filesystem::path p(m_path);
@@ -208,12 +209,10 @@ namespace ws // - Win32 Simple
 			
 			if(ext == ".wav" || ext == ".mid" || ext == ".midi")
 			{
-				//always supported
 				return;
 			}
 			if(ext == ".mp3" || ext == ".wma")
 			{
-				//supported by most modern windows
 				return;
 			}
 			if(ext == ".au" || ext == ".aif" || ext == ".aiff" || ext == ".snd")
@@ -228,6 +227,7 @@ namespace ws // - Win32 Simple
 		public:
 
 
+		// Returns the first available channel (0-99) that is not playing/paused.
 		static int getFreeChannel()
 		{
 			int channel = -1;
@@ -251,6 +251,7 @@ namespace ws // - Win32 Simple
 		}
 
 
+		// Returns the status string (playing, stopped, etc.) of an MCI channel.
 		static std::string getChannelStatus(int m_channel)
 		{
 			
@@ -258,15 +259,14 @@ namespace ws // - Win32 Simple
 			
 			
 			
-		    char returnBuffer[128]; // Buffer to store the status string
+		    char returnBuffer[128];
 		    std::string command = "status " + m_ID + " mode";
 		    
 		     memset(returnBuffer, 0, sizeof(returnBuffer));
 		   
 		    
-		    // Send the command and check for errors
 		    if (mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL) == 0) {
-		        return returnBuffer; // Returns "playing", "stopped", etc.
+		        return returnBuffer;
 		    } else {
 		        return "error";
 		    }
@@ -274,7 +274,7 @@ namespace ws // - Win32 Simple
 		}
 		
 
-		
+		// Opens and plays a sound file on a given channel, returning immediately if non-blocking.
 		static bool PlayFree(std::string m_path,int m_channel,bool m_blocking = false)
 		{
 			
@@ -291,28 +291,23 @@ namespace ws // - Win32 Simple
 			
 
 
-			//Get shortened path name because mciSendStringA does not support long paths.
 			std::wstring wpath = GetShortPathNameSafe(WIDE(m_path));
 			if(!wpath.empty())
 				m_path = SHORT(wpath);
 			
 			
 			std::string command;
-			//Make command to close this old channel if it was already open
 			command = "close " + m_ID;
 			mciSimple(command,false);
 			
 			
-			//open the file and give it an alias - users do not have to see this. All they have to remember is the channel ID since this is technically different device context channels.
 			command = "open "+ m_path + " alias "+m_ID;
 			if(!mciSimple(command))
 				return false;
 			
 			
-			//Make command for playing the file.
 			command = "play "+m_ID;
 			
-			//play the file
 			if(!mciSimple(command))
 				return false;
 			
@@ -324,6 +319,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Opens a sound file for the Wav object; sets time format to milliseconds.
 		bool open(std::string m_path,int m_channel,bool m_blocking = true)
 		{
 			isSupported(m_path);
@@ -342,27 +338,23 @@ namespace ws // - Win32 Simple
 			
 			
 			
-			//close it no matter what
 	        std::string command = "close " + ID;
-	        mciSimple(command,false);//close channel without error report.			
+	        mciSimple(command,false);
 			
 			
 
-			//Get shortened path name because mciSendStringA does not support long paths.
 			std::wstring wpath = GetShortPathNameSafe(WIDE(path));
 			if(!wpath.empty())
 				path = SHORT(wpath);
 			
 			
 			
-			//open channel
 			command = "open "+ path + " alias "+ID;
 			if(!mciSimple(command))
 				return false;
 			
 			
 
-			// Set time format to milliseconds for better control
 	        command = "set " + ID + " time format milliseconds";
 	        if(!mciSimple(command))
 				return false;			
@@ -372,6 +364,7 @@ namespace ws // - Win32 Simple
 			return true;
 		}
 		
+		// Starts playback of the loaded sound; non-blocking if blocking==false.
 		void play()
 		{
 
@@ -387,7 +380,6 @@ namespace ws // - Win32 Simple
 			
 			std::string command = "";
 			
-	        // Start playback
 	        command = "play " + ID;
 	        
 	        if(!mciSimple(command))
@@ -397,7 +389,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
-		
+		// Pauses playback on the specified MCI channel.
 		static void stop(int m_channel)
 		{
 			std::string m_ID = std::to_string(m_channel);
@@ -407,6 +399,7 @@ namespace ws // - Win32 Simple
 			mciSimple(command);
 		}
 		
+		// Pauses playback of this Wav's channel.
 		void stop()
 		{
 			std::string command = "pause "+ ID;
@@ -417,6 +410,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Sets volume percentage (0-100) for this sound channel.
 	    bool setVolume(int percent)
 	    {
 	    	
@@ -432,15 +426,12 @@ namespace ws // - Win32 Simple
 			}
 				    	
 	    	
-	        // Convert percentage back to MCI volume (0-1000)
 	        int volume = (percent * 1000) / 100;
 	        
 	        if(getChannelStatus(channel) == "error") return false;
 	        
-	        // Clamp volume to valid range
 	        volume = std::max(0, std::min(1000, volume));
 	        
-	        // Try different MCI volume commands in order
 	        std::string commands[] = {
 	            "set " + ID + " audio volume to " + std::to_string(volume),
 	            "setaudio " + ID + " volume to " + std::to_string(volume), 
@@ -457,6 +448,7 @@ namespace ws // - Win32 Simple
 	        return false;
 	    }
 	    
+	    // Returns current volume percentage (0-100); 0 if error.
 	    int getVolume()
 	    {
 
@@ -488,11 +480,11 @@ namespace ws // - Win32 Simple
 			
 	        if(volume == 0)
 	        	return 0;
-	        // MCI volume range is 0 - 1000 but this returns percentage of that.
 	        return (volume * 100) / 1000;
 	    }
 		
 		
+		// Seeks to a given position in seconds.
 		bool setProgress(long seconds)
 		{
 			std::string status = getChannelStatus(channel);
@@ -512,7 +504,7 @@ namespace ws // - Win32 Simple
 			return mciSimple(command);
 		}
 		
-		
+		// Returns current playback position in seconds.
 		long getProgress()
 		{
 	    	if(getChannelStatus(channel) == "error")
@@ -536,20 +528,18 @@ namespace ws // - Win32 Simple
 				return 0;
 	        }			
 	        
-		    // Convert string to long
 		    char *end_ptr;
 		    long result = std::strtol(returnBuffer, &end_ptr, 10);
 		    
-		    // Check if conversion was successful
 		    if (returnBuffer == end_ptr) {
-		        return 0; // conversion error
+		        return 0;
 		    }
 	        	
 	        return result / 1000;//return in seconds
 		}	
 		
 		
-		
+		// Returns total length of the sound in seconds (approximate).
 		long getLength()
 		{
 	    	if(getChannelStatus(channel) == "error")
@@ -568,12 +558,11 @@ namespace ws // - Win32 Simple
 			{
 				return 0;
 			}
-			return (atol(returnBuffer) - 10)/1000; // return in seconds
+			return (atol(returnBuffer) - 10)/1000;
 		    
 		}
 		
-		
-		
+		// Returns true if playback has reached the end.
 		bool isFinished()
 		{
 			if(getChannelStatus(channel) == "error")
@@ -611,7 +600,7 @@ namespace ws // - Win32 Simple
 		public:
 		
 		
-		
+		// High-precision timer using QueryPerformanceCounter.
 		Timer()
 		{
 			LARGE_INTEGER freq;
@@ -624,6 +613,7 @@ namespace ws // - Win32 Simple
 		{
 		}
 		
+		// Resets start time and returns elapsed seconds since last restart.
 		double restart()
 		{
 	        double seconds = getSeconds();
@@ -635,6 +625,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+	    // Returns elapsed seconds since start.
 	    double getSeconds() const
 	    {
 	        LARGE_INTEGER currentTime;
@@ -643,11 +634,13 @@ namespace ws // - Win32 Simple
 	      
 	    }
 	    
+	    // Returns elapsed milliseconds since start.
 	    double getMilliSeconds() const
 	    {
 	        return getSeconds() * 1000.0;
 	    }
 	    
+	    // Returns elapsed microseconds since start.
 	    double getMicroSeconds() const
 	    {
 	        return getMilliSeconds() * 1000.0;
@@ -677,22 +670,26 @@ namespace ws // - Win32 Simple
 	{
 		public:
 			
+		// Default constructor.
 		View()
 		{
 			
 		}
 		
+		// Sets the world rectangle (visible area).
 		void setRect(RECT viewRect)
 		{
 			world = viewRect;
 		}
 		
+		// Sets world dimensions from a POINT.
 		void setSize(POINT size)
 		{
 			world.right = size.x;
 			world.bottom = size.y;
 		}
 		
+		// Sets world position (upper-left corner).
 		void setPos(POINT pos)
 		{
 			world.left = pos.x;
@@ -700,17 +697,20 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Sets the viewport rectangle (screen area).
 		void setPortRect(RECT portRect)
 		{
 			port = portRect;
 		}
 		
+		// Sets viewport size.
 		void setPortSize(POINT size)
 		{
 			port.right = size.x;
 			port.bottom = size.y;
 		}
 		
+		// Sets viewport position.
 		void setPortPos(POINT pos)
 		{
 			port.left = pos.x;
@@ -720,11 +720,13 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Returns the world rectangle.
 		RECT getRect()
 		{
 			return world;
 		}
 		
+		// Returns world size.
 		POINT getSize()
 		{
 			POINT p;
@@ -734,6 +736,7 @@ namespace ws // - Win32 Simple
 			return p;
 		}
 		
+		// Returns world position.
 		POINT getPos()
 		{
 			POINT p;
@@ -743,11 +746,13 @@ namespace ws // - Win32 Simple
 			return p;
 		}
 		
+		// Returns the viewport rectangle.
 		RECT getPortRect()
 		{
 			return port;
 		}
 		
+		// Returns viewport size.
 		POINT getPortSize()
 		{
 			POINT p;
@@ -757,6 +762,7 @@ namespace ws // - Win32 Simple
 			return p;
 		}
 		
+		// Returns viewport position.
 		POINT getPortPos()
 		{
 			POINT p;
@@ -769,6 +775,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Zooms the view by adjusting the viewport size inversely to the factor; also moves world.
 	    void zoom(float factor)
 	    {
 	    	if(factor != 0)
@@ -776,19 +783,21 @@ namespace ws // - Win32 Simple
 			
 		    	long int x = world.right / factor;
 		    	long int y = world.bottom / factor;
-				setPortSize({x,y});	// If factor is 2, that means that the visible world area is half as much because it is zooming in and will  be stretching into the viewport.
+				setPortSize({x,y});
 	    		world.left += x;
 	    		world.top += y;
 			}
 		}
 
 
+		// Moves the world by a delta.
 		void move(POINT delta)
 		{
 			world.left += delta.x;
 			world.top += delta.y;
 		}
 		
+		// Moves the viewport by a delta.
 		void movePort(POINT delta)
 		{
 			port.left += delta.x;
@@ -798,6 +807,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Converts viewport (screen) coordinates to world coordinates.
 	    POINT toWorld(POINT pos) 
 	    {
 		    POINT worldSize = getSize();
@@ -815,6 +825,7 @@ namespace ws // - Win32 Simple
 		    return worldPoint;
 	    }
 	    
+	    // Converts world coordinates to viewport (screen) coordinates.
 	    POINT toWindow(POINT pos) 
 	    {
 		    POINT worldSize = getSize();
@@ -869,12 +880,14 @@ namespace ws // - Win32 Simple
 		
 		Texture() = default;
 		
+		// Constructs by loading image from path.
 		Texture(std::string path)
 		{
 			load(path);
 		}
 		
 		
+	    // Frees the bitmap handle.
 	    ~Texture()
 	    {
 	        if (bitmap != NULL)
@@ -888,6 +901,7 @@ namespace ws // - Win32 Simple
 
 
 
+	    // Move constructor.
 	    Texture(Texture&& other) noexcept
 	        : bitmap(other.bitmap), width(other.width), height(other.height)
 	    {
@@ -898,6 +912,7 @@ namespace ws // - Win32 Simple
 
 
 		
+	    // Move assignment operator.
 	    Texture& operator=(Texture&& other) noexcept
 	    {
 	        if (this != &other)
@@ -923,6 +938,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+		// Loads bitmap from file; releases previous image.
 		bool load(std::string path)
 		{
 
@@ -962,6 +978,7 @@ namespace ws // - Win32 Simple
 			return true;
 		}
 		
+	    // Checks if a valid bitmap is loaded.
 	    bool isValid() const
 	    {
 	        return bitmap != NULL;
@@ -971,13 +988,14 @@ namespace ws // - Win32 Simple
 	    
 	    COLORREF transparencyColor = CLR_INVALID; // Add this member variable
 	
+	    // Sets the color key used for transparent blitting.
 	    void setTransparentMask(COLORREF color) {
 	        transparencyColor = color;
 	    }	    
 	    
 	    
 	    
-	    
+	    // Returns the color of a pixel at (Xindex, Yindex); converts from BGR to RGB.
 	    COLORREF getPixel(int Xindex,int Yindex)
 	    {
 			
@@ -1002,6 +1020,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Sets a pixel color at (Xindex, Yindex); converts from RGB to BGR internally.
 		bool setPixel(COLORREF color,int Xindex,int Yindex)
 		{
 		
@@ -1012,7 +1031,7 @@ namespace ws // - Win32 Simple
 			
 			HBITMAP oldbitmap = (HBITMAP)SelectObject(hdc,bitmap);
 			
-			color = RGB(GetBValue(color),GetGValue(color),GetRValue(color));//convert to BGR for HBITMAP. COLORREF is RGB. HBITMAP is BGR
+			color = RGB(GetBValue(color),GetGValue(color),GetRValue(color));
 			
 			SetPixel(hdc,Xindex,Yindex,color);
 			
@@ -1050,6 +1069,7 @@ namespace ws // - Win32 Simple
 			
 		}
 		
+		// Frees pixel memory.
 		~PixelArray()
 		{
 			clear();
@@ -1057,7 +1077,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-	    // Copy constructor
+	    // Copy constructor.
 	    PixelArray(const PixelArray& other)
 	    {
 	        if (other.pixels && other.width > 0 && other.height > 0)
@@ -1073,7 +1093,7 @@ namespace ws // - Win32 Simple
 	        }
 	    }
 	    
-	    // Assignment operator
+	    // Assignment operator.
 	    PixelArray& operator=(const PixelArray& other)
 	    {
 	        if (this != &other)
@@ -1094,7 +1114,7 @@ namespace ws // - Win32 Simple
 	        return *this;
 	    }
 	    
-	    // Move constructor
+	    // Move constructor.
 	    PixelArray(PixelArray&& other) noexcept
 	        : pixels(other.pixels), width(other.width), height(other.height)
 	    {
@@ -1103,7 +1123,7 @@ namespace ws // - Win32 Simple
 	        other.height = 0;
 	    }
 	    
-	    // Move assignment operator
+	    // Move assignment operator.
 	    PixelArray& operator=(PixelArray&& other) noexcept
 	    {
 	        if (this != &other)
@@ -1125,7 +1145,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+		// Frees pixel buffer and resets dimensions.
 		void clear()
 		{
 			if(pixels)
@@ -1140,6 +1160,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Allocates pixel array of given size, initialized to black.
 		bool create(int w,int h)
 		{
 			
@@ -1167,11 +1188,9 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Fills pixel array from a Texture's HBITMAP pixels.
 		bool convertToPixel(Texture &texture)
 		{
-			//convert HBITMAP to COLORREFS
-			//INIT PIXELS AS 2D ARRAY USING WIDTH AND HEIGHT FROM HBITMAP.
-			
 			if(!texture.isValid())
 				return false;
 			
@@ -1193,28 +1212,21 @@ namespace ws // - Win32 Simple
 						
 		}
 		
-		
+		// Creates a new Texture from the pixel array.
 		bool sendToTexture(Texture &texture)
 		{
 			
 	        if (!pixels || width <= 0 || height <= 0)
 	            return false;
 	        
-	        
-	        
-	        
-	        
-	        // Create device context
 	        HDC hdc = CreateCompatibleDC(NULL);
 	        if (!hdc)
 	            return false;
 	        
-	        
-	        // Create bitmap
 	        BITMAPINFO bmi = {};
 	        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 	        bmi.bmiHeader.biWidth = width;
-	        bmi.bmiHeader.biHeight = -height;  // Negative for top-down
+	        bmi.bmiHeader.biHeight = -height;
 	        bmi.bmiHeader.biPlanes = 1;
 	        bmi.bmiHeader.biBitCount = 32;
 	        bmi.bmiHeader.biCompression = BI_RGB;
@@ -1229,10 +1241,8 @@ namespace ws // - Win32 Simple
 	            return false;
 	        }
 	        
-	        // Copy pixels to the bitmap (bitmap expects row-major order: [y][x])
 	        COLORREF* pPixels = (COLORREF*)pBits;
 
-			//Convert RGB data to BGR for HBITMAP
 			for (int i = 0; i < width * height; i++)
 		    {
 		        COLORREF srcPixel = pixels[i];
@@ -1240,7 +1250,6 @@ namespace ws // - Win32 Simple
 		        BYTE g = GetGValue(srcPixel); 
 		        BYTE b = GetBValue(srcPixel);
 		        
-		        // Convert RGB to BGR for bitmap
 		        pPixels[i] = RGB(b, g, r);
 		    }
 
@@ -1250,12 +1259,10 @@ namespace ws // - Win32 Simple
 		        DeleteObject(texture.bitmap);
 		    }	        
 	        
-	        // Set up the texture
 	        texture.bitmap = hBitmap;
 	        texture.width = width;
 	        texture.height = height;
 	        
-	        // Clean up
 	        DeleteDC(hdc);
 	        
 	        return true;
@@ -1264,7 +1271,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+		// Sets the color of a pixel at (x,y).
 		void setPixel(COLORREF color,int x,int y)
 		{
 			if(x >=0 && x < width && y >=0 && y < height)
@@ -1272,6 +1279,7 @@ namespace ws // - Win32 Simple
 			
 		}
 		
+		// Returns the color of a pixel at (x,y).
 		COLORREF getPixel(int x,int y)
 		{
 			if(x >=0 && x < width && y >=0 && y < height)
@@ -1280,7 +1288,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
-		
+		// Replaces all pixels of a given startColor with endColor.
 		bool setMask(COLORREF startColor,COLORREF endColor)
 		{
 			
@@ -1321,6 +1329,7 @@ namespace ws // - Win32 Simple
 		
 		Vec2f scale = {1,1};		
 		
+		// Sets the scale factor.
 		void setScale(Vec2f s)	
 		{
 			scale.x = s.x;
@@ -1328,6 +1337,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Sets the origin offset for position calculations.
 		void setOrigin(POINT pos)
 		{
 			origin.x = pos.x;
@@ -1335,14 +1345,17 @@ namespace ws // - Win32 Simple
 		}
 	
 	
+	    // Returns width multiplied by scale.
 	    int getScaledWidth() const { 
 	        return static_cast<int>(width * scale.x); 
 	    }
 	    
+	    // Returns height multiplied by scale.
 	    int getScaledHeight() const { 
 	        return static_cast<int>(height * scale.y); 
 	    }
 	
+		// Returns the origin multiplied by scale.
 		POINT getScaledOrigin()
 		{
 			long int xo = static_cast<int>(origin.x * scale.x);
@@ -1377,15 +1390,14 @@ namespace ws // - Win32 Simple
 		public:
 		
 		
-		
+		// Default constructor.
 		Sprite()
 		{
 			
 		}
 		
 		
-		
-		
+		// Checks if point lies inside the scaled sprite bounds.
 		virtual bool contains(POINT pos) override
 		{
 			
@@ -1393,7 +1405,7 @@ namespace ws // - Win32 Simple
 			return (pos.x >= x - o.x && pos.y >= y - o.y && pos.x < x + getScaledWidth() - o.x && pos.y < y + getScaledHeight() - o.y); 
 		}
 		
-		
+		// Draws the sprite texture with view culling and transparency.
 		virtual void draw(HDC hdc,View &view)  override
 		{
 			
@@ -1401,15 +1413,13 @@ namespace ws // - Win32 Simple
 		    
 		    POINT o = getScaledOrigin();
 		    
-		    // Apply view transformation to position
 		    POINT viewPos = view.getPos();
 		    int drawX = (x - o.x) - viewPos.x;
 		    int drawY = (y - o.y) - viewPos.y;
 		    
-		    // Only draw if visible in current view
 		    if (drawX + getScaledWidth() < 0 || drawY + getScaledHeight() < 0 ||
 		        drawX >= view.getPortSize().x || drawY >= view.getPortSize().y) {
-		        return; // Culling: skip if not visible
+		        return;
 		    }
 		    
 		    HDC hMemDC = CreateCompatibleDC(hdc);
@@ -1434,8 +1444,7 @@ namespace ws // - Win32 Simple
 
 		}
 		
-		
-		
+		// Attaches a texture and sets rect to full texture size.
 		void setTexture(Texture &texture)
 		{
 			textureRef = &texture;
@@ -1449,7 +1458,7 @@ namespace ws // - Win32 Simple
 			
 		}
 		
-		
+		// Sets the source rectangle used from the texture.
 		void setTextureRect(RECT r)
 		{
 			rect = r;
@@ -1457,24 +1466,25 @@ namespace ws // - Win32 Simple
 			height = r.bottom;
 		}
 		
-		
+		// Returns the source rectangle.
 		RECT getTextureRect()
 		{
 			return rect;
 		}
 		
+		// Returns a reference to the attached texture.
 		Texture &getTexture()
 		{
 			return *textureRef;
 		}
 		
-		
+	    // Returns const pointer to attached texture.
 	    const Texture* getTexture() const
 	    {
 	        return textureRef;
 	    }		
 		
-		
+	    // Checks if a texture is currently assigned.
 	    bool hasTexture() const
 	    {
 	        return textureRef != nullptr;
@@ -1482,7 +1492,6 @@ namespace ws // - Win32 Simple
 		
 		
 
-		
 		
 		public:
 			friend class Window;
@@ -1505,6 +1514,7 @@ namespace ws // - Win32 Simple
 		
 		COLORREF color = RGB(125,255,255);
 		
+		// Initializes a 10x10 shape.
 		Shape()
 		{
 			width = 10;
@@ -1513,7 +1523,7 @@ namespace ws // - Win32 Simple
 		}
 		
 
-
+		// Checks if point lies inside the scaled shape bounds.
 		virtual bool contains(POINT pos)  override
 		{
 			
@@ -1522,7 +1532,7 @@ namespace ws // - Win32 Simple
 		}
 
 
-
+	    // Draws the shape as a solid color rectangle with viewport culling.
 	    virtual void draw(HDC hdc,View &view)  override
 	    {
 		    POINT o = getScaledOrigin();
@@ -1531,13 +1541,12 @@ namespace ws // - Win32 Simple
 		    int drawX = (x - o.x) - viewPos.x;
 		    int drawY = (y - o.y) - viewPos.y;
 		    
-		    // Culling check
 		    RECT spriteRect = {drawX, drawY, drawX + getScaledWidth(), drawY + getScaledHeight()};
 		    RECT viewportRect = {0, 0, view.getPortSize().x, view.getPortSize().y};
 		    RECT intersection;
 
 		    if (!IntersectRect(&intersection, &spriteRect, &viewportRect)) {
-   		    	return; // No intersection with viewport means the entire sprite is outside of view
+   		    	return;
 		    }
 		    
 		    HBRUSH brush = CreateSolidBrush(color);
@@ -1577,8 +1586,7 @@ namespace ws // - Win32 Simple
 		int width = 2;
 	    
 	    
-	    
-	    
+	    // Constructs a line with given endpoints, width and color.
 	    Line(POINT start = {0,0},POINT end = {0,0},int width = 2,COLORREF color = RGB(0,0,255))
 	    {
 	    	this->start = start;
@@ -1588,23 +1596,20 @@ namespace ws // - Win32 Simple
 		}
 	    
 	    
+		// Draws the line with view offset.
 		virtual void draw(HDC hdc, ws::View &view) override {
-	        // Create and select a blue pen
 	        HPEN hPen = CreatePen(PS_SOLID, width, color);
 	        HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
 	        
-	        // Apply view transformation
 	        POINT viewPos = view.getPos();
 	        int drawX1 = start.x - viewPos.x;
 	        int drawY1 = start.y - viewPos.y;
 	        int drawX2 = end.x - viewPos.x;
 	        int drawY2 = end.y - viewPos.y;
 	        
-	        // Draw a line
 	        MoveToEx(hdc, drawX1, drawY1, NULL);
 	        LineTo(hdc, drawX2, drawY2);
 	        
-	        // Restore the old pen and delete the created pen
 	        SelectObject(hdc, hOldPen);
 	        DeleteObject(hPen);
 	        
@@ -1614,6 +1619,7 @@ namespace ws // - Win32 Simple
 	    
 	    
 	    private:
+	    // Hit test always returns false for a line.
 	    virtual bool contains(POINT pos) override
 	    { 
 	    	return false;
@@ -1622,6 +1628,7 @@ namespace ws // - Win32 Simple
 		
 		public:
 			
+		// Checks if point q lies on line segment pr.
 		bool onSegment(POINT p, POINT q, POINT r)
 	    {
 	        if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
@@ -1630,16 +1637,17 @@ namespace ws // - Win32 Simple
 	        return false;
 	    }
 		
-		// Returns: 0 = collinear, 1 = clockwise, 2 = counterclockwise
+		// Returns orientation of triplet: 0 = collinear, 1 = clockwise, 2 = counterclockwise.
 	    int orientation(POINT p, POINT q, POINT r)
 	    {
 	        long long val = (long long)(q.y - p.y) * (r.x - q.x) - 
 	                       (long long)(q.x - p.x) * (r.y - q.y);
 	        
-	        if (val == 0) return 0;  // Collinear
-	        return (val > 0) ? 1 : 2; // Clockwise or counterclockwise
+	        if (val == 0) return 0;
+	        return (val > 0) ? 1 : 2;
 	    }			
 		
+	    // Returns true if this line segment intersects another.
 	    bool intersects(Line &otherLine)
 	    {
 	        POINT p1 = this->start;
@@ -1647,17 +1655,14 @@ namespace ws // - Win32 Simple
 	        POINT p3 = otherLine.start;
 	        POINT p4 = otherLine.end;
 	        
-	        // Calculate orientation values
 	        int o1 = orientation(p1, p2, p3);
 	        int o2 = orientation(p1, p2, p4);
 	        int o3 = orientation(p3, p4, p1);
 	        int o4 = orientation(p3, p4, p2);
 	        
-	        // General case: lines intersect if orientations are different
 	        if (o1 != o2 && o3 != o4)
 	            return true;
 	        
-	        // Special cases: check if points are collinear and lie on segments
 	        if (o1 == 0 && onSegment(p1, p3, p2)) return true;
 	        if (o2 == 0 && onSegment(p1, p4, p2)) return true;
 	        if (o3 == 0 && onSegment(p3, p1, p4)) return true;
@@ -1688,7 +1693,7 @@ namespace ws // - Win32 Simple
 	
 	    Poly() = default;
 	
-	    
+	    // Constructs a polygon from a vector of vertices.
 	    Poly(std::vector<POINT>& vertices, COLORREF fillColor = RGB(255, 0, 0), COLORREF borderColor = RGB(0, 0, 0), int borderWidth = 2, bool filled = true)
 	    {
 	        this->vertices = vertices;
@@ -1699,11 +1704,13 @@ namespace ws // - Win32 Simple
 	    }
 	
 	
+	    // Adds a vertex.
 	    void addVertex(POINT vertex) 
 		{
 	        vertices.push_back(vertex);
 	    }
 	
+	    // Adds a vertex from coordinates.
 	    void addVertex(int x, int y) 
 		{
 	        vertices.push_back({x, y});
@@ -1712,24 +1719,26 @@ namespace ws // - Win32 Simple
 	
 	
 	
+	    // Removes all vertices.
 	    void clear() 
 		{
 	        vertices.clear();
 	    }
 	
+	    // Returns number of vertices.
 	    size_t vertexCount() 
 		{
 	        return vertices.size();
 	    }
 	
 	
-	    // Check if enough points to make valid shape. Minimum = 3
+	    // Returns true if at least 3 vertices.
 	    bool isValid() 
 		{
 	        return vertices.size() >= 3;
 	    }
 	
-	    // Calculate centroid of the polygon
+	    // Returns the centroid of the polygon.
 	    POINT getCentroid() 
 		{
 	        if (vertices.empty()) return {0, 0};
@@ -1746,7 +1755,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
-	    // Check if a point is inside the polygon using ray casting algorithm
+	    // Checks if a point is inside the polygon using ray casting.
 	    virtual bool contains(POINT point) override 
 		{
 	        if (vertices.size() < 3) return false;
@@ -1759,16 +1768,13 @@ namespace ws // - Win32 Simple
 	            POINT p1 = vertices[a];
 	            POINT p2 = vertices[(a + 1) % n];
 	            
-	            // Check if point is on vertex
 	            if (point.x == p1.x && point.y == p1.y) return true;
 	            
-	            // Check if point is on horizontal edge
 	            if (p1.y == p2.y && point.y == p1.y && 
 	                point.x >= std::min(p1.x, p2.x) && point.x <= std::max(p1.x, p2.x)) {
 	                return true;
 	            }
 	            
-	            // Check for crossing
 	            if ((p1.y > point.y) != (p2.y > point.y)) {
 	                double xIntersection = (p2.x - p1.x) * (point.y - p1.y) / (double)(p2.y - p1.y) + p1.x;
 	                
@@ -1782,11 +1788,11 @@ namespace ws // - Win32 Simple
 	    }
 	
 	    
+		// Checks if any edge of the polygon intersects a line, or line endpoints inside.
 		bool intersects(Line &line) 
 		{
 	        if (vertices.size() < 2) return false;
 	        
-	        // Check if any edge intersects with the line
 	        for (size_t i = 0; i < vertices.size(); i++) {
 	            POINT p1 = vertices[i];
 	            POINT p2 = vertices[(i + 1) % vertices.size()];
@@ -1797,7 +1803,6 @@ namespace ws // - Win32 Simple
 	            }
 	        }
 	        
-	        // Check if line is completely inside polygon
 	        if (contains(line.start) || contains(line.end)) {
 	            return true;
 	        }
@@ -1807,11 +1812,9 @@ namespace ws // - Win32 Simple
 	
 	    
 	
-	
-	
+		// Checks if this polygon intersects another polygon (vertex inside or edge intersection).
 		bool intersects(Poly &other) 
 		{
-	        // Check if any vertex of other is inside this polygon
 	        for (const auto& vertex : other.vertices) 
 			{
 	            if (contains(vertex)) 
@@ -1820,14 +1823,12 @@ namespace ws // - Win32 Simple
 	            }
 	        }
 	        
-	        // Check if any vertex of this polygon is inside the other
 	        for (const auto& vertex : vertices) {
 	            if (other.contains(vertex)) {
 	                return true;
 	            }
 	        }
 	        
-	        // Check if any edges intersect
 	        for (size_t i = 0; i < vertices.size(); i++) {
 	            POINT p1 = vertices[i];
 	            POINT p2 = vertices[(i + 1) % vertices.size()];
@@ -1848,7 +1849,7 @@ namespace ws // - Win32 Simple
 	    }
 	
 	    
-	
+		// Returns the bounding rectangle of the polygon.
 		RECT getBoundingRect() 
 		{
 	        if (vertices.empty()) return {0, 0, 0, 0};
@@ -1868,8 +1869,7 @@ namespace ws // - Win32 Simple
 	
 	
 	    
-	
-	
+		// Draws the polygon (filled or outlined) with view offset.
 		virtual void draw(HDC hdc, ws::View &view) override 
 		{
 	
@@ -1878,7 +1878,6 @@ namespace ws // - Win32 Simple
 	        POINT viewPos = view.getPos();
 	        std::vector<POINT> transformedPoints;
 	        
-	        // Apply view transformation to all points
 	        for (const auto& vertex : vertices) {
 	            transformedPoints.push_back({
 	                vertex.x - viewPos.x,
@@ -1886,7 +1885,6 @@ namespace ws // - Win32 Simple
 	            });
 	        }
 	        
-	        // If filled, create and select brush
 	        HBRUSH hBrush = NULL;
 	        HBRUSH hOldBrush = NULL;
 	        
@@ -1895,19 +1893,15 @@ namespace ws // - Win32 Simple
 	            hOldBrush = (HBRUSH)SelectObject(hdc, hBrush);
 	        }
 	        
-	        // Create and select pen for border
 	        HPEN hPen = CreatePen(PS_SOLID, borderWidth, borderColor);
 	        HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
 	        
-	        // Draw the polygon
 	        if (closed && vertices.size() >= 3) {
 	            Polygon(hdc, transformedPoints.data(), static_cast<int>(transformedPoints.size()));
 	        } else {
-	            // Draw as polyline if not closed
 	            Polyline(hdc, transformedPoints.data(), static_cast<int>(transformedPoints.size()));
 	        }
 	        
-	        // Clean up
 	        SelectObject(hdc, hOldPen);
 	        DeleteObject(hPen);
 	        
@@ -1935,6 +1929,7 @@ namespace ws // - Win32 Simple
 		public:
 		Poly poly;
 		
+		// Constructs a radial circle-like polygon with default radius 10, 500 points.
 		Radial()
 		{
 			poly.fillColor = RGB(0,0,255);
@@ -1945,6 +1940,7 @@ namespace ws // - Win32 Simple
 			make();
 		}
 		
+		// Regenerates vertices for the radial shape with given point count.
 		void make(int points = 500)
 		{
 			poly.clear();
@@ -1963,80 +1959,89 @@ namespace ws // - Win32 Simple
 		}
 		
 		
-		
+		// Sets center position and regenerates vertices.
 		void setPosition(int posx,int posy)
 		{
 			center = {posx,posy};
 			make(m_points);
 		}
 		
+		// Sets center position.
 		void setPosition(POINT pos)
 		{
 			center = pos;
 			make(m_points);
 		}
 		
-		
+		// Moves center by delta.
 		void move(POINT delta)
 		{
 			setPosition(center.x + delta.x,center.y + delta.y);
 		}
 		
+		// Moves center by delta.
 		void move(int deltaX,int deltaY)
 		{
 			setPosition(center.x + deltaX,center.y + deltaY);
 		}
 		
-		
+		// Sets number of vertices and regenerates.
 		void setPointCount(int count)
 		{
 			m_points = count;
 			make(m_points);
 		}
 		
+		// Sets radius and regenerates.
 		void setRadius(int size)
 		{
 			radius = size;
 			make(m_points);
 		}
 		
+		// Sets fill color.
 		void setFillColor(COLORREF color)
 		{
 			poly.fillColor = color; 
 		}
 		
+		// Sets border color.
 		void setBorderColor(COLORREF color)
 		{
 			poly.borderColor = color;
 		}
 		
+		// Sets border width.
 		void setBorderWidth(int size)
 		{
 			poly.borderWidth = size;
 		}
 		
-		
+		// Returns radius.
 		int getRadius()
 		{
 			return radius;
 		}
 		
+		// Returns center position.
 		POINT getPosition()
 		{
 			return center;
 		}
 		
+		// Returns number of vertices.
 		int getPointCount()
 		{
 			return m_points;
 		}
 		
-		
+		// Draws the radial shape (delegates to poly).
 	    virtual void draw(HDC hdc, View &view) override
 	    {
 	        poly.draw(hdc, view);
 	    }
 	    
+	    // Checks if point is inside (delegates to poly).
 	    virtual bool contains(POINT pos) override
 	    {
 	        return poly.contains(pos);
@@ -2048,10 +2053,9 @@ namespace ws // - Win32 Simple
 		int m_points = 500;
 		int radius = 10;
 		
-		
+		// Updates x,y,width,height from poly's bounding rect.
 		void updateDrawableProperties()
 	    {
-	        // Set Drawable's position and size based on the poly's bounding rect
 	        RECT bounds = poly.getBoundingRect();
 	        x = bounds.left;
 	        y = bounds.top;
@@ -2100,7 +2104,7 @@ namespace ws // - Win32 Simple
 	    HDC backBufferDC;
 	    HBITMAP backBufferBitmap;
 
-		
+		// Creates window, registers class, initialises double buffering and transparency support.
 		Window(int width,int height,std::string title,DWORD style = WS_OVERLAPPEDWINDOW)
 		{
 			
@@ -2189,6 +2193,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+        // Destroys window, frees buffers and transparency resources.
         ~Window()
         {
             windowInstances.erase(hwnd);
@@ -2203,7 +2208,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+		// Replaces the current view with an external View.
 		void setView(View &v)
 		{
 			view = v;
@@ -2216,6 +2221,7 @@ namespace ws // - Win32 Simple
 	    COLORREF transparencyColor = RGB(-1,0,0); 
 		public:	
 			
+	    // Sets chroma key and alpha transparency; 'type' can be "modern" or "legacy".
 	    void setChromaKey(COLORREF color = RGB(-1,-1,-1),BYTE alphaValue = 255,std::string type = "modern") 
 		{
 			
@@ -2283,7 +2289,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+		// Places this window immediately after the specified window in the Z-order.
 		void setLayerAfter(HWND lastHwnd)
 		{
 			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
@@ -2292,6 +2298,7 @@ namespace ws // - Win32 Simple
 	    
 
 
+	    // Toggles fullscreen mode on or off.
 	    void setFullscreen(bool fullscreen) {
 	        if (fullscreen == isFullscreen) return;
 	        
@@ -2325,10 +2332,12 @@ namespace ws // - Win32 Simple
 	        }
 	    }
 	    
+	    // Switches between fullscreen and windowed.
 	    void toggleFullscreen() {
 	        setFullscreen(!isFullscreen);
 	    }
 	    
+	    // Returns true if window is fullscreen.
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
@@ -2336,8 +2345,7 @@ namespace ws // - Win32 Simple
 
 				
 		
-		
-		
+		// Processes Windows messages; returns false if quit received.
 		bool isOpen()
 		{
 	        MSG msg;
@@ -2363,8 +2371,7 @@ namespace ws // - Win32 Simple
 		
 	
 		
-		
-		
+	    // Pops the next queued message; returns false if queue empty.
 	    bool pollEvent(MSG &message) {
 	        if (msgQ.empty()) {
 	            return false;
@@ -2385,7 +2392,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+	    // Fills the back buffer with a solid color.
 	    void clear(COLORREF color = RGB(0,0,0)) {
 
 
@@ -2412,7 +2419,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+		// Draws any Drawable object onto the back buffer, applying view transformation and setting layout.
 		void draw(Drawable &draw)
 		{
 			
@@ -2425,7 +2432,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
-		
+	    // Presents the back buffer to the screen, handling transparency and stretching.
 	    void display() 
 		{
 			
@@ -2435,7 +2442,6 @@ namespace ws // - Win32 Simple
 		    HDC hdc = GetDC(hwnd);
 		    SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
 		    
-		    // Just copy the entire back buffer to stretch buffer
 		    StretchBlt(stretchBufferDC, 
 		    0, 
 			0, 
@@ -2460,8 +2466,7 @@ namespace ws // - Win32 Simple
 		        }		        
 		        
 		        
-		        // Copy from stretch buffer to ARGB buffer
-		        SetLayout(LegacyAlpha.hdcMem, LAYOUT_BITMAPORIENTATIONPRESERVED); // Set layout as left to right
+		        SetLayout(LegacyAlpha.hdcMem, LAYOUT_BITMAPORIENTATIONPRESERVED);
 		        BitBlt(LegacyAlpha.hdcMem, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
 	
 
@@ -2501,10 +2506,10 @@ namespace ws // - Win32 Simple
 		
 		
 
-        // Static map to store window instances
         static std::map<HWND, Window*> windowInstances;		
 
 		
+        // Static window procedure; forwards messages to the correct instance.
         static LRESULT CALLBACK StaticWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             Window* pWindow = nullptr;
@@ -2525,6 +2530,7 @@ namespace ws // - Win32 Simple
         }	
 		
 	
+        // Instance window procedure; handles destroy, paint, resize, move.
         LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             switch (uMsg) {
@@ -2540,7 +2546,6 @@ namespace ws // - Win32 Simple
 	                HDC hdc = BeginPaint(hwnd, &ps);
 	             
 	             	SetLayout(hdc, LAYOUT_BITMAPORIENTATIONPRESERVED);
-	                // Draw the back buffer to the screen
 	                BitBlt(hdc, 0, 0, width, height, stretchBufferDC, 0, 0, SRCCOPY);
 	                
 	                EndPaint(hwnd, &ps);
@@ -2557,9 +2562,7 @@ namespace ws // - Win32 Simple
 	                
 	                
 	                
-	                //viewport size should be updated here to keep proportion even after window has changed size.
-	                //for now we will wait to do that. For now we will just set the viewport as the window size.
-					
+	                
 					view.setPortSize({width,height});
 					
 					
@@ -2569,11 +2572,10 @@ namespace ws // - Win32 Simple
 			        			        
 			        
 			        DeleteObject(stretchBufferBitmap);
-			        stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height); 	//this will also likely need to change to accomodate the viewport size.
+			        stretchBufferBitmap = CreateCompatibleBitmap(hdc, width, height); 
 			        SelectObject(stretchBufferDC, stretchBufferBitmap);
 			        
 			        
-				    // RECREATE TRANSPARENCY BUFFERS WHEN SIZE CHANGES
 				    if (isTransparent) {
 				        if (LegacyAlpha.hbmp) DeleteObject(LegacyAlpha.hbmp);
 				        if (LegacyAlpha.hdcMem) DeleteDC(LegacyAlpha.hdcMem);
@@ -2672,6 +2674,7 @@ namespace ws // - Win32 Simple
 	namespace Global
 	{
 	
+		// Returns mouse position relative to the given window, converted to world coordinates.
 		POINT getMousePos(Window &window)
 		{
 			
@@ -2681,11 +2684,12 @@ namespace ws // - Win32 Simple
 		        return {0,0};
 		    }
 		    
-		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
+		    ScreenToClient(window.hwnd, &p);
 		    p = window.view.toWorld(p);
 		    return p;
 		}
 		
+		// Returns global mouse screen position.
 		POINT getMousePos()
 		{
 				
@@ -2699,6 +2703,7 @@ namespace ws // - Win32 Simple
 		
 		}
 		
+		// Checks if a virtual mouse button is pressed.
 		bool getMouseButton(int vmButton)
 		{
 			if (GetAsyncKeyState(vmButton) & 0x8000)
@@ -2707,6 +2712,7 @@ namespace ws // - Win32 Simple
 			return false;	
 		}
 		
+		// Checks if a virtual key is pressed.
 		bool getKey(char vmKey)
 		{
 			if (GetAsyncKeyState(vmKey))

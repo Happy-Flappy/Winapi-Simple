@@ -21,7 +21,7 @@
 #include <iomanip>
 
 
-namespace ws // - Win32 Simple
+namespace ws // - Winsimple
 {
 
 	
@@ -49,22 +49,26 @@ namespace ws // - Win32 Simple
 	{
 		public:
 			
+		// Default constructor.
 		View()
 		{
 			
 		}
 		
+		// Sets the world rectangle (visible area).
 		void setRect(RECT viewRect)
 		{
 			world = viewRect;
 		}
 		
+		// Sets world dimensions from a POINT.
 		void setSize(POINT size)
 		{
 			world.right = size.x;
 			world.bottom = size.y;
 		}
 		
+		// Sets world position (upper-left corner).
 		void setPos(POINT pos)
 		{
 			world.left = pos.x;
@@ -72,17 +76,20 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Sets the viewport rectangle (screen area).
 		void setPortRect(RECT portRect)
 		{
 			port = portRect;
 		}
 		
+		// Sets viewport size.
 		void setPortSize(POINT size)
 		{
 			port.right = size.x;
 			port.bottom = size.y;
 		}
 		
+		// Sets viewport position.
 		void setPortPos(POINT pos)
 		{
 			port.left = pos.x;
@@ -92,11 +99,13 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Returns the world rectangle.
 		RECT getRect()
 		{
 			return world;
 		}
 		
+		// Returns world size.
 		POINT getSize()
 		{
 			POINT p;
@@ -106,6 +115,7 @@ namespace ws // - Win32 Simple
 			return p;
 		}
 		
+		// Returns world position.
 		POINT getPos()
 		{
 			POINT p;
@@ -115,11 +125,13 @@ namespace ws // - Win32 Simple
 			return p;
 		}
 		
+		// Returns the viewport rectangle.
 		RECT getPortRect()
 		{
 			return port;
 		}
 		
+		// Returns viewport size.
 		POINT getPortSize()
 		{
 			POINT p;
@@ -129,6 +141,7 @@ namespace ws // - Win32 Simple
 			return p;
 		}
 		
+		// Returns viewport position.
 		POINT getPortPos()
 		{
 			POINT p;
@@ -141,6 +154,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Zooms the view by adjusting the viewport size inversely to the factor.
 	    void zoom(float factor)
 	    {
 	    	if(factor != 0)
@@ -152,13 +166,14 @@ namespace ws // - Win32 Simple
 	    	}
 		}
 
-
+		// Moves the world by a delta.
 		void move(POINT delta)
 		{
 			world.left += delta.x;
 			world.top += delta.y;
 		}
 		
+		// Moves the viewport by a delta.
 		void movePort(POINT delta)
 		{
 			port.left += delta.x;
@@ -168,6 +183,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Converts viewport (screen) coordinates to world coordinates.
 	    POINT toWorld(POINT pos) 
 	    {
 	        
@@ -187,6 +203,7 @@ namespace ws // - Win32 Simple
 	        return worldPoint;
 	    }
 	    
+	    // Converts world coordinates to viewport (screen) coordinates.
 	    POINT toWindow(POINT pos) 
 	    {
 	    	POINT worldSize = getSize();
@@ -242,6 +259,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+	// Converts a UTF-8 std::string to std::wstring.
 	std::wstring WIDE(std::string str)
 	{
 	    int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
@@ -252,6 +270,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+	// Returns c_str() cast to LPCSTR.
 	LPCSTR TO_LPCSTR(std::string &str)
 	{
 		return LPCSTR(str.c_str());
@@ -286,12 +305,14 @@ namespace ws // - Win32 Simple
 		
 		Texture() = default;
 		
+		// Constructs by loading image from path.
 		Texture(std::string path)
 		{
 			load(path);
 		}
 		
 		
+	    // Frees the bitmap handle.
 	    ~Texture()
 	    {
 	        if (bitmap != NULL)
@@ -304,7 +325,7 @@ namespace ws // - Win32 Simple
 
 
 
-
+	    // Move constructor.
 	    Texture(Texture&& other) noexcept
 	        : bitmap(other.bitmap), width(other.width), height(other.height)
 	    {
@@ -315,6 +336,7 @@ namespace ws // - Win32 Simple
 
 
 		
+	    // Move assignment operator.
 	    Texture& operator=(Texture&& other) noexcept
 	    {
 	        if (this != &other)
@@ -340,6 +362,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+		// Loads bitmap from file; releases previous image.
 		bool load(std::string path)
 		{
 
@@ -379,6 +402,7 @@ namespace ws // - Win32 Simple
 			return true;
 		}
 		
+	    // Checks if a valid bitmap is loaded.
 	    bool isValid() const
 	    {
 	        return bitmap != NULL;
@@ -387,7 +411,8 @@ namespace ws // - Win32 Simple
 	    
 	    
 	    COLORREF transparencyColor = CLR_INVALID; 
-			
+		
+	    // Sets the color key used for transparent blitting.
 	    void setTransparentMask(COLORREF color) {
 	        transparencyColor = color;
 	    }	    
@@ -410,6 +435,7 @@ namespace ws // - Win32 Simple
 		
 		Vector2f scale = {1,1};		
 		
+		// Sets the scale factor.
 		void setScale(Vector2f s)	
 		{
 			scale.x = s.x;
@@ -417,6 +443,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Sets the origin offset for position calculations.
 		void setOrigin(POINT pos)
 		{
 			origin.x = pos.x;
@@ -424,14 +451,17 @@ namespace ws // - Win32 Simple
 		}
 	
 	
+	    // Returns width multiplied by scale.
 	    int getScaledWidth() const { 
 	        return static_cast<int>(width * scale.x); 
 	    }
 	    
+	    // Returns height multiplied by scale.
 	    int getScaledHeight() const { 
 	        return static_cast<int>(height * scale.y); 
 	    }
 	
+		// Returns the origin multiplied by scale.
 		POINT getScaledOrigin()
 		{
 			long int xo = static_cast<int>(origin.x * scale.x);
@@ -440,8 +470,9 @@ namespace ws // - Win32 Simple
 			return {xo,yo};
 		}
 	
-		
+		// Pure virtual draw method.
 		virtual void draw(HDC hdc) = 0;
+		// Pure virtual hit test.
 		virtual bool contains(POINT pos) = 0;
 		
 		
@@ -466,7 +497,7 @@ namespace ws // - Win32 Simple
 		public:
 		
 		
-		
+		// Default constructor.
 		Sprite()
 		{
 			
@@ -475,6 +506,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Checks if point lies inside the scaled sprite bounds.
 		virtual bool contains(POINT pos) override
 		{
 			
@@ -483,6 +515,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Draws the sprite texture with transparency.
 		virtual void draw(HDC hdc)  override
 		{
 			
@@ -510,7 +543,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
-		
+		// Attaches a texture and sets rect to full texture size.
 		void setTexture(Texture &texture)
 		{
 			textureRef = &texture;
@@ -525,6 +558,7 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Sets the source rectangle used from the texture.
 		void setTextureRect(RECT r)
 		{
 			rect = r;
@@ -533,23 +567,27 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Returns the source rectangle.
 		RECT getTextureRect()
 		{
 			return rect;
 		}
 		
+		// Returns a reference to the attached texture.
 		Texture &getTexture()
 		{
 			return *textureRef;
 		}
 		
 		
+	    // Returns const pointer to attached texture.
 	    const Texture* getTexture() const
 	    {
 	        return textureRef;
 	    }		
 		
 		
+	    // Checks if a texture is currently assigned.
 	    bool hasTexture() const
 	    {
 	        return textureRef != nullptr;
@@ -580,6 +618,7 @@ namespace ws // - Win32 Simple
 		
 		COLORREF color = RGB(125,255,255);
 		
+		// Initializes a 10x10 shape.
 		Shape()
 		{
 			width = 10;
@@ -589,6 +628,7 @@ namespace ws // - Win32 Simple
 		
 
 
+		// Checks if point lies inside the scaled shape bounds.
 		virtual bool contains(POINT pos)  override
 		{
 			
@@ -598,6 +638,7 @@ namespace ws // - Win32 Simple
 
 
 
+	    // Draws the shape as a solid color rectangle.
 	    virtual void draw(HDC hdc)  override
 	    {
 	    	POINT o = getScaledOrigin();
@@ -686,6 +727,7 @@ namespace ws // - Win32 Simple
 		
 		public:
 		
+		// Creates window, registers class, initialises double buffering with view.
 		Window(int width,int height,std::string title)
 		{
 			
@@ -774,6 +816,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+        // Destroys window, frees buffers and removes from instance map.
         ~Window()
         {
             windowInstances.erase(hwnd);
@@ -787,6 +830,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Replaces the current view with an external View.
 		void setView(View &v)
 		{
 			view = v;
@@ -801,7 +845,7 @@ namespace ws // - Win32 Simple
 	    
 	    
 
-
+	    // Toggles fullscreen mode on or off.
 	    void setFullscreen(bool fullscreen) {
 	        if (fullscreen == isFullscreen) return;
 	        
@@ -835,10 +879,12 @@ namespace ws // - Win32 Simple
 	        }
 	    }
 	    
+	    // Switches between fullscreen and windowed.
 	    void toggleFullscreen() {
 	        setFullscreen(!isFullscreen);
 	    }
 	    
+	    // Returns true if window is fullscreen.
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
@@ -848,6 +894,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Processes Windows messages; returns false if quit received.
 		bool isOpen()
 		{
 	        MSG msg;
@@ -875,6 +922,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Pops the next queued message; returns false if queue empty.
 	    bool pollEvent(MSG &message) {
 	        if (msgQ.empty()) {
 	            return false;
@@ -896,6 +944,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Fills the back buffer with a solid color.
 	    void clear(COLORREF color = RGB(255, 255, 255)) {
 	        HBRUSH brush = CreateSolidBrush(color);
 	        RECT rect = {0, 0, view.getSize().x, view.getSize().y};
@@ -915,6 +964,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Draws any Drawable object onto the back buffer.
 		void draw(Drawable &draw)
 		{
 		    draw.draw(backBufferDC);
@@ -928,6 +978,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Stretches back buffer to window client area and presents.
 	    void display() 
 		{
 
@@ -972,6 +1023,7 @@ namespace ws // - Win32 Simple
         static std::map<HWND, Window*> windowInstances;		
 
 		
+        // Static window procedure; forwards messages to the correct instance.
         static LRESULT CALLBACK StaticWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             Window* pWindow = nullptr;
@@ -992,6 +1044,7 @@ namespace ws // - Win32 Simple
         }	
 		
 	
+        // Instance window procedure; handles destroy, paint and resize.
         LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             switch (uMsg) {

@@ -21,8 +21,7 @@ namespace ws
 		std::string ID = "";
 		std::string extension = "none";
 			
-			
-			
+		// Destructor: closes the MCI device if it was opened.
 		~Wav()
 		{
 		    // Clean up
@@ -36,6 +35,7 @@ namespace ws
 			}
 		}
 
+		// Constructor: stores the audio file path, channel, and blocking flag.
 		Wav(std::string path = "",int channel = 0,bool blocking = true)
 		{
 			this->path = path;
@@ -45,6 +45,7 @@ namespace ws
 		
 		private:
 		
+		// Sends an MCI command and optionally reports errors; returns success status.
 		static bool mciSimple(std::string command,bool sendError = true)
 		{
 			MCIERROR err = mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
@@ -61,6 +62,7 @@ namespace ws
 			return true;		
 		}
 		
+		// Checks file extension and warns about potentially unsupported formats.
 		static void isSupported(std::string m_path)
 		{
 			std::filesystem::path p(m_path);
@@ -87,7 +89,7 @@ namespace ws
 		
 		public:
 
-
+		// Finds and returns an available MCI channel index (0‑99).
 		static int getFreeChannel()
 		{
 			int channel = -1;
@@ -110,7 +112,7 @@ namespace ws
 			return channel;
 		}
 
-
+		// Retrieves the current status ("playing", "stopped", etc.) of an MCI channel.
 		static std::string getChannelStatus(int m_channel)
 		{
 			
@@ -134,7 +136,7 @@ namespace ws
 		}
 		
 
-		
+		// Plays a sound file on a given channel without opening it first.
 		static bool PlayFree(std::string m_path,int m_channel,bool m_blocking = false)
 		{
 			
@@ -149,7 +151,6 @@ namespace ws
 	            return false;
 	        }
 			
-
 
 			//Get shortened path name because mciSendStringA does not support long paths.
 			std::wstring wpath = GetShortPathNameSafe(WIDE(m_path));
@@ -179,6 +180,7 @@ namespace ws
 			return true;
 		}
 		
+		// Opens a sound file on a specific channel, preparing it for playback.
 		bool open(std::string m_path,int m_channel,bool m_blocking = true)
 		{
 			isSupported(m_path);
@@ -200,6 +202,7 @@ namespace ws
 			//close it no matter what
 	        std::string command = "close " + ID;
 	        mciSimple(command,false);//close channel without error report.			
+			
 			
 			
 
@@ -227,6 +230,7 @@ namespace ws
 			return true;
 		}
 		
+		// Starts playback of the currently opened audio file.
 		void play()
 		{
 
@@ -249,8 +253,7 @@ namespace ws
 				return;
 		}
 		
-		
-		
+		// Static method: pauses playback on the given channel.
 		static void stop(int m_channel)
 		{
 			std::string m_ID = std::to_string(m_channel);
@@ -260,6 +263,7 @@ namespace ws
 			mciSimple(command);
 		}
 		
+		// Pauses playback of the currently opened audio on its channel.
 		void stop()
 		{
 			std::string command = "pause "+ ID;
@@ -267,9 +271,7 @@ namespace ws
 			mciSimple(command);
 		}
 		
-		
-		
-		
+		// Sets the playback volume as a percentage (0‑100); returns success.
 	    bool setVolume(int percent)
 	    {
 	    	
@@ -310,6 +312,7 @@ namespace ws
 	        return false;
 	    }
 	    
+	    // Returns the current volume as a percentage (0‑100).
 	    int getVolume()
 	    {
 
@@ -345,7 +348,7 @@ namespace ws
 	        return (volume * 100) / 1000;
 	    }
 		
-		
+		// Seeks to a specific time position in seconds; returns success.
 		bool setProgress(long seconds)
 		{
 			std::string status = getChannelStatus(channel);
@@ -365,7 +368,7 @@ namespace ws
 			return mciSimple(command);
 		}
 		
-		
+		// Returns the current playback position in seconds.
 		long getProgress()
 		{
 	    	if(getChannelStatus(channel) == "error")
@@ -401,8 +404,7 @@ namespace ws
 	        return result / 1000;//return in seconds
 		}	
 		
-		
-		
+		// Returns the total length of the audio file in seconds.
 		long getLength()
 		{
 	    	if(getChannelStatus(channel) == "error")
@@ -425,6 +427,7 @@ namespace ws
 		    
 		}
 	
+		// Returns true if playback has reached the end of the file.
 		bool isFinished()
 		{
 			if(getChannelStatus(channel) == "error")

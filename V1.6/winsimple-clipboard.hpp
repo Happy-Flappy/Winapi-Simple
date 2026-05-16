@@ -25,12 +25,14 @@ namespace ws
 	{
 	public:
 		bool alreadyInit = false;
+		// Constructor: initializes OLE for clipboard operations.
 		ClipboardInit()
 		{
 			HRESULT hr = OleInitialize(NULL);
 			if (hr == S_FALSE)
 				alreadyInit = true;					
 		}
+		// Destructor: uninitializes OLE if it was initialized by this instance.
 		~ClipboardInit()
 		{
 			if(!alreadyInit)
@@ -48,16 +50,22 @@ namespace ws
 	public:
 		ClipData() = default;
 		
+		// Sets the texture data for this clipboard content.
 		void setTexture(ws::Texture tex) { texture = std::move(tex); }
+		// Sets the text data for this clipboard content.
 		void setText(std::string str)    { text = std::move(str); }
+		// Sets the list of file paths for this clipboard content.
 		void setFiles(std::vector<std::string> filesVec) { files = std::move(filesVec); }
 		
+		// Returns the stored texture.
 		ws::Texture getTexture() const { return texture; }
+		// Returns the stored text string.
 		std::string getText() const    { return text; }
+		// Returns the stored list of file paths.
 		const std::vector<std::string>& getFiles() const { return files; }
 	};
 
-
+	// Copies a DIB (device‑independent bitmap) into a ws::Texture; returns success.
 	static bool CopyDIBToTexture(LPVOID pDIB, ws::Texture& tex) {
 		if (!pDIB) return false;
 
@@ -108,7 +116,7 @@ namespace ws
 	{
 		private:
 		
-
+		// Copies an HBITMAP into a ws::Texture; returns success.
 		bool copyHBITMAPToTexture(HBITMAP hbm, ws::Texture& outTex) const
 		{
 			BITMAP bm;
@@ -141,6 +149,7 @@ namespace ws
 			return true;
 		}
 		
+		// Converts a ws::Texture into a DIB (HGLOBAL) for clipboard storage.
 		HGLOBAL textureToDIB(const ws::Texture& tex) const
 		{
 			if (!tex.isValid() || !tex.isFastDIB())
@@ -184,6 +193,7 @@ namespace ws
 			return hGlobal;
 		}
 		
+		// Creates a Gdiplus::Bitmap by copying a rectangle region from a ws::Texture.
 		Gdiplus::Bitmap* copyRectOfBitmap(ws::Texture &texture, ws::IntRect rect)
 		{
 			if (!texture.isValid()) return nullptr;
@@ -215,6 +225,7 @@ namespace ws
 			return copyBitmap;
 		}
 		
+		// Opens the Windows clipboard; returns true on success.
 		bool OpenClipboardCheck()
 		{
 			return OpenClipboard(NULL) != FALSE;
@@ -223,6 +234,7 @@ namespace ws
 	public:
 		Clipboard() = default;
 		
+		// Retrieves all available data (text, files, image) from the clipboard.
 		ClipData paste()
 		{
 			if (!OpenClipboardCheck())
@@ -248,6 +260,7 @@ namespace ws
 			return data;
 		}
 		
+		// Copies a string of text to the clipboard; returns success.
 		bool copyText(const std::string& str)
 		{
 			const std::wstring text = ws::WIDE(str);
@@ -274,6 +287,7 @@ namespace ws
 			return true;
 		}
 		
+		// Copies a single file path to the clipboard; returns success.
 		bool copyFile(const std::string& filePath)
 		{
 			std::wstring widePath = ws::WIDE(filePath);
@@ -313,6 +327,7 @@ namespace ws
 			return success;
 		}
 		
+		// Copies multiple file paths to the clipboard; returns success.
 		bool copyFiles(const std::vector<std::string>& filePaths)
 		{
 			if (filePaths.empty()) return false;
@@ -362,6 +377,7 @@ namespace ws
 			return success;
 		}
 		
+		// Copies a texture (optionally a cropped rectangle) to the clipboard.
 		bool copyTexture(ws::Texture &texture, ws::IntRect rect = {0,0,0,0})
 		{
 			if (!texture.isValid()) return false;
@@ -392,6 +408,7 @@ namespace ws
 		}
 		
 	private:
+		// Internal method: pastes an image from the clipboard, optionally cropping it.
 		ws::Texture pasteTexture(ws::IntRect rect = {0,0,0,0})
 		{
 			ws::Texture tex;
@@ -441,6 +458,7 @@ namespace ws
 		}
 		
 	public:
+		// Retrieves a list of file paths from the clipboard.
 		std::vector<std::string> pasteFiles()
 		{
 			std::vector<std::string> filePaths;
@@ -470,6 +488,7 @@ namespace ws
 			return filePaths;
 		}
 		
+		// Retrieves the first file path from the clipboard, or an empty string.
 		std::string pasteFile()
 		{
 			auto files = pasteFiles();
@@ -477,6 +496,7 @@ namespace ws
 			return "";
 		}
 		
+		// Checks if the clipboard currently contains file data.
 		bool hasFiles()
 		{
 			if (!OpenClipboardCheck()) return false;
@@ -485,6 +505,7 @@ namespace ws
 			return has;
 		}
 		
+		// Checks if the clipboard currently contains text data.
 		bool hasText()
 		{
 			if (!OpenClipboardCheck()) return false;
@@ -493,6 +514,7 @@ namespace ws
 			return has;
 		}
 		
+		// Checks if the clipboard currently contains an image.
 		bool hasTexture()
 		{
 			if (!OpenClipboardCheck()) return false;
@@ -503,6 +525,7 @@ namespace ws
 			return has;
 		}
 		
+		// Empties the clipboard; returns success.
 		bool clear()
 		{
 			if (!OpenClipboardCheck()) return false;
@@ -538,18 +561,21 @@ namespace ws
 		
 		std::queue<std::pair<ws::ClipData, DWORD>> m_dropQueue;
 		
+		// Checks if the data object contains file drop data.
 		bool hasFiles(IDataObject* pData) const {
 			if (!pData) return false;
 			FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 			return SUCCEEDED(pData->QueryGetData(&fmt));
 		}
 		
+		// Checks if the data object contains Unicode text.
 		bool hasText(IDataObject* pData) const {
 			if (!pData) return false;
 			FORMATETC fmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 			return SUCCEEDED(pData->QueryGetData(&fmt));
 		}
 		
+		// Checks if the data object contains an image in any common format.
 		bool hasImage(IDataObject* pData) const {
 			if (!pData) return false;
 			
@@ -587,6 +613,7 @@ namespace ws
 		}
 		
 	public:
+		// Enables acceptance of a specific drag type with the given drop effect.
 		void acceptType(std::string type, ws::DropEffect effect = ws::DropEffect::Copy)
 		{
 			DWORD dwEffect = static_cast<DWORD>(effect);
@@ -607,6 +634,7 @@ namespace ws
 			}
 		}
 		
+		// Disables acceptance of a specific drag type.
 		void rejectType(std::string type)
 		{
 			if (type == "images") m_images.enabled = false;
@@ -614,12 +642,14 @@ namespace ws
 			if (type == "files")  m_files.enabled = false;
 		}
 		
+		// Rejects all drag types.
 		void rejectAll()
 		{
 			m_files.enabled = m_text.enabled = m_images.enabled = false;
 			m_files.effect = m_text.effect = m_images.effect = static_cast<DWORD>(ws::DropEffect::Copy);
 		}
 		
+		// Sets a conditional acceptance rule for a given drag type.
 		void onlyAcceptIf(std::string droptype, std::function<bool()> function)
 		{
 			if (droptype == "images") {
@@ -636,6 +666,7 @@ namespace ws
 			}
 		}
 		
+		// Retrieves a pending drop event from the queue; returns true if available.
 		bool pollDrop(ws::ClipData& outData, DropEffect& outEffect)
 		{
 			if (!windowRef) return false;
@@ -648,6 +679,7 @@ namespace ws
 			return true;
 		}
 		
+		// COM IUnknown::QueryInterface implementation.
 		HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override
 		{
 			if (!windowRef) return S_OK;
@@ -659,9 +691,12 @@ namespace ws
 			*ppv = nullptr;
 			return E_NOINTERFACE;
 		}
+		// COM IUnknown::AddRef stub (no ref counting).
 		ULONG STDMETHODCALLTYPE AddRef()  override { return 1; }
+		// COM IUnknown::Release stub (no ref counting).
 		ULONG STDMETHODCALLTYPE Release() override { return 1; }
 		
+		// IDropTarget::DragEnter: called when a drag enters the window.
 		HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override
 		{
 			if (!windowRef) return S_OK;
@@ -698,6 +733,7 @@ namespace ws
 			return S_OK;
 		}
 		
+		// IDropTarget::DragOver: updates cursor and effect as drag moves.
 		HRESULT STDMETHODCALLTYPE DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override
 		{
 			if (!windowRef) return S_OK;
@@ -734,6 +770,7 @@ namespace ws
 			return S_OK;
 		}
 		
+		// IDropTarget::DragLeave: resets cursor when drag leaves the window.
 		HRESULT STDMETHODCALLTYPE DragLeave() override
 		{
 			if (!windowRef) return S_OK;
@@ -744,6 +781,7 @@ namespace ws
 			return S_OK;
 		}
 		
+		// IDropTarget::Drop: processes the dropped data and queues it.
 		HRESULT STDMETHODCALLTYPE Drop(IDataObject* obj, DWORD, POINTL, DWORD* e) override
 		{
 			if (!windowRef) return S_OK;
@@ -873,6 +911,7 @@ namespace ws
 			return S_OK;
 		}
 		
+		// Registers this drop target with a window and prepares message filters.
 		void setWindow(ws::Window &window)
 		{
 			RegisterDragDrop(window.hwnd, this);
@@ -883,6 +922,7 @@ namespace ws
 			ChangeWindowMessageFilterEx(window.hwnd, 0x0049,          MSGFLT_ALLOW, nullptr);
 		}
 		
+		// Destructor: revokes drop registration if a window was set.
 		~DropTarget()
 		{
 			if (windowRef && windowRef->hwnd)

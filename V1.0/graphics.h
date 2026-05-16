@@ -22,12 +22,13 @@
 #include <iomanip>
 
 
-namespace ws // - Win32 Simple
+namespace ws // - Winsimple
 {
 
 	
 	
 	
+	// Converts a UTF-8 std::string to std::wstring.
 	std::wstring WIDE(std::string str)
 	{
 	    int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
@@ -38,6 +39,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+	// Returns c_str() cast to LPCSTR.
 	LPCSTR TO_LPCSTR(std::string &str)
 	{
 		return LPCSTR(str.c_str());
@@ -72,12 +74,14 @@ namespace ws // - Win32 Simple
 		
 		Texture() = default;
 		
+		// Constructs by loading image from path.
 		Texture(std::string path)
 		{
 			load(path);
 		}
 		
 		
+	    // Frees the bitmap handle.
 	    ~Texture()
 	    {
 	        if (bitmap != NULL)
@@ -90,7 +94,7 @@ namespace ws // - Win32 Simple
 
 
 
-
+	    // Move constructor.
 	    Texture(Texture&& other) noexcept
 	        : bitmap(other.bitmap), width(other.width), height(other.height)
 	    {
@@ -101,6 +105,7 @@ namespace ws // - Win32 Simple
 
 
 		
+	    // Move assignment operator.
 	    Texture& operator=(Texture&& other) noexcept
 	    {
 	        if (this != &other)
@@ -126,6 +131,7 @@ namespace ws // - Win32 Simple
 	
 	
 	
+		// Loads bitmap from file; releases previous image.
 		bool load(std::string path)
 		{
 
@@ -165,6 +171,7 @@ namespace ws // - Win32 Simple
 			return true;
 		}
 		
+	    // Checks if a valid bitmap is loaded.
 	    bool isValid() const
 	    {
 	        return bitmap != NULL;
@@ -174,6 +181,7 @@ namespace ws // - Win32 Simple
 	    
 	    COLORREF transparencyColor = CLR_INVALID; // Add this member variable
 	
+	    // Sets the color key used for transparent blitting.
 	    void setTransparentMask(COLORREF color) {
 	        transparencyColor = color;
 	    }	    
@@ -196,6 +204,7 @@ namespace ws // - Win32 Simple
 		RECT rect;
 		
 		
+		// Initializes position to (0,0) and rect to 10x10.
 		Shape()
 		{
 			x = 0;
@@ -209,6 +218,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Returns true if point (posx,posy) lies within shape bounds (considering origin).
 		bool contains(int posx,int posy)
 		{
 			return (posx >= x - originX && posy >= y - originY && posx < x + rect.right - originX && posy < y + rect.bottom - originY); 
@@ -219,6 +229,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Attaches a texture and sets rect to texture size.
 		void setTexture(Texture &texture)
 		{
 			textureRef = &texture;
@@ -229,17 +240,20 @@ namespace ws // - Win32 Simple
 		}
 		
 		
+		// Returns reference to attached texture.
 		Texture &getTexture()
 		{
 			return *textureRef;
 		}
 		
+	    // Returns const pointer to attached texture (nullptr if none).
 	    const Texture* getTexture() const
 	    {
 	        return textureRef;
 	    }		
 		
 		
+	    // Checks if a texture is currently assigned.
 	    bool hasTexture() const
 	    {
 	        return textureRef != nullptr;
@@ -247,6 +261,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Resets rect to match attached texture dimensions.
 		void fitTexture()
 		{
 			rect.left = 0;
@@ -257,6 +272,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Sets the origin offset used for positioning and hit testing.
 		void setOrigin(int posx,int posy)
 		{
 			originX = posx;
@@ -347,6 +363,7 @@ namespace ws // - Win32 Simple
 		
 		public:
 		
+		// Creates window, registers class, initialises double buffering.
 		Window(int width,int height,std::string title)
 		{
 		
@@ -442,6 +459,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+        // Destroys window, frees back buffers and removes from instance map.
         ~Window()
         {
             windowInstances.erase(hwnd);
@@ -453,6 +471,7 @@ namespace ws // - Win32 Simple
 
 
 
+	    // Toggles fullscreen mode on or off.
 	    void setFullscreen(bool fullscreen) {
 	        if (fullscreen == isFullscreen) return;
 	        
@@ -486,10 +505,12 @@ namespace ws // - Win32 Simple
 	        }
 	    }
 	    
+	    // Switches between fullscreen and windowed.
 	    void toggleFullscreen() {
 	        setFullscreen(!isFullscreen);
 	    }
 	    
+	    // Returns true if window is currently fullscreen.
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
@@ -499,6 +520,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Processes Windows messages; returns false if quit received.
 		bool isOpen()
 		{
 	        MSG msg;
@@ -526,6 +548,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Pops the next queued message; returns false if queue empty.
 	    bool pollEvent(MSG &message) {
 	        if (msgQ.empty()) {
 	            return false;
@@ -547,6 +570,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Fills the back buffer with a solid color.
 	    void clear(COLORREF color = RGB(255, 255, 255)) {
 	        HBRUSH brush = CreateSolidBrush(color);
 	        RECT rect = {0, 0, view.world.width, view.world.height};
@@ -566,6 +590,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+		// Draws a shape (textured or solid) onto the back buffer.
 		void draw(Shape &shape)
 		{
 			if(shape.getTexture().bitmap != NULL)
@@ -610,6 +635,7 @@ namespace ws // - Win32 Simple
 		
 		
 		
+	    // Stretches back buffer to window client area and presents.
 	    void display() 
 		{
 
@@ -654,6 +680,7 @@ namespace ws // - Win32 Simple
         static std::map<HWND, Window*> windowInstances;		
 
 		
+        // Static window procedure; forwards messages to the correct Window instance.
         static LRESULT CALLBACK StaticWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             Window* pWindow = nullptr;
@@ -674,6 +701,7 @@ namespace ws // - Win32 Simple
         }	
 		
 	
+        // Instance window procedure; handles destroy, paint and resize.
         LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             switch (uMsg) {
