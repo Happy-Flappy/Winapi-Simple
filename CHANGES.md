@@ -265,6 +265,8 @@
 * Added ws::Window::getBorderWidth()
 * Added ws::Window::getCaptionRect(bool excludeBorder = false)
 * Added SetProcessDPIAware() to the GDI+ initializer. With DPI awareness, screen.getSize() will be accurate.
+* Fixed incorrect window size creation logic.
+* Fixed ws::Text offset
 
 
 ## V1.7 - Beta

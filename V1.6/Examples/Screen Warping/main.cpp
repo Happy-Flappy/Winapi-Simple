@@ -51,7 +51,6 @@ int main()
 		window.setLayerAfter(HWND_TOPMOST);
 
 		ws::Texture back = screen.getSnapshot();
-		back.setScaleMode(ws::Texture::ScaleMode::NearestNeighbor);
 		back.setSize({width,height});
 		
 		HDC srcDC = back.getHDC();

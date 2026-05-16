@@ -3072,6 +3072,11 @@ namespace ws
 		    
 		    width = static_cast<int>(bounds.Width);
 		    height = static_cast<int>(bounds.Height);
+
+			//update the offset of the text so that ws::Drawable draws the text at the proper position.
+			Gdiplus::Matrix originalTransform;
+			canvas->GetTransform(&originalTransform);
+			canvas->TranslateTransform(-bounds.X, -bounds.Y);
 		    
 		    
 		    Gdiplus::SolidBrush fillBrush(fillColor);
@@ -3685,9 +3690,9 @@ namespace ws
 		
 	
 
-		void create(int width,int height,std::string title = "",DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0,const std::string& className = "Window")
+		void create(int clientWidth,int clientHeight,std::string title = "",DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0,const std::string& className = "Window")
 		{
-			if(width <= 0 || height <= 0)
+			if(clientWidth <= 0 || clientHeight <= 0)
 			{
 				std::cerr << "Error: Attempted to create a window with an invalid size!" << std::endl;
 				MessageBoxA(NULL,"Error: Attempted to create a window with an invalid size!","Developer Error",MB_OK);
@@ -3719,7 +3724,13 @@ namespace ws
 			
 			
 			
-			view.init({0,0,width,height});
+			view.init({0,0,clientWidth,clientHeight});
+
+
+			RECT rect = {0, 0, clientWidth, clientHeight};
+			AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+			int width = rect.right - rect.left;
+			int height = rect.bottom - rect.top;
 			
 			
 			hwnd = CreateWindowEx(
