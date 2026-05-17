@@ -1,5 +1,7 @@
 # WinSimple V1.3 API Documentation
 
+![Radial Polygons](../images/Screenshot 2026-05-16 202219.png)
+
 
 ```
 #include "graphics.h"

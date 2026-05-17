@@ -1,5 +1,7 @@
 # Winsimple V1.6 API Documentation
 
+<iframe width="560" height="315" src="https://youtube.com/embed/VVVxM9egtWc" frameborder="0" allowfullscreen></iframe>
+
 One of the major benefits of V1.6 is that you don't have to include the entire library to use just graphics. Winsimple is divided into the following five optional headers:
 
 * [winsimple.hpp](core.md) - The Base and Core of the Library. Other headers will likely depend on this header.
@@ -12,3 +14,4 @@ One of the major benefits of V1.6 is that you don't have to include the entire l
 
 * [winsimple-controls.hpp](controls.md) - The GUI controls of Winsimple that wrap around the underlying winapi.
 
+![Winsimple Linking](../images/WS_Flags.svg)

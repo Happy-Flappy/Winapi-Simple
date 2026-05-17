@@ -1,5 +1,7 @@
 # WinSimple V1.4 API Documentation
 
+![GDI+ Graphics and Clipboard Copying](../images/Screenshot 2026-05-16 202413.png)
+
 ```
 #include "winsimple.h"
 ```

@@ -1,5 +1,8 @@
 # Winsimple V1.1 API Documentation
 
+
+![Graphics](../images/Screenshot 2026-05-16 201350.png)
+
 ```
 #include "graphics.h"
 ```

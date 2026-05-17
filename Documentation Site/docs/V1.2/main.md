@@ -1,5 +1,8 @@
 # WinSimple V1.2
 
+
+![Global Input And Transparent Windows](../images/Screenshot 2026-05-16 201741.png)
+
 ```
 #include "graphics.h"
 ```

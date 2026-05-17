@@ -1,3 +1,8 @@
+# Winsimple V1.6 API Documentation
+
+
+<iframe width="560" height="315" src="https://youtube.com/embed/mgtPEukFGro" frameborder="0" allowfullscreen></iframe>
+
 ## ws::Timer timer;
 * double seconds = timer.getSeconds();
 * double milliSeconds = timer.getMilliSeconds();
@@ -20,51 +25,100 @@
 
 
 
-## Data Types
-* ws::Vec2i = int x,y
-* ws::Vec2f = float x,y
-* ws::Vec2d = double x,y
-* ws::Vec3i = int x,y,z
-* ws::Vec3f = float x,y,z
-* ws::Vec3d = double x,y,z
-* ws::IntRect = int left,top,width,height
-* bool ws::IntRect::contains(ws::Vec2i point)
-* ws::FloatRect = float left,top,width,height
-* bool ws::FloatRect::contains(ws::Vec2i point)
-* ws::DoubleRect = double left,top,width,height
-* bool ws::DoubleRect::contains(ws::Vec2i point)
+## Data Types & Conversions
 
-* ws::Hue()
-* ws::Hue(Gdiplus::Color &color)
-* ws::Hue(COLORREF color)
-* ws::Hue(int r1,int g1,int b1,int a1=255)
-* ws::Hue::r
-* ws::Hue::g
-* ws::Hue::b
-* const Hue Hue::red = Hue(255, 0, 0, 255);
-* const Hue Hue::green = Hue(0, 255, 0, 255);
-* const Hue Hue::blue = Hue(0, 0, 255, 255);
-* const Hue Hue::orange = Hue(255, 150, 0, 255);
-* const Hue Hue::brown = Hue(150,100, 50, 255);
-* const Hue Hue::yellow = Hue(255, 255, 0, 255);
-* const Hue Hue::cyan = Hue(0, 255, 255, 255);
-* const Hue Hue::purple = Hue(140, 0, 255, 255);
-* const Hue Hue::pink = Hue(255, 0, 255, 255);
-* const Hue Hue::grey = Hue(150, 150, 150, 255);
-* const Hue Hue::black = Hue(0, 0, 0, 255);
-* const Hue Hue::white = Hue(255, 255, 255, 255);
-* const Hue Hue::transparent = Hue(0,0,0,0);	
-* operator Gdiplus::Color() const
-* operator COLORREF() const
-* bool operator==(const Hue& other) const 
-* bool operator!=(const Hue& other) const 
-* struct HSV = float h,s,v
-* ws::Hue ws::Hue::fromHSV(float h, float s, float v, int alpha = 255)
-* ws::Hue ws::Hue::fromHSV(HSV hsv,int alpha = 255)	
-* ws::Hue::HSV toHSV() const
-* bool ws::Hue::inHueRange(float hue,ws::Hue::HSV hsv,float tolerance = 60,float minSaturation = 0.1,float minValue = 0.2)
-* ws::Hue ws::Hue::replaceHue(float hue,float replacement,ws::Hue rgb)
-	
+### Vector Types
+
+All vector types (`Vec2i`, `Vec2f`, `Vec2d`, `Vec3i`, `Vec3f`, `Vec3d`) support the following generic conversions:
+
+* **Construct from any arithmetic types** – e.g. `ws::Vec2f(10, 3.5)` or `ws::Vec3d(1u, 2.0f, 3L)`.
+* **Construct from any type with `.x`, `.y` (and `.z` for 3D)** – works with `POINT`, `Gdiplus::Point`, `Gdiplus::PointF`, custom structs, etc.
+* **Implicit conversion to any type with `.x`, `.y` (and `.z`)** – copies components via `static_cast`. Allows direct assignment to `Gdiplus::PointF`, `POINT`, or your own vector types.
+* **Implicit conversion to `POINT*` / `const POINT*`** – `Vec2i` (and `Vec2f`, `Vec2d`) are layout‑compatible with `POINT`, so they can be passed directly to Win32 functions expecting `POINT*`.
+
+#### `ws::Vec2i`
+* Members: `int x, y`.
+* `Vec2i()` – default.
+* `Vec2i(T x_val, U y_val)` – arithmetic pair.
+* `Vec2i(const T& other)` – from any `.x`/`.y` type.
+
+#### `ws::Vec2f`
+* Members: `float x, y`.
+* Same construction/conversion patterns as `Vec2i`, using `float`.
+
+#### `ws::Vec2d`
+* Members: `double x, y`.
+* Same patterns, using `double`.
+
+#### `ws::Vec3i`
+* Members: `int x, y, z`.
+* `Vec3i()` – default.
+* `Vec3i(T x, U y, V z)` – arithmetic triple.
+* `Vec3i(const T& other)` – from any `.x`/`.y`/`.z` type.
+* Implicit conversion to any `.x`/`.y`/`.z` type.
+
+#### `ws::Vec3f`
+* Members: `float x, y, z`.
+* Same as `Vec3i`, with `float`.
+
+#### `ws::Vec3d`
+* Members: `double x, y, z`.
+* Same as `Vec3i`, with `double`.
+
+
+### Rectangle Types
+
+All rectangle types (`IntRect`, `FloatRect`, `DoubleRect`) use a **left, top, width, height** internal representation but can be constructed from, and converted to, **right/bottom style** rects (like Win32 `RECT`) automatically.
+
+#### `ws::IntRect`
+* Members: `int left, top, width, height`.
+* Constructors:
+  - `IntRect()` – default.
+  - `IntRect(T1 l, T2 t, T3 w, T4 h)` – from four arithmetic values.
+  - `IntRect(const T& other)` – from **any** rect‑like type:
+    - If `other` has `width`/`height`, copies directly.
+    - If `other` has `right`/`bottom`, computes `width = right - left`, `height = bottom - top`.
+* Conversion operator to **any** rect‑like type:
+  - For `width`/`height` style: copies `left, top, width, height`.
+  - For `right`/`bottom` style: sets `right = left + width`, `bottom = top + height`.
+* Additional methods:
+  - `bool contains(const Vec2i& point)` / `const Vec2f& point`
+  - `bool operator==(const IntRect&)` / `operator!=`
+
+#### `ws::FloatRect`
+* Same interface as `IntRect`, but using `float` members.
+
+#### `ws::DoubleRect`
+* Same interface as `IntRect`, using `double` members.
+
+
+### Color Class `ws::Hue`
+
+#### Members & Constructors
+* `int r, g, b, a` (0–255).
+* **Default**: `Hue()` → (0,0,0,255).
+* **From components**: `Hue(int r, int g, int b, int a = 255)`.
+* **From GDI+ color**: `Hue(Gdiplus::Color &color)`.
+* **From COLORREF**: `Hue(COLORREF color)` (alpha forced to 255).
+
+#### Implicit Conversions
+* `operator Gdiplus::Color()` – returns `Gdiplus::Color(a, r, g, b)`.
+* `operator COLORREF()` – returns `RGB(r, g, b)` (drops alpha).
+
+#### Predefined Color Constants
+`red`, `green`, `blue`, `orange`, `brown`, `yellow`, `cyan`, `purple`, `pink`, `grey`, `black`, `white`, `transparent`.
+
+#### HSV Support
+* Nested struct `HSV { float h, s, v; }` (h in degrees 0–360, s and v in 0..1).
+* `static Hue fromHSV(float h, float s, float v, int alpha = 255)` – creates from HSV.
+* `static Hue fromHSV(HSV hsv, int alpha = 255)`.
+* `HSV toHSV() const` – converts current color to HSV.
+
+#### Hue Manipulation
+* `static bool inHueRange(float hue, HSV hsv, float tolerance = 60, float minSaturation = 0.1, float minValue = 0.2)`  
+  Checks if `hsv` is within `hue ± tolerance` degrees and meets minimum saturation/value.
+* `static Hue replaceHue(float hue, float replacement, Hue rgb)`  
+  If `rgb`’s hue falls inside `hue` range, returns a new `Hue` with `replacement` hue but same saturation/value; otherwise returns `rgb` unchanged.
 
 
 ## Class View
@@ -412,7 +466,18 @@
 * ws::Cursor getCursor()
 * void addMessageHandler(std::function<LRESULT(MSG msg)> handler)
 * void clearMessageHandlers() {
-	
+
+### Minimal Window
+```
+ws::Window window;
+window.create(960,540,"");
+window.isOpen();//as long as this function is called, window will not stall.
+
+//optional
+window.clear()
+window.draw(sprite);
+window.display();
+```	
 
 
 ## Global Input Namespace	
@@ -438,4 +503,33 @@
 * float getDPI()
 * ws::IntRect getWorkArea()
 
+## Example
+
+```
+#include "winsimple.hpp"
+
+int main()
+{
+	ws::Window window(960,540,"Window Title");
+	
+	ws::Texture texture;
+	texture.create(960,540,ws::Hue::red);
+	ws::Sprite sprite(texture);
+
+	while(window.isOpen())
+	{
+		MSG msg;
+		while(window.pollEvent(msg))
+		{
+			if(msg.message == WM_SIZE)
+				std::cout << "Window resized" << std::endl;
+		}
+		window.clear();
+		window.draw(sprite);
+		window.display();
+	}
+	return 0;
+}
+
+```
 
