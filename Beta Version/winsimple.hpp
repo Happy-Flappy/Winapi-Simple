@@ -4330,8 +4330,43 @@ namespace ws
 	        return isFullscreen;
 	    }
 
+		//force all clicks to pass through this window as if it does not exist.
+		void disableAnyClicks()
+		{
+			addMessageHandler([](MSG msg) -> LRESULT{
+				if(msg.message == WM_NCHITTEST)
+				{
+					return HTTRANSPARENT;   // mouse passes through
+				}
+				return 0;
+			});			
+		}
+
+
+		//Choose what color should represent emptiness and any click will pass through that color as if nothing is there.
+		void disableSomeClicks(ws::Hue hue)
+		{
+			addMessageHandler([&](MSG msg) -> LRESULT{
+				if(msg.message == WM_NCHITTEST)
+				{
+					POINT p;
+					if(!GetCursorPos(&p))
+					{
+						p.x = -1000;
+						p.y = -1000;
+					}
+					ScreenToClient(hwnd, &p); // Convert to client coordinates
+					
+					ws::Vec2f MP = toWorld(p);
+					if(getPixel(MP.x,MP.y) == hue)
+						return HTTRANSPARENT;   // mouse passes through
+				}
+				return 0;				
+			});
+		}
+
 		// Enables chroma key transparency (legacy per-pixel or simple).
-		void enableChromaKey(ws::Hue hue,bool legacy = false)//losing window control for some reason
+		void enableChromaKey(ws::Hue hue,bool legacy = false)
 		{
 			m_perPixelAlpha = legacy;				
 			
@@ -4403,11 +4438,12 @@ namespace ws
 		{
 			customHandlers.push_back(std::move(handler));
 		}
-
-		void clearMessageHandlers() {
-			customHandlers.clear();
-		}
 		
+		std::vector<std::function<LRESULT(MSG msg)>> getMessageHandlers()
+		{
+			return customHandlers;
+		}
+
 		private:
 		std::vector<std::function<LRESULT(MSG msg)>> customHandlers;
 		
