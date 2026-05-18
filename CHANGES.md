@@ -275,6 +275,8 @@
 * Added std::vector<std::function<LRESULT(MSG msg)>> getMessageHandlers() - allows erasure of a custom handler.
 * Added void disableSomeClicks(ws::Hue hue) - Choose what color should represent emptiness and any click will pass through that color as if nothing is there.
 * Added void disableAnyClicks() - force all clicks to pass through this window as if it does not exist.
+* Added ws::Key button types that are equivalent in value and type to Winapi virtual key codes.
+* Same with ws::Mouse
 
 
 

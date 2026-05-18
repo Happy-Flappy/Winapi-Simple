@@ -915,6 +915,205 @@ namespace ws
 	const Hue Hue::black = Hue(0, 0, 0, 255);
 	const Hue Hue::white = Hue(255, 255, 255, 255);
 	const Hue Hue::transparent = Hue(0,0,0,0);	
+
+
+	//KEYBOARD AND MOUSE BUTTON EQUIVALENTS TO WINAPI TYPES - Use these in ws::Global::getButton() or use the winapi equivalents.
+	class Key 
+	{
+		
+		public:
+		// Letters
+		static const int
+			A = 'A',
+			B = 'B',
+			C = 'C',
+			D = 'D',
+			E = 'E',
+			F = 'F',
+			G = 'G',
+			H = 'H',
+			I = 'I',
+			J = 'J',
+			K = 'K',
+			L = 'L',
+			M = 'M',
+			N = 'N',
+			O = 'O',
+			P = 'P',
+			Q = 'Q',
+			R = 'R',
+			S = 'S',
+			T = 'T',
+			U = 'U',
+			V = 'V',
+			W = 'W',
+			X = 'X',
+			Y = 'Y',
+			Z = 'Z';
+
+		// Digits (top row)
+		static const int
+			Num0 = '0',
+			Num1 = '1',
+			Num2 = '2',
+			Num3 = '3',
+			Num4 = '4',
+			Num5 = '5',
+			Num6 = '6',
+			Num7 = '7',
+			Num8 = '8',
+			Num9 = '9';
+
+		// Numpad
+		static const int
+			NumPad0 = 0x60,
+			NumPad1 = 0x61,
+			NumPad2 = 0x62,
+			NumPad3 = 0x63,
+			NumPad4 = 0x64,
+			NumPad5 = 0x65,
+			NumPad6 = 0x66,
+			NumPad7 = 0x67,
+			NumPad8 = 0x68,
+			NumPad9 = 0x69,
+			Multiply = 0x6A,
+			Add = 0x6B,
+			Separator = 0x6C,
+			Subtract = 0x6D,
+			Decimal = 0x6E,
+			Divide = 0x6F;
+
+		// Function keys
+		static const int
+			F1 = 0x70,
+			F2 = 0x71,
+			F3 = 0x72,
+			F4 = 0x73,
+			F5 = 0x74,
+			F6 = 0x75,
+			F7 = 0x76,
+			F8 = 0x77,
+			F9 = 0x78,
+			F10 = 0x79,
+			F11 = 0x7A,
+			F12 = 0x7B,
+			F13 = 0x7C,
+			F14 = 0x7D,
+			F15 = 0x7E,
+			F16 = 0x7F,
+			F17 = 0x80,
+			F18 = 0x81,
+			F19 = 0x82,
+			F20 = 0x83,
+			F21 = 0x84,
+			F22 = 0x85,
+			F23 = 0x86,
+			F24 = 0x87;
+
+		// Modifiers (generic)
+		static const int
+			Shift = 0x10,
+			Control = 0x11,
+			Alt = 0x12;
+
+		// Modifiers (left/right specific)
+		static const int
+			LeftShift = 0xA0,
+			RightShift = 0xA1,
+			LeftControl = 0xA2,
+			RightControl = 0xA3,
+			LeftAlt = 0xA4,
+			RightAlt = 0xA5;
+
+		// Windows keys & Application key
+		static const int
+			LeftWin = 0x5B,
+			RightWin = 0x5C,
+			Application = 0x5D;
+
+		// Navigation & Editing
+		static const int
+			Backspace = 0x08,
+			Tab = 0x09,
+			Clear = 0x0C,
+			Enter = 0x0D,
+			Pause = 0x13,
+			CapsLock = 0x14,
+			Escape = 0x1B,
+			Space = 0x20,
+			PageUp = 0x21,
+			PageDown = 0x22,
+			End = 0x23,
+			Home = 0x24,
+			Left = 0x25,
+			Up = 0x26,
+			Right = 0x27,
+			Down = 0x28,
+			Select = 0x29,
+			Print = 0x2A,
+			Execute = 0x2B,
+			Snapshot = 0x2C,
+			Insert = 0x2D,
+			Delete = 0x2E,
+			Help = 0x2F;
+
+		// Lock keys
+		static const int
+			NumLock = 0x90,
+			ScrollLock = 0x91;
+
+		// OEM specific keys (US keyboard layout)
+		static const int
+			OemSemicolon = 0xBA,
+			OemPlus = 0xBB,
+			OemComma = 0xBC,
+			OemMinus = 0xBD,
+			OemPeriod = 0xBE,
+			OemQuestion = 0xBF,
+			OemTilde = 0xC0,
+			OemOpenBrackets = 0xDB,
+			OemBackslash = 0xDC,
+			OemCloseBrackets = 0xDD,
+			OemQuotes = 0xDE,
+			Oem8 = 0xDF;
+
+		// Browser / Media keys
+		static const int
+			BrowserBack = 0xA6,
+			BrowserForward = 0xA7,
+			BrowserRefresh = 0xA8,
+			BrowserStop = 0xA9,
+			BrowserSearch = 0xAA,
+			BrowserFavorites = 0xAB,
+			BrowserHome = 0xAC,
+			VolumeMute = 0xAD,
+			VolumeDown = 0xAE,
+			VolumeUp = 0xAF,
+			MediaNextTrack = 0xB0,
+			MediaPrevTrack = 0xB1,
+			MediaStop = 0xB2,
+			MediaPlayPause = 0xB3,
+			LaunchMail = 0xB4,
+			LaunchMediaSelect = 0xB5,
+			LaunchApp1 = 0xB6,
+			LaunchApp2 = 0xB7;
+
+		// Prevent instantiation
+		Key() = delete;
+	};
+
+	class Mouse {
+	public:
+		static const int
+			Left = 0x01,
+			Right = 0x02,
+			Middle = 0x04,
+			XButton1 = 0x05,
+			XButton2 = 0x06;
+
+		Mouse() = delete;
+	};
+
 	
 
 	//============VIEW==============
