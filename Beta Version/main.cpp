@@ -4,21 +4,24 @@
 
 int main()
 {
+	std::vector<int> keys = ws::Key::GetAllKeys();
 	bool released = true;
 	while(true)
 	{
-		if(ws::Global::getButton(ws::Key::Snapshot))
+		for(auto& k : keys)
 		{
-			if(released)
+			
+			if(ws::Global::getButton(k))
 			{
-				std::cout << "Snapshot Key Pressed! Saving...\n";
-				ws::Screen screen;
-				screen.getSnapshot().saveToFile("Snapshot.png");
+				if(released)
+				{
+					std::cout << "";
+				}
+				released = false;
 			}
-			released = false;
+			else
+				released = true;
 		}
-		else
-			released = true;
 	}
 	return 0;
 }

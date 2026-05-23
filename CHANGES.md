@@ -277,8 +277,11 @@
 * Added void disableAnyClicks() - force all clicks to pass through this window as if it does not exist.
 * Added ws::Key button types that are equivalent in value and type to Winapi virtual key codes.
 * Same with ws::Mouse
-
-
+* Added GetAllButtons() to ws::Key and ws::Mouse - returns a vector of buttons that can be iterated.
+* Added GetButtonName(int buttonCode) to ws::Key and ws::Mouse - returns string name of button.
+* Fixed bug in ws::Window::clear() where the backbuffer is created with the world size when it should be viewport size.
+* Changed ws::Window::getView() to return a pointer.
+* Fixed ws::View::toWorld() and toScreen() by removing the secondary screensize parameter.
 
 
 

@@ -1098,6 +1098,102 @@ namespace ws
 			LaunchApp1 = 0xB6,
 			LaunchApp2 = 0xB7;
 
+		static const std::vector<int>& GetAllKeys() 
+		{
+			static const std::vector<int> keys = {
+				// Letters
+				A, B, C, D, E, F, G, H, I, J, K, L, M,
+				N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+				// Digits
+				Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9,
+				// Numpad
+				NumPad0, NumPad1, NumPad2, NumPad3, NumPad4,
+				NumPad5, NumPad6, NumPad7, NumPad8, NumPad9,
+				Multiply, Add, Separator, Subtract, Decimal, Divide,
+				// Function keys
+				F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
+				F11, F12, F13, F14, F15, F16, F17, F18, F19, F20,
+				F21, F22, F23, F24,
+				// Modifiers
+				Shift, Control, Alt,
+				LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt,
+				// Windows / Application
+				LeftWin, RightWin, Application,
+				// Navigation & Editing
+				Backspace, Tab, Clear, Enter, Pause, CapsLock, Escape, Space,
+				PageUp, PageDown, End, Home, Left, Up, Right, Down,
+				Select, Print, Execute, Snapshot, Insert, Delete, Help,
+				// Lock keys
+				NumLock, ScrollLock,
+				// OEM specific
+				OemSemicolon, OemPlus, OemComma, OemMinus, OemPeriod,
+				OemQuestion, OemTilde, OemOpenBrackets, OemBackslash,
+				OemCloseBrackets, OemQuotes, Oem8,
+				// Browser / Media
+				BrowserBack, BrowserForward, BrowserRefresh, BrowserStop,
+				BrowserSearch, BrowserFavorites, BrowserHome,
+				VolumeMute, VolumeDown, VolumeUp,
+				MediaNextTrack, MediaPrevTrack, MediaStop, MediaPlayPause,
+				LaunchMail, LaunchMediaSelect, LaunchApp1, LaunchApp2
+			};
+			return keys;
+		}
+
+		static std::string GetKeyName(int keyCode) 
+		{
+			static const std::unordered_map<int, std::string> nameMap = []{
+				std::unordered_map<int, std::string> map;
+				// Use a macro or manual entries to avoid repetition.
+				// I'll show manual entries for clarity.
+				#define ADD_KEY(k) map[k] = #k
+				ADD_KEY(A); ADD_KEY(B); ADD_KEY(C); ADD_KEY(D); ADD_KEY(E);
+				ADD_KEY(F); ADD_KEY(G); ADD_KEY(H); ADD_KEY(I); ADD_KEY(J);
+				ADD_KEY(K); ADD_KEY(L); ADD_KEY(M); ADD_KEY(N); ADD_KEY(O);
+				ADD_KEY(P); ADD_KEY(Q); ADD_KEY(R); ADD_KEY(S); ADD_KEY(T);
+				ADD_KEY(U); ADD_KEY(V); ADD_KEY(W); ADD_KEY(X); ADD_KEY(Y);
+				ADD_KEY(Z);
+				ADD_KEY(Num0); ADD_KEY(Num1); ADD_KEY(Num2); ADD_KEY(Num3); ADD_KEY(Num4);
+				ADD_KEY(Num5); ADD_KEY(Num6); ADD_KEY(Num7); ADD_KEY(Num8); ADD_KEY(Num9);
+				ADD_KEY(NumPad0); ADD_KEY(NumPad1); ADD_KEY(NumPad2); ADD_KEY(NumPad3); ADD_KEY(NumPad4);
+				ADD_KEY(NumPad5); ADD_KEY(NumPad6); ADD_KEY(NumPad7); ADD_KEY(NumPad8); ADD_KEY(NumPad9);
+				ADD_KEY(Multiply); ADD_KEY(Add); ADD_KEY(Separator); ADD_KEY(Subtract);
+				ADD_KEY(Decimal); ADD_KEY(Divide);
+				ADD_KEY(F1); ADD_KEY(F2); ADD_KEY(F3); ADD_KEY(F4); ADD_KEY(F5);
+				ADD_KEY(F6); ADD_KEY(F7); ADD_KEY(F8); ADD_KEY(F9); ADD_KEY(F10);
+				ADD_KEY(F11); ADD_KEY(F12); ADD_KEY(F13); ADD_KEY(F14); ADD_KEY(F15);
+				ADD_KEY(F16); ADD_KEY(F17); ADD_KEY(F18); ADD_KEY(F19); ADD_KEY(F20);
+				ADD_KEY(F21); ADD_KEY(F22); ADD_KEY(F23); ADD_KEY(F24);
+				ADD_KEY(Shift); ADD_KEY(Control); ADD_KEY(Alt);
+				ADD_KEY(LeftShift); ADD_KEY(RightShift); ADD_KEY(LeftControl);
+				ADD_KEY(RightControl); ADD_KEY(LeftAlt); ADD_KEY(RightAlt);
+				ADD_KEY(LeftWin); ADD_KEY(RightWin); ADD_KEY(Application);
+				ADD_KEY(Backspace); ADD_KEY(Tab); ADD_KEY(Clear); ADD_KEY(Enter);
+				ADD_KEY(Pause); ADD_KEY(CapsLock); ADD_KEY(Escape); ADD_KEY(Space);
+				ADD_KEY(PageUp); ADD_KEY(PageDown); ADD_KEY(End); ADD_KEY(Home);
+				ADD_KEY(Left); ADD_KEY(Up); ADD_KEY(Right); ADD_KEY(Down);
+				ADD_KEY(Select); ADD_KEY(Print); ADD_KEY(Execute); ADD_KEY(Snapshot);
+				ADD_KEY(Insert); ADD_KEY(Delete); ADD_KEY(Help);
+				ADD_KEY(NumLock); ADD_KEY(ScrollLock);
+				ADD_KEY(OemSemicolon); ADD_KEY(OemPlus); ADD_KEY(OemComma);
+				ADD_KEY(OemMinus); ADD_KEY(OemPeriod); ADD_KEY(OemQuestion);
+				ADD_KEY(OemTilde); ADD_KEY(OemOpenBrackets); ADD_KEY(OemBackslash);
+				ADD_KEY(OemCloseBrackets); ADD_KEY(OemQuotes); ADD_KEY(Oem8);
+				ADD_KEY(BrowserBack); ADD_KEY(BrowserForward); ADD_KEY(BrowserRefresh);
+				ADD_KEY(BrowserStop); ADD_KEY(BrowserSearch); ADD_KEY(BrowserFavorites);
+				ADD_KEY(BrowserHome); ADD_KEY(VolumeMute); ADD_KEY(VolumeDown);
+				ADD_KEY(VolumeUp); ADD_KEY(MediaNextTrack); ADD_KEY(MediaPrevTrack);
+				ADD_KEY(MediaStop); ADD_KEY(MediaPlayPause); ADD_KEY(LaunchMail);
+				ADD_KEY(LaunchMediaSelect); ADD_KEY(LaunchApp1); ADD_KEY(LaunchApp2);
+				#undef ADD_KEY
+				return map;
+			}();
+			auto it = nameMap.find(keyCode);
+			if (it != nameMap.end())
+				return it->second;
+			return "Unknown(" + std::to_string(keyCode) + ")";
+		}
+		
+
 		// Prevent instantiation
 		Key() = delete;
 	};
@@ -1110,6 +1206,30 @@ namespace ws
 			Middle = 0x04,
 			XButton1 = 0x05,
 			XButton2 = 0x06;
+
+		static const std::vector<int>& GetAllButtons() 
+		{
+			static const std::vector<int> buttons = { Left, Right, Middle, XButton1, XButton2 };
+			return buttons;
+		}
+
+		static std::string GetButtonName(int buttonCode) {
+			static const std::unordered_map<int, std::string> nameMap = []{
+				std::unordered_map<int, std::string> map;
+				#define ADD_BTN(b) map[b] = #b
+				ADD_BTN(Left);
+				ADD_BTN(Right);
+				ADD_BTN(Middle);
+				ADD_BTN(XButton1);
+				ADD_BTN(XButton2);
+				#undef ADD_BTN
+				return map;
+			}();
+			auto it = nameMap.find(buttonCode);
+			if (it != nameMap.end())
+				return it->second;
+			return "UnknownMouseButton(" + std::to_string(buttonCode) + ")";
+		}		
 
 		Mouse() = delete;
 	};
@@ -1398,15 +1518,8 @@ namespace ws
 	    }
 		
 		// Converts screen coordinates to world coordinates, accounting for view transform.
-		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
+		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos) 
 		{
-			// First account for window stretching
-			ws::Vec2i stretchedPos;
-			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
-											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
-			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
-											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
-			
 			// Calculate the visible world center
 			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
 			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
@@ -1425,8 +1538,8 @@ namespace ws
 			scaleY *= zoomFactor;
 			
 			// Apply inverse transformation
-			float worldX = static_cast<float>(stretchedPos.x);
-			float worldY = static_cast<float>(stretchedPos.y);
+			float worldX = static_cast<float>(screenPos.x);
+			float worldY = static_cast<float>(screenPos.y);
 			
 			// Reverse transformations in opposite order
 			worldX -= portCenterX;
@@ -1450,14 +1563,14 @@ namespace ws
 			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
 		}
 	    
-	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
+	    [[nodiscard]] ws::Vec2i toWorld(int x,int y) 
 	    {
-	        return toWorld(ws::Vec2i(x,y),screenSize);
+	        return toWorld(ws::Vec2i(x,y));
 	    }
 	    
 	
 		// Converts world coordinates to screen coordinates.
-	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
+	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos) 
 	    {
 		        
 	        // Apply the transformation (scaled by zoom)
@@ -1504,17 +1617,13 @@ namespace ws
 	        screenX += portCenterX;
 	        screenY += portCenterY;
 	        
-	        // Now account for window stretching
-	        screenX *= (static_cast<float>(screenSize.x) / static_cast<float>(world.width));
-	        screenY *= (static_cast<float>(screenSize.y) / static_cast<float>(world.height));
-	        
 	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
 	    }
 	
 	    
-	    [[nodiscard]] ws::Vec2i toScreen(int x,int y,ws::Vec2i screenSize) 
+	    [[nodiscard]] ws::Vec2i toScreen(int x,int y) 
 	    {
-	        return toScreen(ws::Vec2i(x,y),screenSize);
+	        return toScreen(ws::Vec2i(x,y));
 	    }       		
 
 		// Applies the current view transform (matrix, clip) to the given GDI+ graphics.
@@ -4104,11 +4213,11 @@ namespace ws
 	    }	
 		
 		// Clears the back buffer to the given color, recreating if needed.
-	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
+	    void clear(ws::Hue color = ws::Hue::transparent) 
 		{
 			if (!hwnd) return;
 
-			ws::Vec2i needed = view.getSize();
+			ws::Vec2i needed = view.getPortSize();;
 
 			if (!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
 			{
@@ -4229,7 +4338,7 @@ namespace ws
 			view = v;
 		}
 		
-		ws::View getView()
+		ws::View &getView()
 		{
 			return view;
 		}
@@ -4596,7 +4705,7 @@ namespace ws
 		// Converts screen coordinates to world.
 		ws::Vec2i toWorld(int x,int y)
 		{
-			return view.toWorld(x,y,getSize());
+			return view.toWorld(x,y);
 		}
 		
 		ws::Vec2i toWorld(ws::Vec2i pos)
@@ -4607,7 +4716,7 @@ namespace ws
 		// Converts world coordinates to screen.
 		ws::Vec2i toScreen(int x,int y)
 		{
-			return view.toScreen(x,y,getSize());
+			return view.toScreen(x,y);
 		}
 		
 		ws::Vec2i toScreen(ws::Vec2i pos)
