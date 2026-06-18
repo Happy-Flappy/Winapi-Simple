@@ -296,6 +296,61 @@ namespace ws
 	    operator const POINT*() const { 
 	        return reinterpret_cast<const POINT*>(this); 
 	    }
+		
+		
+		Vec2i& operator+=(const Vec2i& rhs) {
+			x += rhs.x;
+			y += rhs.y;
+			return *this;
+		}
+		
+		Vec2i& operator-=(const Vec2i& rhs) {
+			x -= rhs.x;
+			y -= rhs.y;
+			return *this;
+		}
+		
+		Vec2i& operator*=(int scalar) {
+			x *= scalar;
+			y *= scalar;
+			return *this;
+		}
+		
+		Vec2i& operator/=(int scalar) {
+			if(scalar == 0)
+				return *this;
+			
+			x /= scalar;
+			y /= scalar;
+			return *this;
+		}
+		
+		// For vector * vector (element-wise multiplication)
+		Vec2i& operator*=(const Vec2i& rhs) {
+			x *= rhs.x;
+			y *= rhs.y;
+			return *this;
+		}
+		
+		// For vector / vector (element-wise division)
+		Vec2i& operator/=(const Vec2i& rhs) {
+			bool skipX = false;
+			bool skipY = false;
+			if(rhs.x == 0)
+				skipX = true;
+			if(rhs.y == 0)
+				skipY = true;
+			if(!skipX)
+				x /= rhs.x;
+			if(!skipY)
+				y /= rhs.y;
+			return *this;
+		}
+		
+		// Unary plus and minus
+		Vec2i operator+() const { return *this; }
+		Vec2i operator-() const { return Vec2i(-x, -y); }		
+		
 	};
 	
 	// ==================== VEC2F ====================
@@ -338,6 +393,46 @@ namespace ws
 	    operator const POINT*() const { 
 	        return reinterpret_cast<const POINT*>(this); 
 	    }
+		
+		Vec2f& operator+=(const Vec2f& rhs) {
+			x += rhs.x;
+			y += rhs.y;
+			return *this;
+		}
+		
+		Vec2f& operator-=(const Vec2f& rhs) {
+			x -= rhs.x;
+			y -= rhs.y;
+			return *this;
+		}
+		
+		Vec2f& operator*=(float scalar) {
+			x *= scalar;
+			y *= scalar;
+			return *this;
+		}
+		
+		Vec2f& operator/=(float scalar) {
+			if (scalar == 0.0f) return *this;
+			x /= scalar;
+			y /= scalar;
+			return *this;
+		}
+		
+		Vec2f& operator*=(const Vec2f& rhs) {
+			x *= rhs.x;
+			y *= rhs.y;
+			return *this;
+		}
+		
+		Vec2f& operator/=(const Vec2f& rhs) {
+			if (rhs.x != 0.0f) x /= rhs.x;
+			if (rhs.y != 0.0f) y /= rhs.y;
+			return *this;
+		}
+		
+		Vec2f operator+() const { return *this; }
+		Vec2f operator-() const { return Vec2f(-x, -y); }		
 	};
 	
 	// ==================== VEC2D ====================
@@ -380,6 +475,46 @@ namespace ws
 	    operator const POINT*() const { 
 	        return reinterpret_cast<const POINT*>(this); 
 	    }
+		
+		Vec2d& operator+=(const Vec2d& rhs) {
+			x += rhs.x;
+			y += rhs.y;
+			return *this;
+		}
+		
+		Vec2d& operator-=(const Vec2d& rhs) {
+			x -= rhs.x;
+			y -= rhs.y;
+			return *this;
+		}
+		
+		Vec2d& operator*=(double scalar) {
+			x *= scalar;
+			y *= scalar;
+			return *this;
+		}
+		
+		Vec2d& operator/=(double scalar) {
+			if (scalar == 0.0) return *this;
+			x /= scalar;
+			y /= scalar;
+			return *this;
+		}
+		
+		Vec2d& operator*=(const Vec2d& rhs) {
+			x *= rhs.x;
+			y *= rhs.y;
+			return *this;
+		}
+		
+		Vec2d& operator/=(const Vec2d& rhs) {
+			if (rhs.x != 0.0) x /= rhs.x;
+			if (rhs.y != 0.0) y /= rhs.y;
+			return *this;
+		}
+		
+		Vec2d operator+() const { return *this; }
+		Vec2d operator-() const { return Vec2d(-x, -y); }		
 	};
 	
 	// ==================== VEC3I ====================
@@ -417,6 +552,52 @@ namespace ws
 	        result.z = static_cast<decltype(T::z)>(z);
 	        return result;
 	    }
+		
+		Vec3i& operator+=(const Vec3i& rhs) {
+			x += rhs.x;
+			y += rhs.y;
+			z += rhs.z;
+			return *this;
+		}
+		
+		Vec3i& operator-=(const Vec3i& rhs) {
+			x -= rhs.x;
+			y -= rhs.y;
+			z -= rhs.z;
+			return *this;
+		}
+		
+		Vec3i& operator*=(int scalar) {
+			x *= scalar;
+			y *= scalar;
+			z *= scalar;
+			return *this;
+		}
+		
+		Vec3i& operator/=(int scalar) {
+			if (scalar == 0) return *this;
+			x /= scalar;
+			y /= scalar;
+			z /= scalar;
+			return *this;
+		}
+		
+		Vec3i& operator*=(const Vec3i& rhs) {
+			x *= rhs.x;
+			y *= rhs.y;
+			z *= rhs.z;
+			return *this;
+		}
+		
+		Vec3i& operator/=(const Vec3i& rhs) {
+			if (rhs.x != 0) x /= rhs.x;
+			if (rhs.y != 0) y /= rhs.y;
+			if (rhs.z != 0) z /= rhs.z;
+			return *this;
+		}
+		
+		Vec3i operator+() const { return *this; }
+		Vec3i operator-() const { return Vec3i(-x, -y, -z); }		
 	};
 	
 	// ==================== VEC3F ====================
@@ -454,6 +635,52 @@ namespace ws
 	        result.z = static_cast<decltype(T::z)>(z);
 	        return result;
 	    }
+			
+		Vec3f& operator+=(const Vec3f& rhs) {
+			x += rhs.x;
+			y += rhs.y;
+			z += rhs.z;
+			return *this;
+		}
+		
+		Vec3f& operator-=(const Vec3f& rhs) {
+			x -= rhs.x;
+			y -= rhs.y;
+			z -= rhs.z;
+			return *this;
+		}
+		
+		Vec3f& operator*=(float scalar) {
+			x *= scalar;
+			y *= scalar;
+			z *= scalar;
+			return *this;
+		}
+		
+		Vec3f& operator/=(float scalar) {
+			if (scalar == 0.0f) return *this;
+			x /= scalar;
+			y /= scalar;
+			z /= scalar;
+			return *this;
+		}
+		
+		Vec3f& operator*=(const Vec3f& rhs) {
+			x *= rhs.x;
+			y *= rhs.y;
+			z *= rhs.z;
+			return *this;
+		}
+		
+		Vec3f& operator/=(const Vec3f& rhs) {
+			if (rhs.x != 0.0f) x /= rhs.x;
+			if (rhs.y != 0.0f) y /= rhs.y;
+			if (rhs.z != 0.0f) z /= rhs.z;
+			return *this;
+		}
+		
+		Vec3f operator+() const { return *this; }
+		Vec3f operator-() const { return Vec3f(-x, -y, -z); }		
 	};
 	
 	// ==================== VEC3D ====================
@@ -491,6 +718,52 @@ namespace ws
 	        result.z = static_cast<decltype(T::z)>(z);
 	        return result;
 	    }
+		
+		Vec3d& operator+=(const Vec3d& rhs) {
+			x += rhs.x;
+			y += rhs.y;
+			z += rhs.z;
+			return *this;
+		}
+		
+		Vec3d& operator-=(const Vec3d& rhs) {
+			x -= rhs.x;
+			y -= rhs.y;
+			z -= rhs.z;
+			return *this;
+		}
+		
+		Vec3d& operator*=(double scalar) {
+			x *= scalar;
+			y *= scalar;
+			z *= scalar;
+			return *this;
+		}
+		
+		Vec3d& operator/=(double scalar) {
+			if (scalar == 0.0) return *this;
+			x /= scalar;
+			y /= scalar;
+			z /= scalar;
+			return *this;
+		}
+		
+		Vec3d& operator*=(const Vec3d& rhs) {
+			x *= rhs.x;
+			y *= rhs.y;
+			z *= rhs.z;
+			return *this;
+		}
+		
+		Vec3d& operator/=(const Vec3d& rhs) {
+			if (rhs.x != 0.0) x /= rhs.x;
+			if (rhs.y != 0.0) y /= rhs.y;
+			if (rhs.z != 0.0) z /= rhs.z;
+			return *this;
+		}
+		
+		Vec3d operator+() const { return *this; }
+		Vec3d operator-() const { return Vec3d(-x, -y, -z); }		
 	};
 	
 	// ==================== INTRECT ====================
@@ -802,43 +1075,79 @@ namespace ws
 			float h;  
 			float s; 
 			float v; 
+		
+			// Creates a Hue from HSV values (h in degrees, s,v in [0,1]).
+			ws::Hue toHue(int alpha = 255) 
+			{
+				
+				// h: 0..360 degrees, s: 0..1, v: 0..1
+				float c = v * s;
+				float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
+				float m = v - c;
+
+				float r1 = 0, g1 = 0, b1 = 0;
+				if (h < 60) {
+					r1 = c; g1 = x; b1 = 0;
+				} else if (h < 120) {
+					r1 = x; g1 = c; b1 = 0;
+				} else if (h < 180) {
+					r1 = 0; g1 = c; b1 = x;
+				} else if (h < 240) {
+					r1 = 0; g1 = x; b1 = c;
+				} else if (h < 300) {
+					r1 = x; g1 = 0; b1 = c;
+				} else {
+					r1 = c; g1 = 0; b1 = x;
+				}
+
+				int r = static_cast<int>((r1 + m) * 255);
+				int g = static_cast<int>((g1 + m) * 255);
+				int b = static_cast<int>((b1 + m) * 255);
+
+				return ws::Hue(r, g, b, alpha);
+			}		
+			
+			
+			// Checks if the given HSV value falls within a hue range (with tolerance and min saturation/value).
+			bool inHueRange(float hue,float tolerance = 60,float minSaturation = 0.1,float minValue = 0.2)
+			{
+				float lower = hue - tolerance;
+				float upper = hue + tolerance;
+
+				bool hueInRange = false;
+				if (lower < 0) {
+					hueInRange = (h >= (360.0f + lower) || h <= upper);
+				} else if (upper > 360) {
+					hueInRange = (h >= lower || h <= (upper - 360.0f));
+				} else {
+					hueInRange = (h >= lower && h <= upper);
+				}
+
+
+				return (hueInRange && (s >= minSaturation) && (v >= minValue));				
+			}
+
+			void setHue(float h2)
+			{
+				h = fmod(h2, 360.0f);
+				if (h < 0) h += 360.0f;
+			}
+			void setSaturation(float sat)
+			{
+				s = sat;
+				if(sat < 0.0f) s = 0.0f;
+				if(sat > 1.0f) s = 1.0f;				
+			}
+			void setValue(float val)
+			{
+				v = val;
+				if(val < 0.0f) v = 0.0f;
+				if(val > 1.0f) v = 1.0f;				
+			}
 			
 		};
 		
-		// Creates an Hue from HSV values (h in degrees, s,v in [0,1]).
-		static Hue fromHSV(float h, float s, float v, int alpha = 255) {
-			// h: 0..360 degrees, s: 0..1, v: 0..1
-			float c = v * s;
-			float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
-			float m = v - c;
-
-			float r1 = 0, g1 = 0, b1 = 0;
-			if (h < 60) {
-				r1 = c; g1 = x; b1 = 0;
-			} else if (h < 120) {
-				r1 = x; g1 = c; b1 = 0;
-			} else if (h < 180) {
-				r1 = 0; g1 = c; b1 = x;
-			} else if (h < 240) {
-				r1 = 0; g1 = x; b1 = c;
-			} else if (h < 300) {
-				r1 = x; g1 = 0; b1 = c;
-			} else {
-				r1 = c; g1 = 0; b1 = x;
-			}
-
-			int r = static_cast<int>((r1 + m) * 255);
-			int g = static_cast<int>((g1 + m) * 255);
-			int b = static_cast<int>((b1 + m) * 255);
-
-			return Hue(r, g, b, alpha);
-		}		
 		
-		
-		static Hue fromHSV(HSV hsv,int alpha = 255)
-		{
-			return fromHSV(hsv.h,hsv.s,hsv.v,alpha);
-		}
 		
 		// Converts this color to HSV representation.
 		HSV toHSV() const {
@@ -868,37 +1177,8 @@ namespace ws
 		}	
 
 
-		// Checks if the given HSV value falls within a hue range (with tolerance and min saturation/value).
-		static bool inHueRange(float hue,ws::Hue::HSV hsv,float tolerance = 60,float minSaturation = 0.1,float minValue = 0.2)
-		{
-			float lower = hue - tolerance;
-			float upper = hue + tolerance;
-
-			bool hueInRange = false;
-			if (lower < 0) {
-				hueInRange = (hsv.h >= (360.0f + lower) || hsv.h <= upper);
-			} else if (upper > 360) {
-				hueInRange = (hsv.h >= lower || hsv.h <= (upper - 360.0f));
-			} else {
-				hueInRange = (hsv.h >= lower && hsv.h <= upper);
-			}
-
-
-			return (hueInRange && (hsv.s >= minSaturation) && (hsv.v >= minValue));				
-		}
 		
-		// Replaces a given hue range with a new hue, preserving saturation and value.
-		static ws::Hue replaceHue(float hue,float replacement,ws::Hue rgb)
-		{
-			HSV hsv = rgb.toHSV();
-			
-			if(ws::Hue::inHueRange(hue,hsv))
-			{
-				ws::Hue rgb2 = fromHSV(replacement,hsv.s,hsv.v,rgb.a);
-				return rgb2;
-			}
-			return fromHSV(hsv.h,hsv.s,hsv.v,rgb.a);
-		}
+
 		
 	};
 	
@@ -3317,6 +3597,62 @@ namespace ws
 	    }
 	};	
 	
+	
+	class Rectangle : public ws::Drawable
+	{
+		public:
+		Rectangle()
+		{
+			width = 1;
+			height = 1;
+		}
+		Rectangle(int w,int h)
+		{
+			setSize(w,h);
+		}
+		
+		//Setters
+		void setFillColor(ws::Hue color)     { m_fillColor = color; }
+		void setBorderColor(ws::Hue color)   { m_borderColor = color; }
+		void setBorderWidth(int width)              { m_borderWidth = width; }
+		void setBorderStyle(Gdiplus::DashStyle style) { m_borderStyle = style; }		
+		
+		//Getters
+		ws::Hue getFillColor() const         { return m_fillColor.GetValue(); }
+		ws::Hue getBorderColor() const       { return m_borderColor.GetValue(); }
+		int getBorderWidth() const                  { return m_borderWidth; }
+		Gdiplus::DashStyle getBorderStyle() const   { return m_borderStyle; }	
+		
+		//draw the rectangle in local coordinates
+		virtual void draw(Gdiplus::Graphics* canvas) override
+		{
+			Gdiplus::RectF rect(0.0f, 0.0f,
+			static_cast<Gdiplus::REAL>(width),
+			static_cast<Gdiplus::REAL>(height));
+
+			if(m_fillColor.GetA() > 0)
+			{
+				Gdiplus::SolidBrush fillBrush(m_fillColor);
+				canvas->FillRectangle(&fillBrush, rect);
+			}
+
+			if(m_borderWidth > 0 && m_borderColor.GetA() > 0)
+			{
+				Gdiplus::Pen borderPen(m_borderColor,
+				static_cast<Gdiplus::REAL>(m_borderWidth));
+				borderPen.SetDashStyle(m_borderStyle);
+				canvas->DrawRectangle(&borderPen, rect);
+			}
+		}		
+		
+		private:
+		
+		Gdiplus::Color m_fillColor = Gdiplus::Color(255, 255, 255, 255); // white
+		Gdiplus::Color m_borderColor = Gdiplus::Color(255, 0, 0, 0);      // black
+		int m_borderWidth = 1;
+		Gdiplus::DashStyle m_borderStyle = Gdiplus::DashStyleSolid;		
+	};
+	
 	//===============TEXT==================
 	class Text : public ws::Drawable
 	{
@@ -4037,6 +4373,7 @@ namespace ws
 			return DefWindowProc(window->hwnd, uMsg, wParam, lParam);
 		}
 		
+		ws::Vec2i srcPos = {0,0};
 		
 		
 		public:		
@@ -4654,9 +4991,10 @@ namespace ws
 		//Choose what color should represent emptiness and any click will pass through that color as if nothing is there.
 		void disableSomeClicks(ws::Hue hue)
 		{
-			addMessageHandler([&](MSG msg) -> LRESULT{
+			addMessageHandler([this,hue](MSG msg) -> LRESULT{
 				if(msg.message == WM_NCHITTEST)
 				{
+					
 					POINT p;
 					if(!GetCursorPos(&p))
 					{
@@ -4672,7 +5010,7 @@ namespace ws
 				return 0;				
 			});
 		}
-
+		
 		// Enables chroma key transparency (legacy per-pixel or simple).
 		void enableChromaKey(ws::Hue hue,bool legacy = false)
 		{
@@ -4722,6 +5060,19 @@ namespace ws
 		ws::Vec2i toScreen(ws::Vec2i pos)
 		{
 			return toScreen(pos.x,pos.y);
+		}
+		
+		void setSourcePos(ws::Vec2i pos)
+		{
+			srcPos = pos;
+		}
+		void setSourcePos(int x,int y)
+		{
+			srcPos = {x,y};
+		}
+		ws::Vec2i getSourcePos()
+		{
+			return srcPos;
 		}
 
 		//Child Management - Declared here but defined in the controls header if included.
@@ -4828,16 +5179,41 @@ namespace ws
 						HDC hdc = BeginPaint(hwnd, &ps);
 
 						if (backBuffer.isFastDIB()) {
+
+							RECT clientRect;
+							GetClientRect(hwnd, &clientRect);
+							int dstW = clientRect.right - clientRect.left;
+							int dstH = clientRect.bottom - clientRect.top;
+
+							int bufW = backBuffer.getSize().x;
+							int bufH = backBuffer.getSize().y;
+
+							int srcH = bufH - srcPos.y;
+							int srcW = bufW - srcPos.x;
+							if (srcH < 1) srcH = 1;   // safety
+
+							SetStretchBltMode(hdc, COLORONCOLOR);
+							StretchBlt(
+								hdc,
+								0, 0, dstW, dstH,               // destination = full client area
+								backBuffer.getHDC(),
+								srcPos.x, srcPos.y, bufW, srcH,            // source = everything below the menu
+								SRCCOPY
+							);
+
+/*
 							ws::Vec2i screenSize = getSize();
 							ws::Vec2i worldSize  = view.getSize();
 
+
+ 
 							if (screenSize.x == worldSize.x && screenSize.y == worldSize.y)
 								BitBlt(hdc, 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, backBuffer.getHDC(), 0, 0, SRCCOPY);
 							else
 							{
 								SetStretchBltMode(hdc, COLORONCOLOR);
-								StretchBlt(hdc, 0, 0, screenSize.x, screenSize.y, backBuffer.getHDC(), 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, SRCCOPY);
-							}
+								StretchBlt(hdc, 0, 0, screenSize.x, screenSize.y, backBuffer.getHDC(), srcPos.x, srcPos.y, backBuffer.getSize().x - srcPos.x, backBuffer.getSize().y - srcPos.y, SRCCOPY);
+							} */
 						}
 						EndPaint(hwnd, &ps);
 					}
@@ -4968,11 +5344,13 @@ namespace ws
 		    {
 		        return {0,0};
 		    }
+			ScreenToClient(window.hwnd, &p); // Convert to client coordinates
 		    
-		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
-
-
-		    return p;
+			p.x += window.getSourcePos().x;
+			p.y += window.getSourcePos().y;
+			
+			
+			return p;
 		}
 		
 		// Returns global mouse position.

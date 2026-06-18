@@ -4,24 +4,27 @@
 
 int main()
 {
-	std::vector<int> keys = ws::Key::GetAllKeys();
-	bool released = true;
-	while(true)
+	ws::Rectangle rect(300,100);
+	rect.setPosition(3,3);
+	rect.setBorderWidth(3);
+	rect.setBorderColor(ws::Hue::blue);
+	rect.setFillColor(ws::Hue::yellow);
+	
+	ws::Hue hue = ws::Hue::yellow;
+	ws::Hue::HSV hsv = hue.toHSV();
+	
+	
+	ws::Window window(960,540,"");
+	window.enableChromaKey(ws::Hue::pink);
+	
+	while(window.isOpen())
 	{
-		for(auto& k : keys)
-		{
-			
-			if(ws::Global::getButton(k))
-			{
-				if(released)
-				{
-					std::cout << "";
-				}
-				released = false;
-			}
-			else
-				released = true;
-		}
+		hsv.h+=0.1;
+		rect.setBorderColor(hsv.toHue());
+		
+		window.clear(ws::Hue::pink);
+		window.draw(rect);
+		window.display();
 	}
 	return 0;
 }

@@ -282,6 +282,14 @@
 * Fixed bug in ws::Window::clear() where the backbuffer is created with the world size when it should be viewport size.
 * Changed ws::Window::getView() to return a pointer.
 * Fixed ws::View::toWorld() and toScreen() by removing the secondary screensize parameter.
+* Removed ws::Slider::getScroll and added under-the-hood messageHandler to ws::Slider constructor.(rare case where message not received by window poller.)
+* Replaced ws::Menu::setWindow(ws::Window &window) with ws::Menu::setVisible(bool visible,ws::Window &window).
+* Fixed issue where ws::Menu adjusted the window view due to the offset. Now using menu.setVisible() corrects that.
+* Added math operators for vec2i,vec2f,vec2d,vec3i,vec3f,vec3d. Eg: ws::Vec2f AtimesB = vectorA * vector;
+* Added bool ws::Wav::loadFromMemory(const void* data, size_t size, int m_channel, bool m_blocking,std::string extension)  
+* Finally fixed an offset that was caused by ws::Menu
+* Added ws::Window::setSourcePos(ws::Vec2i &pos) as part of the fix for the ws::Menu offset.
+* Modified ws::Global::getMousePos(ws::Window &window) to consider ws::Menu offset.
 
 
 

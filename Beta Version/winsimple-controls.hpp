@@ -902,22 +902,18 @@ namespace ws
 				setFont(font,text);
 			}
 			
+			parent.addMessageHandler([&](MSG msg) -> LRESULT {
+				if (msg.message == WM_HSCROLL && (HWND)msg.lParam == this->hwnd) {
+					this->slidePos = (int)SendMessage(this->hwnd, TBM_GETPOS, 0, 0);
+					
+				}
+				return 0;
+			});			
+			
 			
 			return true;
 		}
 		
-	    bool getScroll(MSG &msg)
-	    {
-	    	if(!hwnd)
-				return false;
-	        if((msg.message == WM_HSCROLL || msg.message == WM_VSCROLL) && (HWND)msg.lParam == hwnd)
-	        {
-	            slidePos = (int)SendMessage(hwnd, TBM_GETPOS, 0, 0);
-	            
-				return true;
-	        }
-	        return false;
-	    }
 	    
 	    
 	    void setHorizontal()
@@ -977,7 +973,77 @@ namespace ws
 	
 
 
+	class ScrollBar : public ws::Child
+	{
 
+		public:
+		
+		ScrollBar(bool vertical = true)
+		{
+			setClass(L"SCROLLBAR");
+			if (vertical)
+				addStyle(SBS_VERT);
+			else
+				addStyle(SBS_HORZ);
+			setRange(0, 100);
+			setPageSize(10);
+			setSlidePos(0);
+		}
+
+		void setVertical()
+		{
+			removeStyle(SBS_HORZ);
+			addStyle(SBS_VERT);
+		}
+		
+		void setHorizontal()
+		{
+			removeStyle(SBS_VERT);
+			addStyle(SBS_HORZ);
+		}
+		
+
+		void setRange(int minVal, int maxVal)
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_RANGE;
+			si.nMin = minVal;
+			si.nMax = maxVal;
+			SetScrollInfo(hwnd, SB_CTL, &si, TRUE);
+		}
+
+		void setPageSize(int page)
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_PAGE;
+			si.nPage = page;
+			SetScrollInfo(hwnd, SB_CTL, &si, TRUE);
+		}
+
+		void setSlidePos(int pos)
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_POS;
+			si.nPos = pos;
+			SetScrollInfo(hwnd, SB_CTL, &si, TRUE);
+		}
+
+		int getSlidePos()
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_POS;
+			GetScrollInfo(hwnd, SB_CTL, &si);
+			return si.nPos;
+		}
+
+		virtual bool init(ws::Window& parent) override
+		{
+			if (!Child::init(parent))
+				return false;
+
+			return true;
+		}
+	};
 
 
 	class TextBox : public Child
@@ -1182,6 +1248,8 @@ namespace ws
 		HMENU bar;
 
 		private:
+		ws::View *oldView;
+		ws::Vec2f oldSize = {0,0};
 		ws::Window* windowRef = nullptr;
 
 		public:
@@ -1198,12 +1266,39 @@ namespace ws
 				windowRef->setSize(windowRef->getSize());
 		}
 		
-		void setWindow(ws::Window &window)
+		
+		void setVisible(bool visible,ws::Window &window)
 		{
-			SetMenu(window.hwnd, bar);	
+			if(GetMenuItemCount(bar) == 0)
+			{
+				//setting the menu visible before adding items will cause the client area to offset in the wrong way and will cause mouse coordinates to be off.
+				MessageBoxA(NULL,"Error! You can't use ws::Menu::setVisible() till you add items to the menu!","Invalid Menu Command Order",MB_OK);
+				return;
+			}
+			if(visible)
+				SetMenu(window.hwnd, bar);	
+			else
+				SetMenu(window.hwnd,NULL);
+			
+			SetWindowPos(window.hwnd, NULL, 0, 0, 0, 0,
+						 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+			int menuH = 0;
+			if(visible) 
+			{
+				MENUBARINFO mbi = {sizeof(mbi)};
+				if(GetMenuBarInfo(window.hwnd,OBJID_MENU,0,&mbi))
+					menuH = mbi.rcBar.bottom - mbi.rcBar.top;
+
+				if(menuH == 0)
+					menuH = GetSystemMetrics(SM_CYMENU);
+			}
+	
+			window.setSourcePos(window.getSourcePos().x,menuH);
+			
 			windowRef = &window;
-			if(windowRef != nullptr)
-				windowRef->setSize(windowRef->getSize());
+			InvalidateRect(window.hwnd, NULL, TRUE);
+			UpdateWindow(window.hwnd);
 		}
 		
 		
@@ -1212,6 +1307,11 @@ namespace ws
 			if(m.message == WM_COMMAND)
 				return LOWORD(m.wParam);
 			return -1;
+		}
+		
+		ws::Window &getWindow()
+		{
+			return *windowRef;
 		}
 		
 	};

@@ -8,6 +8,9 @@
 #pragma comment(lib, "winmm.lib")
 #endif
 
+#include <filesystem>
+#include <fstream>
+
 namespace ws 
 {
 	
@@ -20,12 +23,13 @@ namespace ws
 		bool blocking = true;
 		std::string ID = "";
 		std::string extension = "none";
-			
+		bool isMemoryLoaded = false;
+		std::string tempFilePath = "";	
 			
 			
 		~Wav()
 		{
-		    // Clean up
+			// Clean up
 		    if(!ID.empty())
 		    {
 		        std::string status = getChannelStatus(channel);
@@ -33,7 +37,10 @@ namespace ws
 		            std::string command = "close " + ID;
 		            mciSendStringA(command.c_str(), NULL, 0, NULL);
 		        }
-			}
+			}			
+			
+			if(!tempFilePath.empty())
+				std::filesystem::remove(tempFilePath);
 		}
 
 		Wav(std::string path = "",int channel = 0,bool blocking = true)
@@ -176,6 +183,31 @@ namespace ws
 			if(!mciSimple(command))
 				return false;
 			
+			return true;
+		}
+
+		//saves a temporary file so that the program can open and play that file as sound. - Extension must be given!
+		bool loadFromMemory(const void* data, size_t size, int m_channel, bool m_blocking,std::string extension) 
+		{
+			std::filesystem::path tempDir = std::filesystem::current_path();
+			tempFilePath = (tempDir / ("ws_audio_" + std::to_string(rand()) + "_" + std::to_string(clock()) + extension)).string();
+
+			std::ofstream file(tempFilePath, std::ios::binary);
+			if(!file.write(static_cast<const char*>(data), size)) 
+			{
+				std::cerr << "Failed to write audio buffer to temporary file.\n";
+				return false;
+			}
+			file.close();
+
+			if(!open(tempFilePath, m_channel, m_blocking)) 
+			{
+				std::cerr << "Failed to open temporary audio file.\n";
+				std::filesystem::remove(tempFilePath);
+				return false;
+			}
+
+			isMemoryLoaded = true;
 			return true;
 		}
 		
