@@ -290,7 +290,12 @@
 * Finally fixed an offset that was caused by ws::Menu
 * Added ws::Window::setSourcePos(ws::Vec2i &pos) as part of the fix for the ws::Menu offset.
 * Modified ws::Global::getMousePos(ws::Window &window) to consider ws::Menu offset.
-
+* Modified ExploreWindow() to be ExploreWindow(std::string mode = "open") - can also use mode "save".
+* Changed SetProcessDPIAware function to be dynamically loaded - Safety Procedure since windows xp does not have that function.
+* Modified default behavior for client area icon double click to be ignored - otherwise default window behavior closes immediately.
+* Added bool ws::Balloon(ws::Window &window,std::string message,std::string title,HICON hIcon,DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000,DWORD styles = NIF_ICON | NIF_TIP | NIF_INFO)
+* Added bool ws::Balloon(ws::Window &window,std::string message,std::string title,std::string iconPath = "GETFROMWINDOW",DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000)
+* Added std::string ws::getWindowsVersion(); - return strings are: PRE_XP - XP - vista - 7 - 8 - 8.1 - 10 - 11
 
 
 # New major features to be added. 

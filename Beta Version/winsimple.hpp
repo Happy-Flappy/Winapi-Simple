@@ -68,6 +68,65 @@ typedef unsigned long PROPID;
 
 namespace ws
 {
+	
+	std::string getWindowsVersion()
+	{
+		HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+		if(!hKernel32)
+			return "UNKNOWN";
+
+		if(!GetProcAddress(hKernel32, "AttachConsole"))
+			return "PRE_XP";
+
+		HMODULE hNtdll = LoadLibraryW(L"ntdll.dll");
+		if(!hNtdll)
+			return "UNKNOWN";
+
+		typedef LONG (WINAPI *RtlGetVersionFunc)(PRTL_OSVERSIONINFOW);
+		RtlGetVersionFunc pRtlGetVersion = (RtlGetVersionFunc)GetProcAddress(hNtdll, "RtlGetVersion");
+
+		if(!pRtlGetVersion)
+		{
+			FreeLibrary(hNtdll);
+			return "UNKNOWN";
+		}
+
+
+		RTL_OSVERSIONINFOW osvi = {};
+		osvi.dwOSVersionInfoSize = sizeof(osvi);
+
+		LONG result = pRtlGetVersion(&osvi);
+		FreeLibrary(hNtdll);
+
+		if (result != 0)
+			return "UNKNOWN";
+
+		if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
+			return "XP";
+
+		if (osvi.dwMajorVersion == 6)
+		{
+			if (osvi.dwMinorVersion == 0)
+				return "Vista";
+			if (osvi.dwMinorVersion == 1)
+				return "7";
+			if (osvi.dwMinorVersion == 2)
+				return "8";
+			if (osvi.dwMinorVersion == 3)
+				return "8.1";
+		}
+
+		if (osvi.dwMajorVersion == 10)
+		{
+			if (osvi.dwBuildNumber >= 22000)
+				return "11";
+			else
+				return "10";
+		}		
+		return "10";
+	}
+	
+	
 	//All forward declares
 	class Child;
 	class WindowManager;
@@ -3727,8 +3786,10 @@ namespace ws
 		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
 			
-			Gdiplus::FontFamily &family = *fontRef->getFamilyHandle();
-			
+			Gdiplus::FontFamily* familyPtr = fontRef->getFamilyHandle();
+			if (!familyPtr) return;
+			Gdiplus::FontFamily &family = *familyPtr;
+
 			if(!family.IsStyleAvailable(style))
             {
             	std::cerr << "Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed."<<std::endl;
@@ -4366,6 +4427,7 @@ namespace ws
 		std::queue<MSG> msgQ;
 
 		ws::Cursor cursor; 
+		HICON hIcon = nullptr;
 
 		// Default notify stub that just passes to DefWindowProc.
 		static LRESULT defaultNotifyStub(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -4478,16 +4540,22 @@ namespace ws
 		// Destructor – destroys the window and cleans up resources.
         ~Window()
         {
-			RevokeDragDrop(hwnd);//just in case the window does use dragndrop. You have to call the revoke function for the window before it gets destroyed. Placing revoke elsewhere could result in a crash.
-
+			if (hwnd && IsWindow(hwnd))
+			{
+				RevokeDragDrop(hwnd);//just in case the window does use dragndrop. You have to call the revoke function for the window before it gets destroyed. Placing revoke elsewhere could result in a crash.
+				DestroyWindow(hwnd);
+			}			
+			
 
 			if (canvas) {
 				delete canvas;
 				canvas = nullptr;
 			}
 
-			if (hwnd && IsWindow(hwnd)) {
-				DestroyWindow(hwnd);
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
 			}
         }
 		
@@ -5092,6 +5160,31 @@ namespace ws
 			return cursor;
 		}
 		
+		bool setIcon(std::string file,DWORD size = ICON_SMALL)
+		{
+			if (hIcon) {
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}			
+			
+			HICON m_hIcon = (HICON)LoadImageA(
+				NULL,
+				file.c_str(),
+				IMAGE_ICON,
+				0, 0,
+				LR_LOADFROMFILE | LR_DEFAULTSIZE
+			);
+			if(!m_hIcon)
+				return false;
+			hIcon = m_hIcon;
+			SendMessage(hwnd, WM_SETICON, size, (LPARAM)hIcon);	
+			return true;
+		}
+		HICON getIcon()
+		{
+			return hIcon;
+		}			
+		
 		// Adds a custom message handler.
 		void addMessageHandler(std::function<LRESULT(MSG msg)> handler)
 		{
@@ -5122,13 +5215,24 @@ namespace ws
 			}			
 
             switch (uMsg) {
-	            case WM_DESTROY:
+	            
+				case WM_NCLBUTTONDBLCLK:
+					if (wParam == HTSYSMENU)
+						return 0;
+					break;
+				
+				case WM_DESTROY:
 					WindowManager::removeWindow(hwnd);
 					isRunning = false;
 					if (WindowManager::windows.empty())
 						PostQuitMessage(0);
 	                return 0;
 	            
+				case WM_SYSCOMMAND:
+					if (wParam == SC_CLOSE && HIWORD(lParam) == 0 /* from menu */)
+						return 0;
+					break;
+				
 				case WM_CLOSE:
 					DestroyWindow(hwnd);
 					return 0;
@@ -5264,7 +5368,7 @@ namespace ws
 		wc.lpszClassName = wclassName.c_str();
 		wc.hCursor = NULL;
 		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
+		
 		if (!RegisterClass(&wc))
 		{
 			std::cerr << "Failed to register window class: " << className << std::endl;
@@ -5538,8 +5642,7 @@ namespace ws
 		
 		// Returns the system DPI scaling factor.
 		float getDPI()
-		{
-			SetProcessDPIAware();			
+		{		
 			HDC hdc = GetDC(nullptr);
 			if (!hdc) return 1.0f;
 			int dpi = GetDeviceCaps(hdc, LOGPIXELSX);
@@ -5557,7 +5660,7 @@ namespace ws
 		
 	};
 
-
+	typedef BOOL (WINAPI *SetDPIAwareProc)(void);
 	class GDIPInit
 	{
 		public:	
@@ -5573,7 +5676,15 @@ namespace ws
 		{
 			//GDI+
 			Gdiplus::GdiplusStartup(&gdiplustoken,&gdiplusstartup,nullptr);	
-			SetProcessDPIAware();
+			//get a handle to the already loaded user32.dll
+ 			HMODULE hUser32 = LoadLibraryW(L"user32.dll");
+			if(hUser32)
+			{
+				SetDPIAwareProc pSetDPIAware = (SetDPIAwareProc)GetProcAddress(hUser32, "SetProcessDPIAware");
+				//only call the function if it exists. - On windows xp or below, this does not exist but is also not needed.
+				if(pSetDPIAware != NULL)
+					pSetDPIAware();
+			}
 		}
 		
 		// Shuts down GDI+.

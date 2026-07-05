@@ -5,6 +5,7 @@
 #include <commctrl.h>   // for common controls (trackbar, etc.)
 #include <shlobj.h>     // for folder browser (BROWSEINFO, etc.)
 #include <filesystem>
+#include <shellapi.h>
 
 //Controls Linking: -lcomctl32 -lcomdlg32
 
@@ -1718,10 +1719,10 @@ namespace ws
 		public:
 		
 		
-		ExploreWindow()
+		ExploreWindow(std::string mode = "open")
 		{
-			
-			hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+			CLSID clsid = (mode == "save") ? CLSID_FileSaveDialog : CLSID_FileOpenDialog;
+			hr = CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
 			
 			options = pfd->GetOptions(&options);
 			
@@ -1904,6 +1905,67 @@ namespace ws
             return hwnd ? (int)SendMessage(hwnd, LB_GETCOUNT, 0, 0) : 0;
         }
     };	
+	
+
+	bool Balloon(ws::Window &window,std::string message,std::string title,HICON hIcon,DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000,DWORD styles = NIF_ICON | NIF_TIP | NIF_INFO)
+	{
+		NOTIFYICONDATA nid = {};
+		ZeroMemory(&nid, sizeof(nid));
+		nid.cbSize = sizeof(nid);
+		nid.hWnd = window.hwnd;
+		static int BalloonID = 0;
+		nid.uID = BalloonID++;	
+		
+		nid.uFlags = styles;
+		nid.hIcon = hIcon;
+		wcscpy_s(nid.szTip, ws::WIDE(title).c_str());	
+		
+		if(!Shell_NotifyIcon(NIM_ADD, &nid))
+			return false;
+		
+		
+		nid.dwInfoFlags = messageIconType;
+		wcscpy_s(nid.szInfo,ws::WIDE(message).c_str());
+		wcscpy_s(nid.szInfoTitle, ws::WIDE(title).c_str());
+		nid.uTimeout = timeoutMilliseconds; 
+		
+		if(!Shell_NotifyIcon(NIM_MODIFY, &nid))
+			return false;
+		
+	
+		window.addMessageHandler([nid](MSG msg) mutable -> LRESULT {
+			if(msg.message == WM_DESTROY) {
+				Shell_NotifyIcon(NIM_DELETE, &nid);
+				return 0;   
+			}
+			return 0;
+		});			
+		return true;
+	}
+	
+	bool Balloon(ws::Window &window,std::string message,std::string title,std::string iconPath = "GETFROMWINDOW",DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000)
+	{
+		bool tempIcon = true;
+		HICON hIcon = nullptr;
+		if(iconPath == "GETFROMWINDOW")
+		{
+			tempIcon = false;
+			hIcon = window.getIcon();
+		}
+		else
+			hIcon = (HICON)LoadImageA(NULL, iconPath.c_str(), IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
+		if(!hIcon) return false;
+		
+		bool safe = Balloon(window,message,title,hIcon,messageIconType,timeoutMilliseconds);
+		//only destroy the hicon here because we know it was not provided by the user and is only temporary.
+		if(tempIcon)
+			DestroyIcon(hIcon);
+		return safe;		
+	}
+
+
+
+
 	
 
 }

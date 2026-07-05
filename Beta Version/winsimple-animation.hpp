@@ -166,6 +166,18 @@ namespace ws
 			if(index <= 0 || index > int(textures.size()))
 				return false;
 			delays[index] = newDelay;		
+			return true;
+		}
+		
+		bool setDelay(double newDelay)
+		{
+			bool failed = false;
+			for(int a=0;a<getFrameCount();a++)
+			{
+				if(!setFrameDelay(a,newDelay))
+					failed = true;
+			}
+			return failed;
 		}
 		
 		bool setFrame(int index,ws::Texture &newTexture)
