@@ -5,10 +5,12 @@
 int main()
 {
 	ws::Window window(960,540,"");
-	window.setIcon("logoMarkYellow.ico");
 	
 	
-	ws::Balloon(window,"Winsimple Says you have Windows " + ws::getWindowsVersion() + "!","Winsimple");
+	
+	ws::Icon icon("logoMarkYellow.ico");
+	
+	window.setIcon(icon);
 	
 	while(window.isOpen())
 	{

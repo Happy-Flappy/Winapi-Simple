@@ -71,23 +71,36 @@ namespace ws
 	
 	std::string getWindowsVersion()
 	{
+		static std::string windowsVersion = "";
+		
+		if(!windowsVersion.empty())
+			return windowsVersion;
+		
 		HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
 		if(!hKernel32)
+		{
+			windowsVersion = "UNKNOWN";
 			return "UNKNOWN";
-
+		}
 		if(!GetProcAddress(hKernel32, "AttachConsole"))
+		{
+			windowsVersion = "PRE_XP";
 			return "PRE_XP";
+		}
 
 		HMODULE hNtdll = LoadLibraryW(L"ntdll.dll");
 		if(!hNtdll)
+		{
+			windowsVersion = "UNKNOWN";
 			return "UNKNOWN";
-
+		}
 		typedef LONG (WINAPI *RtlGetVersionFunc)(PRTL_OSVERSIONINFOW);
 		RtlGetVersionFunc pRtlGetVersion = (RtlGetVersionFunc)GetProcAddress(hNtdll, "RtlGetVersion");
 
 		if(!pRtlGetVersion)
 		{
 			FreeLibrary(hNtdll);
+			windowsVersion = "UNKNOWN";
 			return "UNKNOWN";
 		}
 
@@ -98,31 +111,55 @@ namespace ws
 		LONG result = pRtlGetVersion(&osvi);
 		FreeLibrary(hNtdll);
 
-		if (result != 0)
+		if(result != 0)
+		{
+			windowsVersion = "UNKNOWN";
 			return "UNKNOWN";
-
+		}
 		if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
+		{
+			windowsVersion = "XP";
 			return "XP";
+		}
 
 		if (osvi.dwMajorVersion == 6)
 		{
-			if (osvi.dwMinorVersion == 0)
+			if(osvi.dwMinorVersion == 0)
+			{
+				windowsVersion = "Vista";
 				return "Vista";
+			}
 			if (osvi.dwMinorVersion == 1)
+			{
+				windowsVersion = "7";
 				return "7";
+			}
 			if (osvi.dwMinorVersion == 2)
+			{
+				windowsVersion = "8";
 				return "8";
+			}
 			if (osvi.dwMinorVersion == 3)
+			{
+				windowsVersion = "8.1";
 				return "8.1";
+			}
 		}
 
 		if (osvi.dwMajorVersion == 10)
 		{
 			if (osvi.dwBuildNumber >= 22000)
+			{
+				windowsVersion = "11";
 				return "11";
+			}
 			else
+			{
+				windowsVersion = "10";
 				return "10";
+			}
 		}		
+		windowsVersion = "10";
 		return "10";
 	}
 	
@@ -4390,6 +4427,229 @@ namespace ws
 	};	
 
 
+
+	class Icon
+	{
+		private:
+		HICON hIcon = nullptr;
+		
+		public:
+		
+		Icon() = default;
+		//constructor loads from file
+		Icon(std::string path)
+		{
+			loadFromFile(path);
+		}
+		//contructor loads from memory
+		Icon(const void* buffer,size_t bufferSize)
+		{
+			loadFromMemory(buffer,bufferSize);
+		}
+		//copy constructor that makes this icon the same as another icon - NOT A POINTER.
+		Icon(HICON icon) : hIcon(nullptr) 
+		{
+			if(icon)
+				hIcon = CopyIcon(icon);
+		}
+		~Icon()
+		{
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+		}
+		//operator that makes an HICON take on pointer address of this icons HICON.
+		operator HICON() const {return hIcon;}
+		
+		//copy operation from HICON replaces this icon.
+		Icon& operator=(HICON icon) 
+		{
+			if(hIcon) 
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+			if(icon) 
+			{
+				hIcon = CopyIcon(icon);
+			}
+			return *this;
+		}		
+
+		// Copy constructor – copies the icon from another Icon
+		Icon(const Icon& other) : hIcon(nullptr) {
+			if(other.hIcon) {
+				hIcon = CopyIcon(other.hIcon);
+			}
+		}
+
+		// Copy assignment – replaces current icon with a copy of the other's icon
+		Icon& operator=(const Icon& other) {
+			if(this != &other) 
+			{
+				if (hIcon) {
+					DestroyIcon(hIcon);
+					hIcon = nullptr;
+				}
+				if(other.hIcon) {
+					hIcon = CopyIcon(other.hIcon);
+				}
+			}
+			return *this;
+		}
+
+		// Move constructor – steals the handle from other; other becomes empty
+		Icon(Icon&& other) noexcept : hIcon(other.hIcon) {
+			other.hIcon = nullptr;
+		}
+
+		// Move assignment – replaces current icon with other's, leaves other empty
+		Icon& operator=(Icon&& other) noexcept {
+			if(this != &other) 
+			{
+				if (hIcon) {
+					DestroyIcon(hIcon);
+					hIcon = nullptr;
+				}
+				// Steal the handle
+				hIcon = other.hIcon;
+				other.hIcon = nullptr;
+			}
+			return *this;
+		}
+
+		
+		HICON getHandle()
+		{
+			return hIcon;
+		}
+		
+		
+		
+		//load the icon from an .ico file.
+		bool loadFromFile(std::string path)
+		{
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+			
+			hIcon = (HICON)LoadImageA(
+				NULL,
+				path.c_str(),
+				IMAGE_ICON,
+				0,
+				0,
+				LR_LOADFROMFILE | LR_SHARED
+			);
+			if(!hIcon)
+				return false;
+			return true;
+		}
+		//load the icon from a block of memory.
+		bool loadFromMemory(const void* buffer,size_t bufferSize)
+		{
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+			
+			
+			HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
+			if (!hGlobal)
+				return false;
+
+			void* pData = GlobalLock(hGlobal);
+			if (!pData) {
+				GlobalFree(hGlobal);
+				return false;
+			}
+			memcpy(pData, buffer, bufferSize);
+			GlobalUnlock(hGlobal);
+
+			IStream* pStream = nullptr;
+			HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pStream); // TRUE = free on release
+			if (FAILED(hr)) {
+				GlobalFree(hGlobal);
+				return false;
+			}
+			
+			
+			Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream);
+			if(!pBitmap || pBitmap->GetLastStatus() != Gdiplus::Ok)
+				return false;
+			
+			pBitmap->GetHICON(&hIcon);
+			delete pBitmap;
+
+			pStream->Release();
+			
+			if(!hIcon)
+				return false;
+			return true;			
+		}
+		
+		bool isValid()
+		{
+			if(!hIcon)
+				return false;
+			return true;
+		}
+		
+		//get a texture copy of the icon at a specific size.
+		ws::Texture getTexture(int width,int height)
+		{
+			ws::Texture tex;
+			if(!tex.create(width,height))
+				return tex;
+			HDC hdc = tex.getHDC();
+			if(!hdc)
+				return tex;
+			BOOL result = DrawIconEx(
+			hdc,
+			0,0,
+			hIcon,
+			width,height,
+			0,
+			NULL,
+			DI_NORMAL
+			);
+			
+			if(!result)
+				return ws::Texture(); 
+			return tex;
+		}
+		
+		
+		//get a texture copy of the icon at a specific size. - if you pass in a single number it will be treated as a square size.
+		ws::Texture getTexture(DWORD size = ICON_SMALL)
+		{
+			if(!isValid())
+				return ws::Texture();
+		    int width,height;
+			if(size == ICON_SMALL) {
+				width  = GetSystemMetrics(SM_CXSMICON);
+				height = GetSystemMetrics(SM_CYSMICON);
+			}
+			else if(size == ICON_BIG) 
+			{
+				width  = GetSystemMetrics(SM_CXICON);
+				height = GetSystemMetrics(SM_CYICON);
+			} 
+			else 
+				width = height = static_cast<int>(size);
+			
+			return getTexture(width,height);
+		}
+	};
+
+
+
+
 	//=============== WINDOW ==============
 
 	class WindowManager
@@ -4859,27 +5119,30 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
 		}
 
+		//returns the extended window styles for this window
 		DWORD getExStyle() const
 		{	
 			return GetWindowLong(hwnd, GWL_EXSTYLE);
 		}
 	    
+		//returns the non-extended window styles for this window.
 	    DWORD getStyle() const
 	    {
 	    	return GetWindowLong(hwnd, GWL_STYLE);
             
 		}
 	    
+		//checks if a certain individual style exists for this window.
 	    bool hasStyle(DWORD checkStyle)
 	    {
 	    	return (getStyle() & checkStyle);
 		}
-		
+		//checks if a certain individual extended style exists for this window.
 		bool hasExStyle(DWORD checkStyle)
 	    {
 	    	return (getExStyle() & checkStyle);
 		}
-		
+		// Sets the window size (client area dimensions). - Overload for ws::Vec2i
 		void setSize(ws::Vec2i size)
 		{
 			setSize(size.x,size.y);
@@ -4916,6 +5179,7 @@ namespace ws
 			return ws::Vec2i(width,height);			
 		}
 		
+		//sets the window position - overload
 		void setPosition(ws::Vec2i pos)
 		{
 			setPosition(pos.x,pos.y);
@@ -5038,7 +5302,8 @@ namespace ws
 				isFullscreen = false;
 			}
 		}
-	    
+		
+		//checks if window is in fullscreen styling.
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
@@ -5090,6 +5355,7 @@ namespace ws
 				SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),static_cast<BYTE>(hue.a),LWA_COLORKEY | LWA_ALPHA);
 		}
 		
+		//disables the chroma keying that causes window transparency. - also disables alpha only.
 		void disableChromaKey()
 		{
 			removeExStyle(WS_EX_LAYERED);
@@ -5103,6 +5369,7 @@ namespace ws
 				SetLayeredWindowAttributes(hwnd,0,static_cast<BYTE>(alpha),LWA_ALPHA);			
 		}
 		
+		//Disables alpha only transparency - also disables chroma key.
 		void disableAlphaOnly()
 		{
 			disableChromaKey();
@@ -5113,7 +5380,7 @@ namespace ws
 		{
 			return view.toWorld(x,y);
 		}
-		
+		// Converts screen coordinates to world. - overload
 		ws::Vec2i toWorld(ws::Vec2i pos)
 		{
 			return toWorld(pos.x,pos.y);
@@ -5124,20 +5391,24 @@ namespace ws
 		{
 			return view.toScreen(x,y);
 		}
-		
+		// Converts world coordinates to screen. - overload
 		ws::Vec2i toScreen(ws::Vec2i pos)
 		{
 			return toScreen(pos.x,pos.y);
 		}
 		
+		//You really shouldn't mess with this.
+		// Sets where in texture coordinates the backbuffer is drawn on the window client area. 
 		void setSourcePos(ws::Vec2i pos)
 		{
 			srcPos = pos;
 		}
+		// Sets where in texture coordinates the backbuffer is drawn on the window client area. - overload
 		void setSourcePos(int x,int y)
 		{
 			srcPos = {x,y};
 		}
+		//returns the position where the backbuffer is drawn to the window client area.
 		ws::Vec2i getSourcePos()
 		{
 			return srcPos;
@@ -5160,12 +5431,27 @@ namespace ws
 			return cursor;
 		}
 		
-		bool setIcon(std::string file,DWORD size = ICON_SMALL)
+		//Sets the window icon to a given HICON. - This function is not responsible for cleanup of your HICON handle.
+		bool setIcon(HICON icon,DWORD size = ICON_SMALL)
 		{
-			if (hIcon) {
+			
+			if(!icon)
+				return false;
+		
+			if(hIcon) 
+			{
 				DestroyIcon(hIcon);
 				hIcon = nullptr;
 			}			
+
+			hIcon = icon;
+			SendMessage(hwnd, WM_SETICON, size, (LPARAM)hIcon);	
+			return true;			
+		}
+		
+		//Sets the window icon to a given .ico file.
+		bool setIcon(std::string file,DWORD size = ICON_SMALL)
+		{
 			
 			HICON m_hIcon = (HICON)LoadImageA(
 				NULL,
@@ -5174,12 +5460,13 @@ namespace ws
 				0, 0,
 				LR_LOADFROMFILE | LR_DEFAULTSIZE
 			);
-			if(!m_hIcon)
-				return false;
-			hIcon = m_hIcon;
-			SendMessage(hwnd, WM_SETICON, size, (LPARAM)hIcon);	
-			return true;
+			bool res = setIcon(m_hIcon,size);
+			DestroyIcon(m_hIcon);
+			m_hIcon = nullptr;	
+			return res;
 		}
+		
+		
 		HICON getIcon()
 		{
 			return hIcon;

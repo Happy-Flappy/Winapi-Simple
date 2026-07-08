@@ -296,7 +296,30 @@
 * Added bool ws::Balloon(ws::Window &window,std::string message,std::string title,HICON hIcon,DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000,DWORD styles = NIF_ICON | NIF_TIP | NIF_INFO)
 * Added bool ws::Balloon(ws::Window &window,std::string message,std::string title,std::string iconPath = "GETFROMWINDOW",DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000)
 * Added std::string ws::getWindowsVersion(); - return strings are: PRE_XP - XP - vista - 7 - 8 - 8.1 - 10 - 11
+* Added bool ws::Window::setIcon(HICON icon,DWORD size = ICON_SMALL)
+* Added bool ws::Window::setIcon(std::string file,DWORD size = ICON_SMALL)
+* Added ws::Icon - fully backwards compatible and swappable with HICON.
+* Icon() = default;
+* Icon(std::string path)
+* Icon(const void* buffer,size_t bufferSize)
+* Icon(HICON icon) : hIcon(nullptr) 
+* ~Icon()
+* operator HICON() const {return hIcon;}
+* Icon& operator=(HICON icon) 
+* Icon(const Icon& other) : hIcon(nullptr) {
+* Icon& operator=(const Icon& other) {
+* Icon(Icon&& other) noexcept : hIcon(other.hIcon) {
+* Icon& operator=(Icon&& other) noexcept {
+* HICON getHandle()
+* bool loadFromFile(std::string path)
+* bool loadFromMemory(const void* buffer,size_t bufferSize)
+* bool isValid()
+* ws::Texture getTexture(int width,int height)
+* ws::Texture getTexture(DWORD size = ICON_SMALL)
 
+
+
+ 
 
 # New major features to be added. 
 
