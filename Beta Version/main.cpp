@@ -5,20 +5,12 @@
 int main()
 {
 	ws::Window window(960,540,"");
-	
-	
-	
-	ws::Icon icon("logoMarkYellow.ico");
-	
-	window.setIcon(icon);
-	
+	ws::Icon ico("logoMarkYellow.ico");
+	window.setIcon(ico);
 	while(window.isOpen())
 	{
-		
-		
+		window.clear();
+		window.display();
 	}
-
-
-	system("pause");
 	return 0;
 }

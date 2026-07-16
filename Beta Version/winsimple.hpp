@@ -2332,6 +2332,7 @@ namespace ws
 			return m_dibBits;
 		}
 		
+		//returns whether this is a fast DIB section under the hood or is a GDI HBITMAP only.
 		bool isFastDIB() const
 		{
 			return m_isFast;
@@ -2987,6 +2988,16 @@ namespace ws
 	    virtual ~Drawable() = default;
 	};
 
+	//dynamically loaded function for AlphaBlend drawing.
+    typedef BOOL (WINAPI *AlphaBlendFunc)(
+        HDC hdcDest,
+        int xDest, int yDest,
+        int cxDest, int cyDest,
+        HDC hdcSrc,
+        int xSrc, int ySrc,
+        int cxSrc, int cySrc,
+        BLENDFUNCTION blendFunction
+    );
 	//============SPRITE=============
 	class Sprite : public Drawable
 	{
@@ -3031,6 +3042,7 @@ namespace ws
 	        if (!textureRef || !textureRef->isValid()) 
 	            return;
 	        
+				
 	        Gdiplus::Rect destRect(0,0, width, height);
 	        Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
 			
@@ -3103,8 +3115,104 @@ namespace ws
 	        return textureRef != nullptr;
 	    }		
 		
-		
+		//draws to a texture with full transforms using GDI+ DrawImage.
+		void draw(ws::Texture &dest)
+		{
+			if (!textureRef || !textureRef->isValid()) return;
 
+			Gdiplus::Graphics graphics(dest.getHDC());
+
+			switch(textureRef->getScaleMode()) 
+			{
+				case Texture::ScaleMode::NearestNeighbor:
+					graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+					break;
+				case Texture::ScaleMode::Bilinear:
+					graphics.SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
+					break;
+				case Texture::ScaleMode::Bicubic:
+					graphics.SetInterpolationMode(Gdiplus::InterpolationModeBicubic);
+					break;
+				case Texture::ScaleMode::HighQualityBicubic:
+					graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+					break;
+			}		
+			
+			Gdiplus::Matrix transform;
+			transform.Translate(static_cast<Gdiplus::REAL>(x), static_cast<Gdiplus::REAL>(y));
+			if (rotation != 0.0f)
+				transform.Rotate(rotation);
+			if (scale.x != 1.0f || scale.y != 1.0f)
+				transform.Scale(scale.x, scale.y);
+			transform.Translate(static_cast<Gdiplus::REAL>(-origin.x), static_cast<Gdiplus::REAL>(-origin.y));
+
+			graphics.SetTransform(&transform);
+			
+			Gdiplus::Rect destRect(0, 0, texWidth, texHeight);
+			Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
+			graphics.DrawImage(textureRef->bitmap, destRect,
+							   srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+							   Gdiplus::UnitPixel);			
+		}
+		//Draws to a texture using AlphaBlend function -  this does not support complex transforms.
+		void drawBlend(ws::Texture &dest,DWORD stretchMode = 0)
+		{
+			if (!textureRef || !textureRef->isValid()) return;
+
+			int destX = static_cast<int>(x - origin.x * scale.x);
+			int destY = static_cast<int>(y - origin.y * scale.y);
+			int destW = static_cast<int>(texWidth * scale.x);
+			int destH = static_cast<int>(texHeight * scale.y);
+
+			int srcX = texLeft, srcY = texTop;
+			int srcW = texWidth, srcH = texHeight;
+
+			BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+
+			static AlphaBlendFunc pAlphaBlend = []() -> AlphaBlendFunc {
+				HMODULE hMsimg32 = LoadLibraryW(L"msimg32.dll");
+				if (hMsimg32) {
+					return (AlphaBlendFunc)GetProcAddress(hMsimg32, "AlphaBlend");
+				}
+				return nullptr;
+			}();
+			
+			
+			
+			if(stretchMode != 0)
+				SetStretchBltMode(dest.getHDC(), stretchMode);
+
+			if (pAlphaBlend) 
+			{
+				pAlphaBlend(dest.getHDC(), destX, destY, destW, destH,
+							textureRef->getHDC(), srcX, srcY, srcW, srcH,
+							blend);
+			}
+		}
+		//Draws sprite data to a texture but discards all rotation transforms and negative scale.
+		void Blt(ws::Texture &dest,DWORD stretchMode = COLORONCOLOR)
+		{
+			if (!textureRef || !textureRef->isValid()) return;
+
+			int destX = static_cast<int>(x - origin.x * scale.x);
+			int destY = static_cast<int>(y - origin.y * scale.y);
+			int destW = static_cast<int>(texWidth * scale.x);
+			int destH = static_cast<int>(texHeight * scale.y);
+
+			int srcX = texLeft, srcY = texTop;
+			int srcW = texWidth, srcH = texHeight;
+
+			// (COLORONCOLOR is fastest, HALFTONE gives better quality)
+			SetStretchBltMode(dest.getHDC(), stretchMode);
+
+			StretchBlt(
+				dest.getHDC(),
+				destX, destY, destW, destH,
+				textureRef->getHDC(),
+				srcX, srcY, srcW, srcH,
+				SRCCOPY
+			);			
+		}
 		
 		
 		public:

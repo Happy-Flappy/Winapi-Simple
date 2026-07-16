@@ -316,6 +316,9 @@
 * bool isValid()
 * ws::Texture getTexture(int width,int height)
 * ws::Texture getTexture(DWORD size = ICON_SMALL)
+* Added ws::Sprite::draw(ws::Texture &dest)
+* Added ws::Sprite::drawBlend(ws::Texture &dest,DWORD stretchMode = 0)
+* Added ws::Sprite::Blt(ws::Texture &dest,DWORD stretchMode = COLORONCOLOR)
 
 
 
