@@ -319,7 +319,7 @@
 * Added ws::Sprite::draw(ws::Texture &dest)
 * Added ws::Sprite::drawBlend(ws::Texture &dest,DWORD stretchMode = 0)
 * Added ws::Sprite::Blt(ws::Texture &dest,DWORD stretchMode = COLORONCOLOR)
-
+* Fixed many ws::Wav bottlenecks by storing data members instead of calling MCI for everything.
 
 
  
