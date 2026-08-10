@@ -69,6 +69,15 @@ typedef unsigned long PROPID;
 namespace ws
 {
 	
+	
+	static bool debugMode = true;
+	void warning(std::string str)
+	{
+		if(debugMode)
+			std::cerr << str << std::endl;
+	}
+	
+	
 	std::string getWindowsVersion()
 	{
 		static std::string windowsVersion = "";
@@ -2281,7 +2290,7 @@ namespace ws
 			ReleaseDC(nullptr, hdcScreen);
 
 			if (!m_hDIB) {
-				std::cerr << "Texture::create failed to create DIBSection\n";
+				ws::warning("Texture::create failed to create DIBSection");
 				return false;
 			}
 
@@ -2291,7 +2300,7 @@ namespace ws
 			bitmap = new Gdiplus::Bitmap(w, h, w * 4, PixelFormat32bppARGB, (BYTE*)m_dibBits);
 
 			if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
-				std::cerr << "Texture::create failed to create GDI+ wrapper\n";
+				ws::warning("Texture::create failed to create GDI+ wrapper");
 				destroyDIB();
 				return false;
 			}
@@ -2350,7 +2359,7 @@ namespace ws
 
 			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
 			{
-				std::cerr << "Failed to load image at " << std::quoted(path) << ".\n";
+				ws::warning("Failed to load image at (" + path + ")");
 				if (temp) { delete temp; }
 				return false;
 			}
@@ -2393,7 +2402,7 @@ namespace ws
 			Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromStream(pStream);
 			pStream->Release();
 
-			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
+			if(!temp || temp->GetLastStatus() != Gdiplus::Ok)
 			{
 				if (temp) { delete temp; }
 				return false;
@@ -2403,7 +2412,7 @@ namespace ws
 			int h = temp->GetHeight();
 
 			// Create DIBSection of the same size
-			if (!create(w, h))
+			if(!create(w, h))
 			{
 				delete temp;
 				return false;
@@ -2426,7 +2435,7 @@ namespace ws
 			if (w <= 0 || h <= 0) return false;
 
 			// Create DIBSection of the same size
-			if (!create(w, h))
+			if(!create(w, h))
 				return false;
 
 			// Draw source bitmap into the DIBSection via GDI+
@@ -2571,13 +2580,13 @@ namespace ws
 		{
 		    if (!bitmap || width <= 0 || height <= 0)
 		    {
-		        std::cerr << "Cannot save: Invalid bitmap\n";
+		        ws::warning("Cannot save: Invalid bitmap");
 		        return false;
 		    }
 		
 		    if (!ResolveRelativePath(path))
 		    {
-		        std::cerr << "Failed to resolve path: " << path << "\n";
+		        ws::warning("Failed to resolve path (" + path + ")");
 		        return false;
 		    }
 		    
@@ -2615,7 +2624,7 @@ namespace ws
 		    else
 		    {
 		        // default to PNG if extension not recognized
-		        std::cerr << "Unsupported format. Using PNG.\n";
+		        ws::warning("Unsupported format. Using PNG.");
 		        GetEncoderClsid(L"image/png", &encoderClsid);
 		        path += ".png"; // Add extension
 		    }
@@ -2625,7 +2634,7 @@ namespace ws
 		    
 		    if (status != Gdiplus::Ok)
 		    {
-			    std::cerr << "Failed to save image to: " << path << "\n";
+			    ws::warning("Failed to save image to (" + path + ")");
 				return false;
 			}
 			return true;
@@ -2984,7 +2993,15 @@ namespace ws
 	    
 	    // Pure virtual - draw the content in local space
 	    virtual void draw(Gdiplus::Graphics* graphics) = 0;
-	    
+		
+		//draws to a texture with full transforms using GDI+ DrawImage. - ignores window view transforms!
+		void drawToTexture(ws::Texture& target) 
+		{
+			if (!target.isValid()) return;
+			Gdiplus::Graphics graphics(target.getHDC());
+			drawGlobal(&graphics);
+		}
+		
 	    virtual ~Drawable() = default;
 	};
 
@@ -3115,49 +3132,17 @@ namespace ws
 	        return textureRef != nullptr;
 	    }		
 		
-		//draws to a texture with full transforms using GDI+ DrawImage.
-		void draw(ws::Texture &dest)
+		//Draws to a texture using AlphaBlend function -  this does not support complex transforms. - ignores window view transforms!
+		void drawBlend(ws::Texture &dest,float alphaEffect = 255,DWORD stretchMode = 0)
 		{
-			if (!textureRef || !textureRef->isValid()) return;
+			if(!textureRef || !textureRef->isValid()) return;
 
-			Gdiplus::Graphics graphics(dest.getHDC());
-
-			switch(textureRef->getScaleMode()) 
+			if(scale.x < 0 || scale.y < 0)
 			{
-				case Texture::ScaleMode::NearestNeighbor:
-					graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
-					break;
-				case Texture::ScaleMode::Bilinear:
-					graphics.SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
-					break;
-				case Texture::ScaleMode::Bicubic:
-					graphics.SetInterpolationMode(Gdiplus::InterpolationModeBicubic);
-					break;
-				case Texture::ScaleMode::HighQualityBicubic:
-					graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-					break;
-			}		
-			
-			Gdiplus::Matrix transform;
-			transform.Translate(static_cast<Gdiplus::REAL>(x), static_cast<Gdiplus::REAL>(y));
-			if (rotation != 0.0f)
-				transform.Rotate(rotation);
-			if (scale.x != 1.0f || scale.y != 1.0f)
-				transform.Scale(scale.x, scale.y);
-			transform.Translate(static_cast<Gdiplus::REAL>(-origin.x), static_cast<Gdiplus::REAL>(-origin.y));
-
-			graphics.SetTransform(&transform);
-			
-			Gdiplus::Rect destRect(0, 0, texWidth, texHeight);
-			Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
-			graphics.DrawImage(textureRef->bitmap, destRect,
-							   srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
-							   Gdiplus::UnitPixel);			
-		}
-		//Draws to a texture using AlphaBlend function -  this does not support complex transforms.
-		void drawBlend(ws::Texture &dest,DWORD stretchMode = 0)
-		{
-			if (!textureRef || !textureRef->isValid()) return;
+				ws::warning("Warning! Attempted to drawBlend with negative scale. Defaulting to GDI+ draw for negative scaling support.(This will be slower)");
+				drawToTexture(dest);
+				return;
+			}
 
 			int destX = static_cast<int>(x - origin.x * scale.x);
 			int destY = static_cast<int>(y - origin.y * scale.y);
@@ -3167,7 +3152,7 @@ namespace ws
 			int srcX = texLeft, srcY = texTop;
 			int srcW = texWidth, srcH = texHeight;
 
-			BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+			BLENDFUNCTION blend = { AC_SRC_OVER, 0, static_cast<unsigned char>(alphaEffect), AC_SRC_ALPHA };
 
 			static AlphaBlendFunc pAlphaBlend = []() -> AlphaBlendFunc {
 				HMODULE hMsimg32 = LoadLibraryW(L"msimg32.dll");
@@ -3189,7 +3174,7 @@ namespace ws
 							blend);
 			}
 		}
-		//Draws sprite data to a texture but discards all rotation transforms and negative scale.
+		//Draws sprite data to a texture but discards all rotation transforms and negative scale. - ignores window view transforms!
 		void Blt(ws::Texture &dest,DWORD stretchMode = COLORONCOLOR)
 		{
 			if (!textureRef || !textureRef->isValid()) return;
@@ -3876,26 +3861,38 @@ namespace ws
 		
 		
 		void setFont(ws::Font &newFont)
-		{ fontRef = &newFont; }
+		{ 
+			fontRef = &newFont; 
+			getLocalBounds();
+		}
 		
 		ws::Font* getFont()
 		{ return fontRef; }
 		
 		void setString(std::string str)
-		{ text = str; }
+		{
+			text = str; 
+			getLocalBounds();
+		}
 		
 		std::string getString()
 		{ return text; }
 		
 		
 		void setCharacterSize(int size)
-		{ charSize = size;}
+		{ 
+			charSize = size;
+			getLocalBounds();
+		}
 		
 		int getCharacterSize()
 		{ return charSize; }	
 		
 		void setStyle(Gdiplus::FontStyle fontStyle)
-		{ style = fontStyle;}
+		{ 
+			style = fontStyle;
+			getLocalBounds();
+		}
 		
 		Gdiplus::FontStyle getStyle()
 		{ return style; }		
@@ -3913,7 +3910,10 @@ namespace ws
 		{ return borderColor; }
 		
 		void setBorderWidth(int w)
-		{ borderWidth = w; }
+		{ 
+			borderWidth = w; 
+			getLocalBounds();
+		}
 		
 		int getBorderWidth()
 		{ return borderWidth; }
@@ -3937,7 +3937,7 @@ namespace ws
 
 			if(!family.IsStyleAvailable(style))
             {
-            	std::cerr << "Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed."<<std::endl;
+            	ws::warning("Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed.");
                 if(family.IsStyleAvailable(Gdiplus::FontStyleRegular))
                     style = Gdiplus::FontStyleRegular;
                 else if(family.IsStyleAvailable(Gdiplus::FontStyleBold))
@@ -3964,10 +3964,12 @@ namespace ws
 			Gdiplus::PointF(0,0), 
 			&format
 			);
-    
-    		Gdiplus::Pen outlinePen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
-    		outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
-		    
+			
+			
+			Gdiplus::Pen outlinePen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+			outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
+			
+			
 		    Gdiplus::RectF bounds;
 		    path.GetBounds(&bounds, NULL, &outlinePen);
 		    
@@ -3983,12 +3985,47 @@ namespace ws
 		    Gdiplus::SolidBrush fillBrush(fillColor);
     
     		// Draw the outline
-    		canvas->DrawPath(&outlinePen, &path);
+    		if(borderWidth > 0)
+				canvas->DrawPath(&outlinePen, &path);
     		
     		// Fill the text
     		canvas->FillPath(&fillBrush, &path);
     		
 		} 
+
+		ws::IntRect getLocalBounds() const
+		{
+			if (!fontRef) return {0,0,0,0};
+
+			Gdiplus::GraphicsPath path;
+			Gdiplus::StringFormat format(Gdiplus::StringFormat::GenericTypographic());
+			format.SetFormatFlags(format.GetFormatFlags() | Gdiplus::StringFormatFlagsNoFitBlackBox | Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
+
+			path.AddString(
+				ws::WIDE(text).c_str(), 
+				static_cast<INT>(text.length()),
+				fontRef->getFamilyHandle(), 
+				style, 
+				static_cast<Gdiplus::REAL>(charSize), 
+				Gdiplus::PointF(0,0), 
+				&format
+			);
+
+			Gdiplus::RectF bounds;
+			path.GetBounds(&bounds, NULL, NULL);
+
+			// Update the drawable's width and height
+			const_cast<ws::Text*>(this)->width  = static_cast<int>(bounds.Width);
+			const_cast<ws::Text*>(this)->height = static_cast<int>(bounds.Height);
+
+
+			return ws::IntRect(
+				static_cast<int>(bounds.X),
+				static_cast<int>(bounds.Y),
+				static_cast<int>(bounds.Width),
+				static_cast<int>(bounds.Height)
+			);					
+		}		
 		
 		
 		private:
@@ -4418,7 +4455,7 @@ namespace ws
 		{
 			animated = false;
 			srcPath.clear();			
-			if (handle)
+			if(handle)
 			{
 				DestroyCursor(handle);
 				handle = nullptr;
@@ -4427,12 +4464,12 @@ namespace ws
 			std::wstring wfilename = ws::WIDE(filename);
 
 			// just detect it from the extension, no reason to make the caller do this
-			bool isAni = wfilename.size() >= 4 &&
-						 _wcsicmp(wfilename.c_str() + wfilename.size() - 4, L".ani") == 0;
+			bool isAni = wfilename.size() >= 4 && _wcsicmp(wfilename.c_str() + wfilename.size() - 4, L".ani") == 0;
 
-			if (isAni) {
+			if(isAni)
 				handle = LoadCursorFromFileW(wfilename.c_str());
-			} else {
+			else
+			{
 				handle = (HCURSOR)LoadImageW(
 					nullptr,
 					wfilename.c_str(),
@@ -4441,9 +4478,9 @@ namespace ws
 					LR_LOADFROMFILE | LR_DEFAULTSIZE
 				);
 			}
-
-			if (!handle) {
-				std::cerr << "Failed to load cursor from file: " << filename << std::endl;
+			if(!handle) 
+			{
+				ws::warning("Failed to load cursor from file (" + filename + ")");
 				animated = false;
 				srcPath.clear();
 				return false;
@@ -4465,9 +4502,9 @@ namespace ws
 		// Copy constructor.
 		Cursor(const Cursor& other) : animated(other.animated), srcPath(other.srcPath)
 		{
-			if (other.handle)
+			if(other.handle)
 			{
-				if (other.animated && !other.srcPath.empty())
+				if(other.animated && !other.srcPath.empty())
 				{
 					// CopyIcon loses animation frames, reload from file instead
 					handle = LoadCursorFromFileW(other.srcPath.c_str());
@@ -4475,9 +4512,7 @@ namespace ws
 						handle = (HCURSOR)CopyIcon((HICON)other.handle); // fallback just in case
 				}
 				else
-				{
 					handle = (HCURSOR)CopyIcon((HICON)other.handle);
-				}
 			}
 		}
 
@@ -4486,26 +4521,22 @@ namespace ws
 		{
 			if (this != &other)
 			{
-				if (handle) DestroyCursor(handle);
+				if(handle) DestroyCursor(handle);
 				animated = other.animated;
 				srcPath  = other.srcPath;
-				if (other.handle)
+				if(other.handle)
 				{
-					if (other.animated && !other.srcPath.empty())
+					if(other.animated && !other.srcPath.empty())
 					{
 						handle = LoadCursorFromFileW(other.srcPath.c_str());
 						if (!handle)
 							handle = (HCURSOR)CopyIcon((HICON)other.handle);
 					}
 					else
-					{
 						handle = (HCURSOR)CopyIcon((HICON)other.handle);
-					}
 				}
 				else
-				{
 					handle = nullptr;
-				}
 			}
 			return *this;
 		}
@@ -4521,9 +4552,9 @@ namespace ws
 		// Move assignment operator.
 		Cursor& operator=(Cursor&& other) noexcept
 		{
-			if (this != &other)
+			if(this != &other)
 			{
-				if (handle) DestroyCursor(handle);
+				if(handle) DestroyCursor(handle);
 				handle         = other.handle;
 				animated       = other.animated;
 				srcPath        = std::move(other.srcPath);
@@ -4580,30 +4611,29 @@ namespace ws
 				hIcon = nullptr;
 			}
 			if(icon) 
-			{
 				hIcon = CopyIcon(icon);
-			}
 			return *this;
 		}		
 
 		// Copy constructor – copies the icon from another Icon
-		Icon(const Icon& other) : hIcon(nullptr) {
-			if(other.hIcon) {
+		Icon(const Icon& other) : hIcon(nullptr) 
+		{
+			if(other.hIcon)
 				hIcon = CopyIcon(other.hIcon);
-			}
 		}
 
 		// Copy assignment – replaces current icon with a copy of the other's icon
-		Icon& operator=(const Icon& other) {
+		Icon& operator=(const Icon& other) 
+		{
 			if(this != &other) 
 			{
-				if (hIcon) {
+				if (hIcon) 
+				{
 					DestroyIcon(hIcon);
 					hIcon = nullptr;
 				}
-				if(other.hIcon) {
+				if(other.hIcon)
 					hIcon = CopyIcon(other.hIcon);
-				}
 			}
 			return *this;
 		}
@@ -4617,7 +4647,8 @@ namespace ws
 		Icon& operator=(Icon&& other) noexcept {
 			if(this != &other) 
 			{
-				if (hIcon) {
+				if(hIcon) 
+				{
 					DestroyIcon(hIcon);
 					hIcon = nullptr;
 				}
@@ -4834,8 +4865,7 @@ namespace ws
 		{
 			if(clientWidth <= 0 || clientHeight <= 0)
 			{
-				std::cerr << "Error: Attempted to create a window with an invalid size!" << std::endl;
-				MessageBoxA(NULL,"Error: Attempted to create a window with an invalid size!","Developer Error",MB_OK);
+				ws::warning("Error: Attempted to create a window with an invalid size!");
 			}
 			
 			if (hwnd && IsWindow(hwnd)) 
@@ -4890,7 +4920,7 @@ namespace ws
 			
 			
 		    if (hwnd == nullptr) {
-		        std::cerr << "Failed to create window!" << std::endl;
+		        ws::warning("Failed to create window!");
 				exit(-1);
 		    }			
 			
@@ -4930,7 +4960,7 @@ namespace ws
 		// Immediately destroys the window.
 		void close()
 		{
-		    if (hwnd && IsWindow(hwnd)) {
+		    if(hwnd && IsWindow(hwnd)) {
 		        DestroyWindow(hwnd);
 		    }
 		    isRunning = false;
@@ -4943,10 +4973,11 @@ namespace ws
 				return false;
 			
 			MSG msg;
-			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
+			while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
 			{
 				
-				if (msg.message == WM_QUIT) {
+				if(msg.message == WM_QUIT) 
+				{
 					isRunning = false;
 					return false;
 				}
@@ -4954,12 +4985,10 @@ namespace ws
 				
 				bool isOurs = (msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd));
 				
-				if (isOurs) 
-				{
+				if(isOurs) 
 					msgQ.push(msg);
-				}
 				
-				if (isOurs && !IsDialogMessage(hwnd, &msg)) 
+				if(isOurs && !IsDialogMessage(hwnd, &msg)) 
 				{
 					TranslateMessage(&msg);
 					DispatchMessage(&msg);
@@ -4975,10 +5004,10 @@ namespace ws
 		}
 		
 		// Pops the next queued message; returns false if queue empty.
-	    bool pollEvent(MSG &message) {
-	        if (msgQ.empty()) {
+	    bool pollEvent(MSG &message) 
+		{
+	        if (msgQ.empty())
 	            return false;
-	        }
 	        
 	        message = msgQ.front();
 	        msgQ.pop();
@@ -4988,11 +5017,11 @@ namespace ws
 		// Clears the back buffer to the given color, recreating if needed.
 	    void clear(ws::Hue color = ws::Hue::transparent) 
 		{
-			if (!hwnd) return;
+			if(!hwnd) return;
 
 			ws::Vec2i needed = view.getPortSize();;
 
-			if (!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
+			if(!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
 			{
 				delete canvas;
 				canvas = nullptr;
@@ -5003,7 +5032,7 @@ namespace ws
 				canvas->SetSmoothingMode(Gdiplus::SmoothingModeNone);
 			}
 
-			if (canvas)
+			if(canvas)
 				canvas->Clear(color);		
 	    }
 		
@@ -5011,8 +5040,6 @@ namespace ws
 		void draw(Drawable &draw)
 		{
 			if(!canvas || !hwnd) return;
-
-
 
 
 
@@ -5042,10 +5069,10 @@ namespace ws
 		// Updates the layered window for per‑pixel alpha when enabled.
 		void updateLayeredWindow()
 		{
-			if (!m_perPixelAlpha || !hwnd) return;
+			if(!m_perPixelAlpha || !hwnd) return;
 
 			HDC hdc = backBuffer.getHDC();
-			if (!hdc) return;
+			if(!hdc) return;
 
 			SIZE size = { backBuffer.getSize().x, backBuffer.getSize().y };
 			POINT ptSrc = { 0, 0 };
@@ -5061,7 +5088,7 @@ namespace ws
 		
 		public:
 		
-		// Invalidates and updates the window (and possibly layered window).
+		// Invalidates and updates the window
 	    void display() 
 		{
 			if(m_perPixelAlpha && hwnd)
@@ -5161,7 +5188,6 @@ namespace ws
 			
 			DWORD s = getStyle();
 			s |= style;
-			
 				
 			SetWindowLongA(hwnd,GWL_STYLE,s);		
 		}
@@ -5262,7 +5288,7 @@ namespace ws
 	    	if(screenWidth <= 0 || screenHeight <= 0)
 			{
 				setVisible(false);
-				std::cerr << "Warning! You tried to set a window to an invalid size. This has been converted into a safe setVisible(false) command. Try using the setVisible function as a better practice.\n";
+				ws::warning("Warning! You tried to set a window to an invalid size. This has been converted into a safe setVisible(false) command. Try using the setVisible function as a better practice.");
 				return;
 			}
 	    	SetWindowPos(hwnd, 
@@ -5609,22 +5635,22 @@ namespace ws
 					return lresult;//if result is not zero that means that the message was handled.
 			}			
 
-            switch (uMsg) {
+            switch(uMsg) {
 	            
 				case WM_NCLBUTTONDBLCLK:
-					if (wParam == HTSYSMENU)
+					if(wParam == HTSYSMENU)
 						return 0;
 					break;
 				
 				case WM_DESTROY:
 					WindowManager::removeWindow(hwnd);
 					isRunning = false;
-					if (WindowManager::windows.empty())
+					if(WindowManager::windows.empty())
 						PostQuitMessage(0);
 	                return 0;
 	            
 				case WM_SYSCOMMAND:
-					if (wParam == SC_CLOSE && HIWORD(lParam) == 0 /* from menu */)
+					if(wParam == SC_CLOSE && HIWORD(lParam) == 0 /* from menu */)
 						return 0;
 					break;
 				
@@ -5634,7 +5660,6 @@ namespace ws
 				
 				case WM_NOTIFY:
 				{
-					
 					NMHDR* pnmh = reinterpret_cast<NMHDR*>(lParam);
 					return s_handleNotifyForChildren(this, pnmh, uMsg, wParam, lParam);		
 				}
@@ -5664,7 +5689,7 @@ namespace ws
 	            case WM_PAINT: 
 				{
 	            	
-					if (m_perPixelAlpha)
+					if(m_perPixelAlpha)
 					{
 						PAINTSTRUCT ps;
 						BeginPaint(hwnd, &ps);
@@ -5689,7 +5714,7 @@ namespace ws
 
 							int srcH = bufH - srcPos.y;
 							int srcW = bufW - srcPos.x;
-							if (srcH < 1) srcH = 1;   // safety
+							if(srcH < 1) srcH = 1;   // safety
 
 							SetStretchBltMode(hdc, COLORONCOLOR);
 							StretchBlt(
@@ -5699,20 +5724,6 @@ namespace ws
 								srcPos.x, srcPos.y, bufW, srcH,            // source = everything below the menu
 								SRCCOPY
 							);
-
-/*
-							ws::Vec2i screenSize = getSize();
-							ws::Vec2i worldSize  = view.getSize();
-
-
- 
-							if (screenSize.x == worldSize.x && screenSize.y == worldSize.y)
-								BitBlt(hdc, 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, backBuffer.getHDC(), 0, 0, SRCCOPY);
-							else
-							{
-								SetStretchBltMode(hdc, COLORONCOLOR);
-								StretchBlt(hdc, 0, 0, screenSize.x, screenSize.y, backBuffer.getHDC(), srcPos.x, srcPos.y, backBuffer.getSize().x - srcPos.x, backBuffer.getSize().y - srcPos.y, SRCCOPY);
-							} */
 						}
 						EndPaint(hwnd, &ps);
 					}
@@ -5753,7 +5764,7 @@ namespace ws
 		std::wstring wclassName = ws::WIDE(className);
 		
 		// Check if already registered
-		if (registeredClasses.find(wclassName) != registeredClasses.end())
+		if(registeredClasses.find(wclassName) != registeredClasses.end())
 			return true;   // already exists, nothing to do
 
 		HINSTANCE instance = GetModuleHandle(nullptr);
@@ -5766,7 +5777,7 @@ namespace ws
 		
 		if (!RegisterClass(&wc))
 		{
-			std::cerr << "Failed to register window class: " << className << std::endl;
+			ws::warning("Failed to register window class " + className);
 			return false;
 		}
 
@@ -5873,18 +5884,6 @@ namespace ws
 				return true;
 			return false;			
 		}
-		
-		//depreciated functions. Avoid using these!
-		bool getMouseButton(int vmButton)
-		{
-			return getButton(vmButton);
-		}
-		bool getKey(int vmKey)
-		{
-			return getButton(vmKey);
-		}
-		
-		
 		
 	}
 

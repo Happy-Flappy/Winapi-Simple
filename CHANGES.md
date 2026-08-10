@@ -320,7 +320,11 @@
 * Added ws::Sprite::drawBlend(ws::Texture &dest,DWORD stretchMode = 0)
 * Added ws::Sprite::Blt(ws::Texture &dest,DWORD stretchMode = COLORONCOLOR)
 * Fixed many ws::Wav bottlenecks by storing data members instead of calling MCI for everything.
-
+* Added ws::Drawable::drawToTexture(ws::Texture &target)
+* Added ws::Text::getLocalBounds() and had it called per every size changing ws::Text function call.
+* Added borderWidth check to ws::Text so that it will not draw any border if the border has zero width.
+* Added middle parameter to ws::Sprite::drawBlend(ws::Texture &dest,int alphaEffect = 255,DWORD stretchMode = 0)
+* Removed Depreciated getMouseButton and getKey. Use getButton for both mouse and keyboard.
 
  
 
