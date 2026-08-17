@@ -1,3 +1,4 @@
+//WINSIMPLE VERSION 1.7
 #ifndef WINSIMPLE_HPP
 #define WINSIMPLE_HPP
 
@@ -1903,8 +1904,14 @@ namespace ws
 	    }
 		
 		// Converts screen coordinates to world coordinates, accounting for view transform.
-		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos) 
+		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
 		{
+			ws::Vec2i stretchedPos;
+			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
+											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
+			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
+											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
+			
 			// Calculate the visible world center
 			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
 			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
@@ -1923,8 +1930,8 @@ namespace ws
 			scaleY *= zoomFactor;
 			
 			// Apply inverse transformation
-			float worldX = static_cast<float>(screenPos.x);
-			float worldY = static_cast<float>(screenPos.y);
+			float worldX = static_cast<float>(stretchedPos.x);
+			float worldY = static_cast<float>(stretchedPos.y);
 			
 			// Reverse transformations in opposite order
 			worldX -= portCenterX;
@@ -1948,16 +1955,15 @@ namespace ws
 			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
 		}
 	    
-	    [[nodiscard]] ws::Vec2i toWorld(int x,int y) 
+	    [[nodiscard]] ws::Vec2i toWorld(int x,int y,ws::Vec2i screenSize) 
 	    {
-	        return toWorld(ws::Vec2i(x,y));
+	        return toWorld(ws::Vec2i(x,y),screenSize);
 	    }
 	    
 	
 		// Converts world coordinates to screen coordinates.
-	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos) 
+	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
 	    {
-		        
 	        // Apply the transformation (scaled by zoom)
 	        float zoomFactor = std::pow(2.0f, zoom);
 	        
@@ -2001,14 +2007,19 @@ namespace ws
 	        // 4. Translate to port center
 	        screenX += portCenterX;
 	        screenY += portCenterY;
+
+			// Now account for window stretching
+			screenX *= (static_cast<float>(screenSize.x) / static_cast<float>(world.width));
+			screenY *= (static_cast<float>(screenSize.y) / static_cast<float>(world.height));
+			
 	        
 	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
 	    }
 	
 	    
-	    [[nodiscard]] ws::Vec2i toScreen(int x,int y) 
+	    [[nodiscard]] ws::Vec2i toScreen(int x,int y,ws::Vec2i screenSize) 
 	    {
-	        return toScreen(ws::Vec2i(x,y));
+	        return toScreen(ws::Vec2i(x,y),screenSize);
 	    }       		
 
 		// Applies the current view transform (matrix, clip) to the given GDI+ graphics.
@@ -5512,7 +5523,7 @@ namespace ws
 		// Converts screen coordinates to world.
 		ws::Vec2i toWorld(int x,int y)
 		{
-			return view.toWorld(x,y);
+			return view.toWorld(x,y,getSize());
 		}
 		// Converts screen coordinates to world. - overload
 		ws::Vec2i toWorld(ws::Vec2i pos)
@@ -5523,7 +5534,7 @@ namespace ws
 		// Converts world coordinates to screen.
 		ws::Vec2i toScreen(int x,int y)
 		{
-			return view.toScreen(x,y);
+			return view.toScreen(x,y,getSize());
 		}
 		// Converts world coordinates to screen. - overload
 		ws::Vec2i toScreen(ws::Vec2i pos)

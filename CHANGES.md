@@ -325,6 +325,7 @@
 * Added borderWidth check to ws::Text so that it will not draw any border if the border has zero width.
 * Added middle parameter to ws::Sprite::drawBlend(ws::Texture &dest,int alphaEffect = 255,DWORD stretchMode = 0)
 * Removed Depreciated getMouseButton and getKey. Use getButton for both mouse and keyboard.
+* Fixed ws::View::toWorld again since I accidentally broke it in this beta version.(nothing major - just coordinate offset)
 
  
 
