@@ -326,6 +326,9 @@
 * Added middle parameter to ws::Sprite::drawBlend(ws::Texture &dest,int alphaEffect = 255,DWORD stretchMode = 0)
 * Removed Depreciated getMouseButton and getKey. Use getButton for both mouse and keyboard.
 * Fixed ws::View::toWorld again since I accidentally broke it in this beta version.(nothing major - just coordinate offset)
+* Fixed ws::Font::loadFromSystem(). It now updates to system fonts properly.
+* Dynamically loaded RevokeDragDrop() function in ws::Window so that compiling no longer requires -lole32.
+
 
  
 

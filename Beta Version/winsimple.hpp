@@ -64,7 +64,6 @@ typedef unsigned long PROPID;
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "ole32.lib")
 #endif
 
 namespace ws
@@ -2706,10 +2705,17 @@ namespace ws
 		{
 			fontFilePath.clear();
 			isCustomFont = false;
-			
+
 			fontCollection.reset(new Gdiplus::PrivateFontCollection());
 			
 			fontName = name;
+
+			family.reset(new Gdiplus::FontFamily(ws::WIDE(name).c_str()));
+			if(family->GetLastStatus() != Gdiplus::Ok) 
+			{
+				family.reset(new Gdiplus::FontFamily(L"Arial"));
+				fontName = "Arial";
+			}
 			
 			return update();
 			
@@ -2797,11 +2803,10 @@ namespace ws
 			}
 			else
 			{
-				
-				gdiFont.reset(new Gdiplus::Font(ws::WIDE(fontName).c_str(), 
-	            24, 
-	            Gdiplus::FontStyleRegular, 
-	            Gdiplus::UnitPixel));
+				gdiFont.reset(new Gdiplus::Font(family.get(),
+				24, 
+				Gdiplus::FontStyleRegular, 
+				Gdiplus::UnitPixel));
 			}
 			
 			
@@ -4951,7 +4956,7 @@ namespace ws
         {
 			if (hwnd && IsWindow(hwnd))
 			{
-				RevokeDragDrop(hwnd);//just in case the window does use dragndrop. You have to call the revoke function for the window before it gets destroyed. Placing revoke elsewhere could result in a crash.
+				pRevokeDragDrop(hwnd);//just in case the window does use dragndrop. You have to call the revoke function for the window before it gets destroyed. Placing revoke elsewhere could result in a crash.
 				DestroyWindow(hwnd);
 			}			
 			
@@ -5629,6 +5634,25 @@ namespace ws
 		}
 
 		private:
+		
+		//cleanup dragndrop whether it was used or not.
+		void pRevokeDragDrop(HWND &targetHwnd)
+		{
+			typedef HRESULT (WINAPI *Ptr)(HWND);
+			
+			HMODULE hOle32 = LoadLibrary(TEXT("Ole32.dll"));
+			if(hOle32 == nullptr)
+				return;
+			Ptr ptr = (Ptr)GetProcAddress(hOle32,"RevokeDragDrop");
+			if(ptr == nullptr)
+			{
+				FreeLibrary(hOle32);
+				return;
+			}
+			ptr(targetHwnd);
+			FreeLibrary(hOle32);
+		}
+		
 		std::vector<std::function<LRESULT(MSG msg)>> customHandlers;
 		
 		// Handles messages; called by the global window procedure.
@@ -6098,6 +6122,7 @@ namespace ws
 			//Gdi+
 			Gdiplus::GdiplusShutdown(gdiplustoken);
 		}
+		
 		
 	}gdipInit;
 	
