@@ -316,7 +316,8 @@ namespace ws
         float delay = 0.15f;
         bool ended = false;
         bool start = true;          // to make timer start at 0
-        std::vector<ws::IntRect> rect;
+        bool loop = false;
+		std::vector<ws::IntRect> rect;
         ws::Timer timer;
 
         void add(int left, int top, int width, int height)
@@ -332,23 +333,27 @@ namespace ws
 
     ws::IntRect Shift(ShiftData &shift)
     {
-        if (shift.start && !shift.ended)
+        if(shift.start && !shift.ended)
         {
             shift.timer.restart();
             shift.start = false;
         }
 
-        if (!shift.ended && shift.timer.getSeconds() >= shift.delay)
+        if(shift.timer.getSeconds() >= shift.delay)
         {
             // Advance to next frame if not at the end
-            if (shift.currentframe + 1 < static_cast<int>(shift.rect.size()))
-            {
+            if(shift.currentframe + 1 < static_cast<int>(shift.rect.size()))
                 shift.currentframe++;
-            }
             else
             {
-                // Reached the end – stay on last frame and mark ended
-                shift.ended = true;
+				// reached the end
+				if(shift.loop)
+					shift.currentframe = 0;				
+				else
+				{
+					shift.currentframe = shift.rect.size()-1;
+					shift.ended = true;
+				}
             }
             shift.timer.restart();
         }

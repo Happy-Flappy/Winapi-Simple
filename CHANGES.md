@@ -328,9 +328,21 @@
 * Fixed ws::View::toWorld again since I accidentally broke it in this beta version.(nothing major - just coordinate offset)
 * Fixed ws::Font::loadFromSystem(). It now updates to system fonts properly.
 * Dynamically loaded RevokeDragDrop() function in ws::Window so that compiling no longer requires -lole32.
+* Removed ws::Balloon() overload that loaded the icon from file. Using ws::Icon is the safer memory managed alternative.
+* Modified ws::Balloon to remove it's own tray icon after the delay.
+* Added ws::TrayIcon 
+* Added ws::TrayIcon::showBalloon(const std::string& message, const std::string& title,DWORD infoFlags = NIIF_USER, int timeoutMs = 5000)
+* Added bool ws::Drawable::intersects(ws::IntRect box)
+* Added bool loop to ws::ShiftData
+* Added ws::Font::loadFromMemory(const void* data, size_t size)
+* Changed ws::View to use ws::FloatRect instead of ws::IntRect to avoid jitter.
+* Changed ws types to have base templates. ws::Vec2<>,ws::Vec3<>,and ws::Rect<>.
+* Added bool intersects to ws::Rect
+* Added ws::Texture::editAllPixels(Func&& func,int start = 0,int end = -1) - Provides faster iteration.
+* Fixed ws::View::toWorld again. Like seriously, how many times have I had to fix this again???
+* Added Kinematics Demo
 
 
- 
 
 # New major features to be added. 
 

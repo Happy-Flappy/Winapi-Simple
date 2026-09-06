@@ -1371,37 +1371,52 @@ namespace ws
 		// Converts screen coordinates to world coordinates, accounting for view transform.
 		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
 		{
-			// 1. Map screen (client) coords to viewport (port) local coords
-			float portX = static_cast<float>(screenPos.x) * (port.width / static_cast<float>(screenSize.x));
-			float portY = static_cast<float>(screenPos.y) * (port.height / static_cast<float>(screenSize.y));
-
-			// 2. Viewport local center
-			float portCenterX = port.width / 2.0f;
-			float portCenterY = port.height / 2.0f;
-
-			// 3. World center
-			float worldCenterX = world.left + world.width / 2.0f;
-			float worldCenterY = world.top + world.height / 2.0f;
-
-			// 4. Scale from world to port (including zoom)
-			float scaleX = (port.width / world.width) * std::pow(2.0f, zoom);
-			float scaleY = (port.height / world.height) * std::pow(2.0f, zoom);
-
-			// 5. Invert the world→port transform (without rotation first)
-			float worldX = (portX - portCenterX) / scaleX + worldCenterX;
-			float worldY = (portY - portCenterY) / scaleY + worldCenterY;
-
-			// 6. Apply inverse rotation (if any)
-			if (rotation != 0.0f) {
-				float dx = worldX - worldCenterX;
-				float dy = worldY - worldCenterY;
-				float rad = -rotation * static_cast<float>(M_PI) / 180.0f;
-				float cosA = std::cos(rad);
-				float sinA = std::sin(rad);
-				worldX = dx * cosA - dy * sinA + worldCenterX;
-				worldY = dx * sinA + dy * cosA + worldCenterY;
+			ws::Vec2i stretchedPos;
+			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
+											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
+			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
+											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
+			
+			// Calculate the visible world center
+			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
+			
+			// Calculate the port center
+			float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+			float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+			
+			// Calculate scale to fit world into port
+			float scaleX = static_cast<float>(port.width) / world.width;
+			float scaleY = static_cast<float>(port.height) / world.height;
+			
+			// Apply zoom
+			float zoomFactor = std::pow(2.0f, zoom);
+			scaleX *= zoomFactor;
+			scaleY *= zoomFactor;
+			
+			// Apply inverse transformation
+			float worldX = static_cast<float>(stretchedPos.x);
+			float worldY = static_cast<float>(stretchedPos.y);
+			
+			// Reverse transformations in opposite order
+			worldX -= portCenterX;
+			worldY -= portCenterY;
+			
+			if (rotation != 0) {
+				Gdiplus::Matrix rotMatrix;
+				rotMatrix.Rotate(-rotation);
+				Gdiplus::PointF point(worldX, worldY);
+				rotMatrix.TransformPoints(&point, 1);
+				worldX = point.X;
+				worldY = point.Y;
 			}
-
+			
+			worldX /= scaleX;
+			worldY /= scaleY;
+			
+			worldX += visibleWorldCenterX;
+			worldY += visibleWorldCenterY;
+			
 			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
 		}
 	    
@@ -1414,36 +1429,56 @@ namespace ws
 		// Converts world coordinates to screen coordinates.
 	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
 	    {
-			// 1. World center
-			float worldCenterX = world.left + world.width / 2.0f;
-			float worldCenterY = world.top + world.height / 2.0f;
+	        // Apply the transformation (scaled by zoom)
+	        float zoomFactor = std::pow(2.0f, zoom);
+	        
+	        // Calculate the visible world center
+	        float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
+	        float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
+	        
+	        // Calculate the port center
+	        float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
+	        float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
+	        
+	        // Calculate scale to fit visible world into port
+	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
+	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
+	        
+	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
+	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
+	        
+	        // Apply transformation
+	        float screenX = static_cast<float>(worldPos.x);
+	        float screenY = static_cast<float>(worldPos.y);
+	        
+	        // 1. Translate world center to origin
+	        screenX -= visibleWorldCenterX;
+	        screenY -= visibleWorldCenterY;
+	        
+	        // 2. Apply scale
+	        screenX *= scaleX;
+	        screenY *= scaleY;
+	        
+	        // 3. Apply rotation
+	        if (rotation != 0) {
+	            Gdiplus::Matrix rotMatrix;
+	            rotMatrix.Rotate(rotation);
+	            Gdiplus::PointF point(screenX, screenY);
+	            rotMatrix.TransformPoints(&point, 1);
+	            screenX = point.X;
+	            screenY = point.Y;
+	        }
+	        
+	        // 4. Translate to port center
+	        screenX += portCenterX;
+	        screenY += portCenterY;
 
-			// 2. Translate to origin
-			float dx = static_cast<float>(worldPos.x) - worldCenterX;
-			float dy = static_cast<float>(worldPos.y) - worldCenterY;
-
-			// 3. Apply rotation
-			if (rotation != 0.0f) {
-				float rad = rotation * static_cast<float>(M_PI) / 180.0f;
-				float cosA = std::cos(rad);
-				float sinA = std::sin(rad);
-				float newX = dx * cosA - dy * sinA;
-				float newY = dx * sinA + dy * cosA;
-				dx = newX;
-				dy = newY;
-			}
-
-			// 4. Apply scale (world → port)
-			float scaleX = (port.width / world.width) * std::pow(2.0f, zoom);
-			float scaleY = (port.height / world.height) * std::pow(2.0f, zoom);
-			float portX = dx * scaleX + port.width / 2.0f;
-			float portY = dy * scaleY + port.height / 2.0f;
-
-			// 5. Map port → screen (client) coordinates (inverse of the initial stretch)
-			float screenX = portX * (static_cast<float>(screenSize.x) / port.width);
-			float screenY = portY * (static_cast<float>(screenSize.y) / port.height);
-
-			return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
+			// Now account for window stretching
+			screenX *= (static_cast<float>(screenSize.x) / static_cast<float>(world.width));
+			screenY *= (static_cast<float>(screenSize.y) / static_cast<float>(world.height));
+			
+	        
+	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
 	    }
 	
 	    
