@@ -1,4 +1,0 @@
-Escape quits game
-
-
-Arrow keys move pen
