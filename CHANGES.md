@@ -341,6 +341,8 @@
 * Added ws::Texture::editAllPixels(Func&& func,int start = 0,int end = -1) - Provides faster iteration.
 * Fixed ws::View::toWorld again. Like seriously, how many times have I had to fix this again???
 * Added Kinematics Demo
+* Added SWP_NOACTIVATE to the setLayerAfter() method in ws::Window to avoid automatic activation.
+* Added setBehindIcons() to set window behind desktop icons. (only works on windows 11 for now)
 
 
 

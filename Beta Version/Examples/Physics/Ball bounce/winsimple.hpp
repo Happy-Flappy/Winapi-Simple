@@ -4661,7 +4661,7 @@ namespace ws
 		// Places this window after another in Z-order.
 		void setLayerAfter(HWND lastHwnd)
 		{
-			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
 		}
 		
 		// Adds a window style.
@@ -4991,55 +4991,6 @@ namespace ws
 		void disableAlphaOnly()
 		{
 			disableChromaKey();
-		}
-		
-		//Sets the window behind the desktop icons. (WARNING -  this will override many window settings and styles to produce a functional desktop window.)
-		static bool setBehindIcons(HWND source)
-		{
-			//for windows 11
-			bool raised = (GetWindowLongPtr(progman, GWL_EXSTYLE) & WS_EX_NOREDIRECTIONBITMAP) != 0;
-			
-			if(!raised)
-			{
-				ws::Warning("Can't set window behind icons on this computer due to imcompatible desktop design.");
-				return false;
-			}
-			
-			HWND progman   = FindWindowW(L"Progman", nullptr);
-			HWND workerW   = FindWindowExW(progman, nullptr, L"WorkerW", nullptr);
-			HWND shellView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
-			if (!progman || !workerW || !shellView)
-			{
-				ws::warning("Could not locate Progman / WorkerW / SHELLDLL_DefView. Failed to set Window behind icons!");
-				return false;
-			}
-			
-			//SetAllStyle
-			SetWindowLongA(source,GWL_STYLE,0);
-			SetWindowLongA(source,GWL_STYLE,WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN);
-			
-			SetParent(source, workerW);
-			
-			//add WS_EX_LAYERED
-			DWORD exStyle = GetWindowLong(source, GWL_EXSTYLE);
-			exStyle |= WS_EX_LAYERED;
-			SetWindowLongA(source,GWL_EXSTYLE,exStyle);
-			
-			
-			//enable alpha only
-			SetLayeredWindowAttributes(source,0,255,LWA_ALPHA);
-			
-			ShowWindow(source,SW_SHOW);
-			
-			//setLayerAfter shellView
-			SetWindowPos(source,shellView,0,0,0,0,SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-			return true;			
-		}
-		
-		//overload that sets this window behind the icons.
-		bool setBehindIcons()
-		{
-			return setBehindIcons(hwnd);
 		}
 		
 		// Converts screen coordinates to world.
