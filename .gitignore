@@ -3,3 +3,16 @@
 *.png
 *.wav
 *.mp3
+
+#visual studio gitignore
+*.db
+*.db-shm
+*.db-wal
+*.vsidx
+*.wsuo
+*.opendb
+DocumentLayout.json
+ProjectSettings.json
+slnx.sqlite
+VSWorkspaceState.json
+*.sqlite-journal
