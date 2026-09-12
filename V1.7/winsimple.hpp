@@ -4996,15 +4996,6 @@ namespace ws
 		//Sets the window behind the desktop icons. (WARNING -  this will override many window settings and styles to produce a functional desktop window.)
 		static bool setBehindIcons(HWND source)
 		{
-			//for windows 11
-			bool raised = (GetWindowLongPtr(progman, GWL_EXSTYLE) & WS_EX_NOREDIRECTIONBITMAP) != 0;
-			
-			if(!raised)
-			{
-				ws::Warning("Can't set window behind icons on this computer due to imcompatible desktop design.");
-				return false;
-			}
-			
 			HWND progman   = FindWindowW(L"Progman", nullptr);
 			HWND workerW   = FindWindowExW(progman, nullptr, L"WorkerW", nullptr);
 			HWND shellView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
@@ -5013,6 +5004,20 @@ namespace ws
 				ws::warning("Could not locate Progman / WorkerW / SHELLDLL_DefView. Failed to set Window behind icons!");
 				return false;
 			}
+			
+			//for windows 11
+			
+			#ifndef WS_EX_NOREDIRECTIONBITMAP
+			#define WS_EX_NOREDIRECTIONBITMAP 0x00200000L
+			#endif
+			
+			bool raised = (GetWindowLongPtr(progman, GWL_EXSTYLE) & WS_EX_NOREDIRECTIONBITMAP) != 0;
+			if(!raised)
+			{
+				ws::warning("Can't set window behind icons on this computer due to imcompatible desktop design.");
+				return false;
+			}
+			
 			
 			//SetAllStyle
 			SetWindowLongA(source,GWL_STYLE,0);
