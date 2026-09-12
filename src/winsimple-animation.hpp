@@ -7,22 +7,23 @@ namespace ws
 	{
 		public:
 		
+		
 		int width = 0;
 		int height = 0;
 		
-		// Constructor: initializes an empty GIF object.
+		
 		GIF()
 		{
 			
 		}
 		
-		// Destructor: releases GIF textures and delay data.
 		~GIF() {
 		    textures.clear();
 		    delays.clear();
 		}
 		
-		// Loads an animated GIF from a file path and decodes all frames.
+		
+		
 		bool loadFromFile(std::string path)
 		{
 			
@@ -112,7 +113,8 @@ namespace ws
 			return true;
 		}
 		
-		// Adds a single frame with a millisecond delay to the GIF animation.
+		
+		
 		void addFrame(ws::Texture &newFrame,double millisecondDelay)
 		{
 			
@@ -127,13 +129,15 @@ namespace ws
 			totalFrames++;
 		}
 		
-		// Returns a reference to the current displayed texture frame.
+		
+		
+		
 		ws::Texture& getTexture()
 		{
 			return currentTexture;
 		}
 		
-		// Returns a pointer to the texture at the given frame index.
+		
 		ws::Texture* getFrame(int index)
 		{
 			if(index < 0 || index > int(textures.size()))
@@ -145,7 +149,7 @@ namespace ws
 			return &textures[index];
 		}
 		
-		// Retrieves the delay in milliseconds for a specific frame index.
+		
 		double getFrameDelay(int index)
 		{
 			if(index <= 0 || index > int(textures.size()))
@@ -156,15 +160,26 @@ namespace ws
 			return delays[index];
 		}
 		
-		// Sets the delay for a given frame index; returns true on success.
+		
 		bool setFrameDelay(int index,double newDelay)
 		{	
 			if(index <= 0 || index > int(textures.size()))
 				return false;
 			delays[index] = newDelay;		
+			return true;
 		}
 		
-		// Replaces the texture at a given frame index; returns true on success.
+		bool setDelay(double newDelay)
+		{
+			bool failed = false;
+			for(int a=0;a<getFrameCount();a++)
+			{
+				if(!setFrameDelay(a,newDelay))
+					failed = true;
+			}
+			return failed;
+		}
+		
 		bool setFrame(int index,ws::Texture &newTexture)
 		{
 			if(index <= 0 || index > int(textures.size()))
@@ -173,31 +188,30 @@ namespace ws
 			return true;
 		}
 		
-		// Returns whether the GIF will loop when playback reaches the end.
+		
+		
 		bool getLoop()
 		{
 			return loop;
 		}
 		
-		// Enables or disables looping of the GIF animation.
 		void setLoop(bool trueFalse = true)
 		{
 			loop = trueFalse;
 		}
 		
-		// Returns the total number of frames in the GIF.
+		
 		int getFrameCount()
 		{
 			return totalFrames;
 		}
 		
-		// Returns the index of the currently displayed frame.
 		int getCurrentFrame()
 		{
 			return currentFrame;
 		}
 		
-		// Starts or resumes playback of the GIF animation.
+		
 		void play()
 		{
 			if(status == "stopped")
@@ -213,26 +227,28 @@ namespace ws
 			
 		}
 		
-		// Pauses the GIF animation at the current frame.
+		
 		void pause()
 		{
 			status = "paused";
 		}
 		
-		// Stops the GIF animation and resets to the first frame.
+		
 		void stop()
 		{
 			currentFrame = 0;
 			status = "stopped";
 		}
 		
-		// Returns the current playback status as a string.
+		
 		std::string getStatus()
 		{
 			return status;
 		}
 		
-		// Updates the animation timer and advances frames; returns the current texture.
+		
+		
+		
 		ws::Texture& update()
 		{
 			
@@ -261,7 +277,8 @@ namespace ws
 			return currentTexture;
 		}
 		
-		// Returns the file path from which the GIF was loaded.
+		
+		
 		std::string getPath()
 		{
 			return path;
@@ -287,6 +304,8 @@ namespace ws
 	
 
 
+
+
 	//SHIFT ANIMATOR 
 
     class ShiftData
@@ -297,42 +316,44 @@ namespace ws
         float delay = 0.15f;
         bool ended = false;
         bool start = true;          // to make timer start at 0
-        std::vector<ws::IntRect> rect;
+        bool loop = false;
+		std::vector<ws::IntRect> rect;
         ws::Timer timer;
 
-        // Adds a rectangle region to the shift animation sequence.
         void add(int left, int top, int width, int height)
         {
             rect.push_back({left, top, width, height});
         }
 
-        // Adds a rectangle region using an existing IntRect structure.
         void add(ws::IntRect r)
         {
             add(r.left, r.top, r.width, r.height);
         }
     };
 
-    // Advances a shift animation and returns the current rectangle region.
     ws::IntRect Shift(ShiftData &shift)
     {
-        if (shift.start && !shift.ended)
+        if(shift.start && !shift.ended)
         {
             shift.timer.restart();
             shift.start = false;
         }
 
-        if (!shift.ended && shift.timer.getSeconds() >= shift.delay)
+        if(shift.timer.getSeconds() >= shift.delay)
         {
             // Advance to next frame if not at the end
-            if (shift.currentframe + 1 < static_cast<int>(shift.rect.size()))
-            {
+            if(shift.currentframe + 1 < static_cast<int>(shift.rect.size()))
                 shift.currentframe++;
-            }
             else
             {
-                // Reached the end – stay on last frame and mark ended
-                shift.ended = true;
+				// reached the end
+				if(shift.loop)
+					shift.currentframe = 0;				
+				else
+				{
+					shift.currentframe = shift.rect.size()-1;
+					shift.ended = true;
+				}
             }
             shift.timer.restart();
         }

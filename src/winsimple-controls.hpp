@@ -1,9 +1,11 @@
+
 #ifndef WINSIMPLE_CONTROLS
 #define WINSIMPLE_CONTROLS
 
 #include <commctrl.h>   // for common controls (trackbar, etc.)
 #include <shlobj.h>     // for folder browser (BROWSEINFO, etc.)
 #include <filesystem>
+#include <shellapi.h>
 
 //Controls Linking: -lcomctl32 -lcomdlg32
 
@@ -17,7 +19,7 @@
 
 namespace ws
 {
-	// Forward declaration: handles WM_NOTIFY messages for child controls.
+	//this is the real notify handler that ws::Window will point to now that this header is included.
     LRESULT handleNotifyForChildren(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam);
     
 	
@@ -26,7 +28,6 @@ namespace ws
 		public:
 		int maxControlID = 1000;
 		
-		// Constructor: initializes common controls and COM for folder dialogs.
 		ControlsInit()
 		{
 			INITCOMMONCONTROLSEX icex;
@@ -45,7 +46,6 @@ namespace ws
 			ws::Window::s_handleNotifyForChildren = &handleNotifyForChildren;
 		}
 		
-		// Destructor: uninitializes COM.
 		~ControlsInit()
 		{
 			CoUninitialize();
@@ -84,13 +84,12 @@ namespace ws
 		COLORREF borderColor = RGB(0,0,0);
 
 		
-		// Constructor: creates a child control with a given Win32 class name.
 		Child(const std::wstring& className = L"Button") : m_className(ws::SHORT(className))
 		{
 			controlID = controlsInit.maxControlID++;
 		}
 		
-		// Destructor: destroys the child window and frees the custom font.
+		
 		virtual ~Child()
 		{
 			for(auto& cb : m_destructorCallbacks)
@@ -102,13 +101,12 @@ namespace ws
 				DeleteObject(customFont);
 		}
 
-		// Initializes the child control and creates its Win32 window.
+		// init – called by ws::Window::addChild()
 		virtual bool init(ws::Window& parent)
 		{
 			return init(parent.hwnd);
 		}
 		
-		// Initializes the child control with a given parent HWND.
 		virtual bool init(HWND phwnd)
 		{
 			if (!phwnd) return false;
@@ -171,18 +169,16 @@ namespace ws
 			return true;			
 		}
 
-		// Registers a callback to be called when this child is destroyed.
 		void registerDestructorCallback(DestructorCallback callback)
 		{
 			m_destructorCallbacks.push_back(std::move(callback));
 		}
-		// Clears all registered destructor callbacks.
 		void clearDestructorCallbacks() 
 		{
 			m_destructorCallbacks.clear();
 		}
 
-		// Adds another child control as a child of this control.
+
 		void addChild(ws::Child& child) 
 		{
 			children.push_back(&child);
@@ -192,7 +188,6 @@ namespace ws
 				child.init(this->hwnd);  
 		}
 
-		// Removes a child control from this control's child list.
 		void removeChild(ws::Child &child)
 		{
 			for(size_t a=0;a<children.size();a++)
@@ -205,7 +200,6 @@ namespace ws
 			}
 		}
 		
-		// Checks whether a given child is directly owned by this control.
 		bool hasChild(ws::Child &child)
 		{
 			for(size_t a=0;a<children.size();a++)
@@ -218,7 +212,7 @@ namespace ws
 			return false;
 		}			
 		
-		// Sets the Win32 class name of this control (recreates if already created).
+
 		void setClass(const std::wstring& className = L"Button")
 		{
 			m_className = ws::SHORT(className);
@@ -228,19 +222,17 @@ namespace ws
 			}
 		}
 		
-		// Returns the Win32 class name of this control.
 		std::string getClass()
 		{
 			return m_className;
 		}
 		
-		// Shows or hides the control.
 		void setVisible(bool visible)
 		{
 			ShowWindow(hwnd,(visible) ? SW_SHOW : SW_HIDE);
 		}
 
-		// Moves the control to new coordinates.
+		
 		void setPosition(int xPos, int yPos) 
 		{ 
 			x = xPos; 
@@ -249,19 +241,16 @@ namespace ws
 				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE); 
 		}
 		
-		// Moves the control to a new position given as a Vec2i.
 		void setPosition(ws::Vec2i pos) 
 		{ 
 			setPosition(pos.x, pos.y); 
 		}
 		
-		// Returns the current position of the control.
 		ws::Vec2i getPosition() const 
 		{ 
 			return {x, y}; 
 		}
 
-		// Resizes the control to the given width and height.
 		virtual void setSize(int w, int h) 
 		{ 
 			width = w; 
@@ -270,25 +259,21 @@ namespace ws
 				SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE); 
 		}
 		
-		// Resizes the control using a Vec2i size.
 		virtual void setSize(ws::Vec2i size) 
 		{ 
 			setSize(size.x, size.y); 
 		}
 		
-		// Returns the current size of the control.
 		ws::Vec2i getSize() const 
 		{ 
 			return {width, height}; 
 		}
 		
-		// Returns the handle of the custom font assigned to this control.
 		HFONT getFontHandle()
 		{
 			return customFont;
 		}
 
-		// Adds a window style flag to the control.
 		void addStyle(DWORD addedStyle) 
 		{ 
 			style |= addedStyle; 
@@ -299,7 +284,6 @@ namespace ws
 			} 
 		}
 		
-		// Removes a window style flag from the control.
 		void removeStyle(DWORD removedStyle) 
 		{ 
 			style &= ~removedStyle; 
@@ -310,14 +294,13 @@ namespace ws
 			} 
 		}
 		
-		// Checks whether a given style flag is currently set.
 		bool hasStyle(DWORD checkStyle) const 
 		{ 
 			DWORD current = GetWindowLong(hwnd, GWL_STYLE); 
 			return (current & checkStyle) != 0; 
 		}
 
-		// Adds an extended window style flag.
+
 		void addExStyle(DWORD addedStyle) 
 		{ 
 			exStyle |= addedStyle; 
@@ -328,7 +311,6 @@ namespace ws
 			} 
 		}
 		
-		// Removes an extended window style flag.
 		void removeExStyle(DWORD removedStyle) 
 		{ 
 			exStyle &= ~removedStyle; 
@@ -339,14 +321,13 @@ namespace ws
 			} 
 		}
 		
-		// Checks whether a given extended style flag is set.
 		bool hasExStyle(DWORD checkStyle) const 
 		{ 
 			DWORD current = GetWindowLong(hwnd, GWL_EXSTYLE); 
 			return (current & checkStyle) != 0; 
 		}
 		
-		// Sets the text of the control.
+
 		void setText(const std::string& newText) 
 		{ 
 			text = newText; 
@@ -354,7 +335,6 @@ namespace ws
 				SetWindowTextA(hwnd, text.c_str()); 
 		}
 		
-		// Retrieves the current text of the control.
 		std::string getText() const 
 		{ 
 			if (!hwnd) 
@@ -367,7 +347,6 @@ namespace ws
 			wbuf.resize(len); return ws::SHORT(wbuf); 
 		}
 
-		// Applies a ws::Font and ws::Text style to the control.
 		void setFont(ws::Font& font, ws::Text& textSettings) 
 		{
 			if (!font.isValid()) return;
@@ -418,20 +397,18 @@ namespace ws
 			}			
 		}
 
-		// Checks if a point (relative to parent) lies inside the control.
 		bool contains(ws::Vec2i point) const 
 		{ 
 			return (point.x >= x && point.x < x+width && point.y >= y && point.y < y+height); 
 		}
 
-		// Handles WM_COMMAND messages; override in derived classes.
+		// For message handling – derived classes can override if needed
 		virtual bool handleCommand(MSG &msg) { return false; }
-		// Handles WM_NOTIFY messages; override in derived classes.
 		virtual bool handleNotify(NMHDR* pnmh) { return false; }
 	};
 	
 
-	// Adds a child control to a ws::Window and initializes it.
+	
 	void ws::Window::addChild(ws::Child &child)
 	{
 		//prevent duplicate child addition
@@ -450,7 +427,6 @@ namespace ws
 
 	}
 	
-	// Removes a child control from the window.
 	void ws::Window::removeChild(ws::Child &child)
 	{
 		for(size_t a=0;a<children.size();a++)
@@ -463,7 +439,6 @@ namespace ws
 		}
 	}
 	
-	// Checks whether a child control is registered with the window.
 	bool ws::Window::hasChild(ws::Child &child)
 	{
 		for(size_t a=0;a<children.size();a++)
@@ -476,7 +451,6 @@ namespace ws
 		return false;
 	}	
 
-	// Routes WM_NOTIFY messages to child controls; returns 0 if handled.
 	LRESULT handleNotifyForChildren(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         for (Child* child : window->children)
@@ -504,14 +478,12 @@ namespace ws
 		
 		public:
 		
-		// Constructor: sets the tab control class and default styles.
 		Tabs()
 		{
 			setClass(L"SysTabControl32");
 			addStyle(TCS_FIXEDWIDTH | TCS_RIGHTJUSTIFY  | WS_CLIPSIBLINGS);			
 		}
 		
-		// Initializes the tab control and processes any pending pages.
 		virtual bool init(ws::Window& parent) override
 		{
 			if (!Child::init(parent))
@@ -540,7 +512,6 @@ namespace ws
 			return true;
 		}		
 		
-		// Adds a new tab page with a title and a child control.
 		void addPage(const std::string& title, ws::Child& page)
 		{
 			if(!hwnd)
@@ -576,7 +547,6 @@ namespace ws
 				setSelected(0);
 		}
 
-		// Removes a page child from the tab control.
 		void removePage(ws::Child &child)
 		{
 			for(size_t a=0;a<pages.size();a++)
@@ -589,7 +559,6 @@ namespace ws
 			}
 		}
 		
-		// Checks whether a page child belongs to this tab control.
 		bool hasPage(ws::Child &child)
 		{
 			for(size_t a=0;a<pages.size();a++)
@@ -602,7 +571,6 @@ namespace ws
 			return false;
 		}	
 		
-		// Selects the tab page at the given index.
 		void setSelected(int index)
 		{
 			if(!hwnd)
@@ -621,20 +589,18 @@ namespace ws
 			updatePagePositions();
 		}
 
-		// Returns the index of the currently selected tab.
 		int getSelected() const
 		{
 			return TabCtrl_GetCurSel(hwnd);
 		}
 
-		// Overrides setSize to also reposition page contents.
 		virtual void setSize(int w, int h) override
 		{
 			Child::setSize(w, h);
 			updatePagePositions();
 		}
 		
-		// Handles TCN_SELCHANGE notifications to switch visible pages.
+		
 		virtual bool handleNotify(NMHDR* pnmh) override
 		{
 			if (pnmh->hwndFrom == hwnd && pnmh->code == TCN_SELCHANGE)
@@ -650,7 +616,8 @@ namespace ws
 			return false;      // not handled, let parent process
 		}
 
-		// Updates the position and size of all pages to fit the display area.
+
+
 		void updatePagePositions()
 		{
 			if (!hwnd) return;
@@ -693,7 +660,6 @@ namespace ws
 		
 		public:
 		
-		// Constructor: sets the COMBOBOX class and dropdown style.
 		ComboBox()
 		{
 			setClass(L"COMBOBOX");
@@ -701,7 +667,6 @@ namespace ws
 	        addStyle(WS_VSCROLL);			
 		}
 		
-		// Initializes the combo box and adds any pending items.
 		virtual bool init(ws::Window &parent) override
 		{
 			if (!Child::init(parent)) return false;
@@ -726,7 +691,6 @@ namespace ws
 			return true;
 		}
 		
-		// Adds a string item to the combo box drop‑down list.
 	    void addItem(const std::string& item)
 	    {
 			if (!hwnd) {
@@ -737,7 +701,6 @@ namespace ws
 	        SendMessageA(hwnd, CB_ADDSTRING, 0, (LPARAM)item.c_str());
 	    }
 	    
-		// Adds multiple string items to the combo box.
 	    void addItems(const std::vector<std::string>& items)
 	    {
 			if (!hwnd) {
@@ -752,35 +715,30 @@ namespace ws
 	        }
 	    }
 	    
-		// Removes the item at the specified index.
 	    void removeItem(int index)
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_DELETESTRING, (WPARAM)index, 0);
 	    }
 	    
-		// Clears all items from the combo box.
 	    void clear()
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
 	    }
 	    
-		// Returns the index of the currently selected item.
 	    int getSelectedIndex()
 	    {
 	        if (!hwnd) return -1;
 	        return (int)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
 	    }
 	    
-		// Selects the item at the given index.
 	    void setSelectedIndex(int index)
 	    {
 	        if (!hwnd) return;
 	        SendMessage(hwnd, CB_SETCURSEL, (WPARAM)index, 0);
 	    }
 	    
-		// Returns the text of the currently selected item.
 	    std::string getSelectedText()
 	    {
 	        if (!hwnd) return "";
@@ -797,14 +755,12 @@ namespace ws
 	        return std::string(buffer.data());
 	    }
 	    
-		// Returns the total number of items in the combo box.
 	    int getItemCount()
 	    {
 	        if (!hwnd) return 0;
 	        return (int)SendMessage(hwnd, CB_GETCOUNT, 0, 0);
 	    }
 	    
-		// Returns the text of the item at the given index.
 	    std::string getItemText(int index)
 	    {
 	        if (!hwnd || index < 0) return "";
@@ -818,7 +774,6 @@ namespace ws
 	        return std::string(buffer.data());
 	    }
 
-		// Checks if a WM_COMMAND message indicates a selection change.
 		bool selectionChanged(MSG &msg)
 		{
 	        if (msg.message == WM_COMMAND && HIWORD(msg.wParam) == CBN_SELCHANGE)
@@ -831,7 +786,7 @@ namespace ws
 	        return false;			
 		}
 		
-		// Switches between editable and read‑only dropdown styles.
+	    
 	    void setDropdownStyle(bool allowEdit = true)
 	    {
 	        if (!hwnd) return;
@@ -853,7 +808,6 @@ namespace ws
 	                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 	    }
 	    
-		// Returns the text currently typed in the editable edit field.
 	    std::string getEditText()
 	    {
 	        if (!hwnd) return "";
@@ -869,7 +823,6 @@ namespace ws
 	        return std::string(buffer.data());
 	    }
 	    
-		// Sets the text in the editable edit field.
 	    void setEditText(const std::string& text)
 	    {
 	        if (!hwnd) return;
@@ -883,13 +836,11 @@ namespace ws
 	{
 		public:
 		
-		// Constructor: sets the Button class.
 		Button()
 		{
 			setClass(L"Button");
 		}
 		
-		// Initializes the button and sets a default font if needed.
 		virtual bool init(ws::Window &parent) override
 		{
 			if(!Child::init(parent)) return false;
@@ -907,7 +858,6 @@ namespace ws
 			return true;				
 		}
 
-		// Checks if a WM_COMMAND message indicates this button was clicked.
 	    bool isPressed(MSG &msg)
 	    {
 	        if(msg.message == WM_COMMAND && HIWORD(msg.wParam) == BN_CLICKED)
@@ -927,7 +877,6 @@ namespace ws
 	{
 		public:
 		
-		// Constructor: sets the trackbar class and horizontal style.
 		Slider()
 		{
 			setClass(TRACKBAR_CLASS);
@@ -936,7 +885,6 @@ namespace ws
 			setRange(0,100);			
 		}
 		
-		// Initializes the slider and restores any pending range/position.
 		virtual bool init(ws::Window &parent) override
 		{
 			if(!Child::init(parent)) return false;
@@ -955,40 +903,34 @@ namespace ws
 				setFont(font,text);
 			}
 			
+			parent.addMessageHandler([&](MSG msg) -> LRESULT {
+				if (msg.message == WM_HSCROLL && (HWND)msg.lParam == this->hwnd) {
+					this->slidePos = (int)SendMessage(this->hwnd, TBM_GETPOS, 0, 0);
+					
+				}
+				return 0;
+			});			
+			
 			
 			return true;
 		}
 		
-		// Checks scroll messages and updates the stored position; returns true if moved.
-	    bool getScroll(MSG &msg)
-	    {
-	    	if(!hwnd)
-				return false;
-	        if((msg.message == WM_HSCROLL || msg.message == WM_VSCROLL) && (HWND)msg.lParam == hwnd)
-	        {
-	            slidePos = (int)SendMessage(hwnd, TBM_GETPOS, 0, 0);
-	            
-				return true;
-	        }
-	        return false;
-	    }
 	    
-		// Makes the slider horizontal.
+	    
 	    void setHorizontal()
 	    {
 	    	removeStyle(TBS_VERT);
 	    	addStyle(TBS_HORZ);
 		}
 		
-		// Makes the slider vertical.
 		void setVertical()
 		{
 	    	removeStyle(TBS_HORZ);
 	    	addStyle(TBS_VERT);
 		}
 		
-		// Sets the range (minimum and maximum) of the slider.
-        void setRange(int minimum = 0,int maximum = 100)
+        
+		void setRange(int minimum = 0,int maximum = 100)
 		{
 			storedMin = minimum;
 			storedMax = maximum;
@@ -1001,7 +943,6 @@ namespace ws
 			SendMessage(hwnd, TBM_SETRANGEMAX, TRUE, maximum);
 		}
 		
-		// Sets the current slider position.
 		void setSlidePosition(int pos = 0)
 		{
 			slidePos = pos;
@@ -1015,7 +956,6 @@ namespace ws
 			 
 		}
 		
-		// Returns the current slider position.
 		int getSlidePosition()
 		{
 			return slidePos;
@@ -1034,12 +974,83 @@ namespace ws
 	
 
 
+	class ScrollBar : public ws::Child
+	{
+
+		public:
+		
+		ScrollBar(bool vertical = true)
+		{
+			setClass(L"SCROLLBAR");
+			if (vertical)
+				addStyle(SBS_VERT);
+			else
+				addStyle(SBS_HORZ);
+			setRange(0, 100);
+			setPageSize(10);
+			setSlidePos(0);
+		}
+
+		void setVertical()
+		{
+			removeStyle(SBS_HORZ);
+			addStyle(SBS_VERT);
+		}
+		
+		void setHorizontal()
+		{
+			removeStyle(SBS_VERT);
+			addStyle(SBS_HORZ);
+		}
+		
+
+		void setRange(int minVal, int maxVal)
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_RANGE;
+			si.nMin = minVal;
+			si.nMax = maxVal;
+			SetScrollInfo(hwnd, SB_CTL, &si, TRUE);
+		}
+
+		void setPageSize(int page)
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_PAGE;
+			si.nPage = page;
+			SetScrollInfo(hwnd, SB_CTL, &si, TRUE);
+		}
+
+		void setSlidePos(int pos)
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_POS;
+			si.nPos = pos;
+			SetScrollInfo(hwnd, SB_CTL, &si, TRUE);
+		}
+
+		int getSlidePos()
+		{
+			SCROLLINFO si = { sizeof(si) };
+			si.fMask = SIF_POS;
+			GetScrollInfo(hwnd, SB_CTL, &si);
+			return si.nPos;
+		}
+
+		virtual bool init(ws::Window& parent) override
+		{
+			if (!Child::init(parent))
+				return false;
+
+			return true;
+		}
+	};
+
 
 	class TextBox : public Child
 	{
 		public:
 		
-		// Constructor: sets the EDIT class and multiline styles.
 		TextBox()
 		{
 			setClass(L"EDIT");
@@ -1049,7 +1060,7 @@ namespace ws
 			addExStyle(WS_EX_CLIENTEDGE);
 		}
 		
-		// Initializes the text box and sets a default font and character limit.
+		
 		virtual bool init(ws::Window &parent) override
 		{
 			
@@ -1069,8 +1080,7 @@ namespace ws
 			return true;		
 		}		
 		int char_limit = 0;
-		// Sets the maximum number of characters (0 = infinite).
-		void setCharacterLimit(int max_chars = 0)
+		void setCharacterLimit(int max_chars = 0)//0 is infinite
 		{
 			if(!hwnd)
 				char_limit = max_chars;
@@ -1078,7 +1088,7 @@ namespace ws
 				SendMessage(hwnd, EM_SETLIMITTEXT, (WPARAM)max_chars, 0);			
 		}
 		
-		// Returns true if this text box currently has keyboard focus.
+		
 		bool getFocus()
 		{
 	        if (!hwnd) return false;
@@ -1090,10 +1100,10 @@ namespace ws
 	
 	
 	
+	
 	class Label : public Child
 	{
 		public:
-		// Constructor: sets the STATIC class and notification style.
 		Label()
 		{
 			setClass(L"STATIC");
@@ -1101,7 +1111,6 @@ namespace ws
 			addStyle(SS_LEFT);			
 		}
 		
-		// Initializes the label and sets a default font.
 		virtual bool init(ws::Window &parent) override
 		{
 			
@@ -1134,39 +1143,31 @@ namespace ws
 		
 		public:
 
-		// Sets the parent window for the color dialog.
 		void init(ws::Window &newParent)
 		{ parentRef = &newParent;}
 
-		// Returns the parent window pointer.
 		ws::Window *getParent()
 		{ return parentRef;}
 
-		// Adds a flag to the dialog's behaviour.
 		void addFlag(DWORD newFlag)
 		{ flags |= newFlag; }
 		
-		// Removes a flag from the dialog's behaviour.
 		void removeFlag(DWORD removeFlag)
 		{ flags &= ~removeFlag;}
 		
-		// Returns the current dialog flags.
 		DWORD getFlags()
 		{ return flags; }
 
-		// Sets the initial color shown when the dialog opens.
 		void setInitColor(ws::Hue hue)
 		{ initColor = hue; }
 
-		// Returns the initial color value.
 		ws::Hue getInitColor()
 		{ return initColor; }
 
-		// Returns the color selected by the user after the dialog closes.
 		ws::Hue getResult()
 		{ return chosenColor; }
 
-		// Opens the color dialog; returns true if a color was chosen.
+		
 		bool open()
 		{
 			CHOOSECOLOR cc;
@@ -1196,7 +1197,6 @@ namespace ws
 	{
 		public:
 	    
-		// Constructor: creates a popup menu for the dropdown.
 		Dropdown(int newID, std::string newName)
 	    {
 	        if (newID != 0) // Leaf items don't need a menu handle
@@ -1206,14 +1206,12 @@ namespace ws
 	        isPopup = (newID != 0);
 	    }
 	    
-		// Adds a menu item with an ID, type, and name.
 	    void addItem(int id,DWORD type, std::string itemName)
 	    {
 	        if (isPopup)
 	            AppendMenuA(handle, type, id, ws::TO_LPCSTR(itemName));
 	    }
 	    
-		// Adds a submenu (another Dropdown) to this dropdown.
 	    void addSubmenu(Dropdown &submenu)
 	    {
 	        if (isPopup && submenu.isPopup)
@@ -1221,19 +1219,15 @@ namespace ws
 	                       ws::TO_LPCSTR(submenu.getName()));
 	    }
 		
-		// Returns the underlying HMENU handle.
 		HMENU getHandle()
 		{ return handle; }
 		
-		// Returns the name of the dropdown.
 		std::string getName()
 		{ return name;}
 		
-		// Returns the menu item ID.
 		int getID()
 		{ return ID;}
 		
-		// Adds another dropdown as a menu item.
 		void addItem(Dropdown drop)
 		{
 			if (isPopup)
@@ -1255,17 +1249,17 @@ namespace ws
 		HMENU bar;
 
 		private:
+		ws::View *oldView;
+		ws::Vec2f oldSize = {0,0};
 		ws::Window* windowRef = nullptr;
 
 		public:
 		
-		// Constructor: creates an empty menu bar.
 		Menu()
 		{
 			bar = CreateMenu();
 		}
 		
-		// Adds a Dropdown (popup menu) to the menu bar.
 		void addDropdown(ws::Dropdown &drop)
 		{
 			AppendMenuA(bar, MF_POPUP, (UINT_PTR)drop.getHandle(), ws::TO_LPCSTR(drop.getName()));
@@ -1273,21 +1267,52 @@ namespace ws
 				windowRef->setSize(windowRef->getSize());
 		}
 		
-		// Attaches the menu bar to a ws::Window.
-		void setWindow(ws::Window &window)
+		
+		void setVisible(bool visible,ws::Window &window)
 		{
-			SetMenu(window.hwnd, bar);	
+			if(GetMenuItemCount(bar) == 0)
+			{
+				//setting the menu visible before adding items will cause the client area to offset in the wrong way and will cause mouse coordinates to be off.
+				MessageBoxA(NULL,"Error! You can't use ws::Menu::setVisible() till you add items to the menu!","Invalid Menu Command Order",MB_OK);
+				return;
+			}
+			if(visible)
+				SetMenu(window.hwnd, bar);	
+			else
+				SetMenu(window.hwnd,NULL);
+			
+			SetWindowPos(window.hwnd, NULL, 0, 0, 0, 0,
+						 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+			int menuH = 0;
+			if(visible) 
+			{
+				MENUBARINFO mbi = {sizeof(mbi)};
+				if(GetMenuBarInfo(window.hwnd,OBJID_MENU,0,&mbi))
+					menuH = mbi.rcBar.bottom - mbi.rcBar.top;
+
+				if(menuH == 0)
+					menuH = GetSystemMetrics(SM_CYMENU);
+			}
+	
+			window.setSourcePos(window.getSourcePos().x,menuH);
+			
 			windowRef = &window;
-			if(windowRef != nullptr)
-				windowRef->setSize(windowRef->getSize());
+			InvalidateRect(window.hwnd, NULL, TRUE);
+			UpdateWindow(window.hwnd);
 		}
 		
-		// Extracts the menu command ID from a WM_COMMAND message.
-		int getEvent(MSG &m)
+		
+		int getEvent(MSG &m)//You can use this for readability or you can use the normal way.
 		{
 			if(m.message == WM_COMMAND)
 				return LOWORD(m.wParam);
 			return -1;
+		}
+		
+		ws::Window &getWindow()
+		{
+			return *windowRef;
 		}
 		
 	};
@@ -1298,19 +1323,18 @@ namespace ws
 	{
 		public:
 		
-		// Adds a flag to the popup menu's behaviour.
+		
+		
 		void addFlag(DWORD newFlag)
 		{ flags |= newFlag; }
 		
-		// Removes a flag from the popup menu's behaviour.
 		void removeFlag(DWORD removeFlag)
 		{ flags &= ~removeFlag;}
 		
-		// Returns the current flags.
 		DWORD getFlags()
 		{ return flags; }		
 		
-		// Retrieves and resets the last selected command ID.
+		
 		int getResult()
 		{
 			int r = command;
@@ -1318,19 +1342,15 @@ namespace ws
 			return r;
 		}
 		
-		// Returns the list of menu item strings.
 		std::vector<std::string> getList()
 		{ return list; }
 		
-		// Sets the list of menu item strings.
 		void setList(std::vector<std::string> newList)
 		{ list = newList; }
 		
-		// Adds a single menu item string to the list.
 		void addItem(std::string item)
 		{ list.push_back(item);}
 		
-		// Removes a menu item string from the list.
 		void removeItem(std::string item)
 		{	
 			for(size_t a=0;a<list.size();a++)
@@ -1344,15 +1364,16 @@ namespace ws
 			
 		}
 		
-		// Sets the parent window that will own the context menu.
 		void init(ws::Window &newParent)
 		{ parentRef = &newParent;}
 		
-		// Returns the parent window pointer.
 		ws::Window *getParent()
 		{ return parentRef;}
 		
-		// Opens the context menu at the given mouse position; returns true.
+		
+		
+		
+		
 		bool open(ws::Vec2i mouse)
 		{
 			if(parentRef == nullptr)
@@ -1407,55 +1428,46 @@ namespace ws
 	{
 	    public:
 	    
-	    // Constructor: initializes a file open/save dialog.
 	    FileWindow()
 	    {
 	        
 	    }
 	    
-		// Sets the initial filename to be shown in the dialog.
 	    void setInitResult(std::string file)
 	    {
 	        fileName = file;
 	    }
 	    
-		// Returns the filename selected by the user.
 	    std::string getResult()
 	    {
 	        return fileName;
 	    }
 	    
-		// Sets the dialog window title.
 	    void setTitle(std::string name)
 	    { 
 	        title = name; 
 	    }
 	    
-		// Returns the dialog window title.
 	    std::string getTitle()
 	    { 
 	        return title; 
 	    }
 	    
-		// Adds a flag to the dialog's behaviour.
 	    void addFlag(DWORD newFlag)
 	    { 
 	        flags |= newFlag; 
 	    }
 	    
-		// Removes a flag from the dialog's behaviour.
 	    void removeFlag(DWORD removeFlag)
 	    { 
 	        flags &= ~removeFlag;
 	    }
 	    
-		// Returns the current dialog flags.
 	    DWORD getFlags()
 	    { 
 	        return flags; 
 	    }
 	    
-		// Opens the file selection dialog; returns true if a file was chosen.
 	    bool open(ws::Window *parent = nullptr)
 	    {
 			
@@ -1512,7 +1524,6 @@ namespace ws
 	        }
 	    }
 	    
-		// Opens the file save dialog; returns true if a file was chosen.
 	    bool save(ws::Window *parent = nullptr)
 	    {
 	        std::wstring wtitle = ws::WIDE(title);
@@ -1587,55 +1598,46 @@ namespace ws
 	{
 	    public:
 	    
-	    // Constructor: initializes a folder selection dialog.
 	    FolderWindow()
 	    {
 	        
 	    }
 	    
-		// Sets the title of the folder selection dialog.
 	    void setTitle(std::string name)
 	    {
 	        title = name;
 	    }
 	    
-		// Returns the title of the folder selection dialog.
 	    std::string getTitle()
 	    {
 	        return title;
 	    }
 	    
-		// Adds a flag to the dialog's behaviour.
 	    void addFlag(DWORD flag)
 	    { 
 	        flags |= flag;
 	    }
 	    
-		// Replaces all flags with the given value.
 	    void setFlags(DWORD allFlags)
 	    { 
 	        flags = allFlags;
 	    }
 	    
-		// Removes a flag from the dialog's behaviour.
 	    void removeFlag(DWORD flag)
 	    { 
 	        flags &= ~flag;
 	    }
 	    
-		// Returns the current flags.
 	    DWORD getFlags()
 	    {
 	        return flags;
 	    }
 	    
-		// Returns the selected folder path after dialog closes.
 	    std::string getResult()
 	    { 
 	        return folderName;
 	    }
 	    
-		// Opens the folder selection dialog; returns true if a folder was chosen.
 	    bool open(ws::Window *parent = nullptr)
 	    {
 	        std::wstring wtitle = ws::WIDE(title);
@@ -1684,7 +1686,6 @@ namespace ws
 	        return false;
 	    }
 	    
-		// Sets the initial folder to be displayed when the dialog opens.
 	    void setInitResult(std::string folder)
 	    {
 	        initialFolder = folder;
@@ -1696,7 +1697,7 @@ namespace ws
 	    std::string folderName = "";
 	    std::string initialFolder = "";
 	    
-	    // Callback function used to set the initial folder in the browser dialog.
+	    // callback function for setting initial folder
 	    static int __stdcall BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
 	    {
 	        if (uMsg == BFFM_INITIALIZED) {
@@ -1717,37 +1718,32 @@ namespace ws
 		
 		public:
 		
-		// Constructor: creates a modern IFileDialog COM object.
-		ExploreWindow()
+		
+		ExploreWindow(std::string mode = "open")
 		{
-			
-			hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+			CLSID clsid = (mode == "save") ? CLSID_FileSaveDialog : CLSID_FileOpenDialog;
+			hr = CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
 			
 			options = pfd->GetOptions(&options);
 			
 			addStyle(FOS_NOCHANGEDIR);
 		}
 		
-		// Adds a style flag to the file dialog.
+		
 		void addStyle(DWORD style)
 		{
 			options |= style;
 		}
-		// Removes a style flag from the file dialog.
 		void removeStyle(DWORD style)
 		{
 			options &= ~style;
 		}
 		
-		// Sets the dialog title.
 		void setTitle(std::string title) {m_title = title;}
-		// Sets the initial folder or result.
 		void setInitResult(std::string folder) {m_initialFolder = folder;}
 		
-		// Returns the selected file or folder path.
 		std::string getResult() {return m_resultName;}
 		
-		// Opens the modern file dialog; returns true if a file/folder was selected.
 		bool open(ws::Window *parent = nullptr)
 		{
 
@@ -1812,14 +1808,12 @@ namespace ws
         std::vector<std::string> pendingItems;
 		public:
         
-		// Constructor: sets the LISTBOX class and standard styles.
 		ListBox()
 		{
             addStyle(LBS_STANDARD | WS_VSCROLL | WS_HSCROLL | LBS_NOTIFY);
 			setClass(L"LISTBOX");
 		}
         
-		// Initializes the list box and adds any pending items.
 		virtual bool init(ws::Window &parent) override 
 		{
 			if(!Child::init(parent)) return false;
@@ -1840,7 +1834,6 @@ namespace ws
             return true;
         }
 		
-		// Adds a string item to the list box.
         void addItem(const std::string& item) 
 		{
             if (!hwnd) 
@@ -1851,7 +1844,6 @@ namespace ws
             SendMessageA(hwnd, LB_ADDSTRING, 0, (LPARAM)item.c_str());
         }
 
-		// Adds multiple string items to the list box.
 		void addItems(const std::vector<std::string>& items)
 		{
 			if (!hwnd) {
@@ -1861,34 +1853,29 @@ namespace ws
 			for (const auto& item : items) addItem(item);
 		}
 
-		// Removes the item at the given index.
 		void removeItem(int index)
 		{
 			if (!hwnd) return;
 			SendMessageA(hwnd, LB_DELETESTRING, (WPARAM)index, 0);
 		}
         
-		// Clears all items from the list box.
 		void clear() 
 		{
             if (!hwnd) { pendingItems.clear(); return; }
             SendMessageA(hwnd, LB_RESETCONTENT, 0, 0);
         }
 		
-		// Returns the index of the currently selected item.
         int getSelectedIndex() 
 		{
             return hwnd ? (int)SendMessageA(hwnd, LB_GETCURSEL, 0, 0) : -1;
         }
 		
-		// Returns the text of the currently selected item.
         std::string getSelectedText() 
 		{
             int index = getSelectedIndex();
             return (index == -1) ? "" : getItemText(index);
         }
 		
-		// Returns the text of the item at the given index.
         std::string getItemText(int index) 
 		{
             if (!hwnd || index < 0) return "";
@@ -1902,25 +1889,154 @@ namespace ws
             return std::string(buf.data());
         }
         
-		// Sets the selected item by index.
 		void setSelectedIndex(int index) 
 		{
             if (hwnd) 
 				SendMessage(hwnd, LB_SETCURSEL, (WPARAM)index, 0);
         }
         
-		// Checks if a WM_COMMAND message indicates a selection change.
 		bool selectionChanged(MSG &msg) 
 		{
             return msg.message == WM_COMMAND && HIWORD(msg.wParam) == LBN_SELCHANGE && LOWORD(msg.wParam) == controlID;
         }
         
-		// Returns the total number of items in the list box.
 		int getItemCount() 
 		{
             return hwnd ? (int)SendMessage(hwnd, LB_GETCOUNT, 0, 0) : 0;
         }
     };	
+	
+
+	bool Balloon(ws::Window &window,std::string message,std::string title,HICON hIcon,DWORD messageIconType = NIIF_USER,int timeoutMilliseconds = 5000,DWORD styles = NIF_ICON | NIF_TIP | NIF_INFO)
+	{
+		NOTIFYICONDATA nid = {};
+		ZeroMemory(&nid, sizeof(nid));
+		nid.cbSize = sizeof(nid);
+		nid.hWnd = window.hwnd;
+		static int BalloonID = 0;
+		nid.uID = BalloonID++;	
+		
+		nid.uFlags = styles;
+		nid.hIcon = hIcon;
+		wcscpy_s(nid.szTip, ws::WIDE(title).c_str());	
+		
+		if(!Shell_NotifyIcon(NIM_ADD, &nid))
+			return false;
+		
+		
+		nid.dwInfoFlags = messageIconType;
+		wcscpy_s(nid.szInfo,ws::WIDE(message).c_str());
+		wcscpy_s(nid.szInfoTitle, ws::WIDE(title).c_str());
+		nid.uTimeout = timeoutMilliseconds; 
+		
+		if(!Shell_NotifyIcon(NIM_MODIFY, &nid)) 
+		{
+			Shell_NotifyIcon(NIM_DELETE, &nid);
+			return false;
+		}
+		
+		ws::Timer timer;
+		window.addMessageHandler([timer,timeoutMilliseconds,nid](MSG msg) mutable -> HRESULT{
+			if(timer.getMilliSeconds() >= timeoutMilliseconds)
+				Shell_NotifyIcon(NIM_DELETE, &nid);
+			return 0;
+		});
+		return true;
+	}
+	
+	class TrayIcon
+	{
+		private:
+		int myID = -1;
+		NOTIFYICONDATA m_nid;
+		std::shared_ptr<MSG> msgPtr; 
+		
+		public:
+		bool init(ws::Window &window,std::string title,HICON hIcon,DWORD styles = NIF_ICON | NIF_MESSAGE | NIF_TIP)
+		{
+			msgPtr = std::make_shared<MSG>();
+			std::weak_ptr<MSG> weakMsg = msgPtr;
+			
+			ZeroMemory(&m_nid, sizeof(m_nid));
+			m_nid.cbSize = sizeof(NOTIFYICONDATA);
+			m_nid.hWnd = window.hwnd;
+			static int ID = 0;
+			myID = ++ID;
+			m_nid.uID = myID;
+			m_nid.uFlags = styles;
+			m_nid.hIcon = hIcon;
+			m_nid.uCallbackMessage = WM_USER + myID;
+			lstrcpy(m_nid.szTip, ws::WIDE(title).c_str());
+			
+			if(!Shell_NotifyIcon(NIM_ADD, &m_nid))
+				return false;
+			
+			//store incoming messages
+			int localID = myID;
+			window.addMessageHandler([weakMsg,localID](MSG msg) mutable -> LRESULT{
+				if(msg.message != WM_USER + localID) 
+					return 0;
+				if(auto sp = weakMsg.lock())
+					*sp = msg;
+				return 0; 
+			});
+			
+			
+			//destroy handler
+			NOTIFYICONDATA localNid = m_nid;
+			window.addMessageHandler([localNid](MSG msg) mutable -> LRESULT {
+				if(msg.message == WM_DESTROY) 
+				{			
+					Shell_NotifyIcon(NIM_DELETE, &localNid);
+					return 0;   
+				}
+				return 0;
+			});			
+			return true;				
+		}
+		bool isPressed(int button)
+		{
+			if(!msgPtr) return false;
+			const MSG& msg = *msgPtr;			
+			
+			if(msg.message != WM_USER + myID)
+				return false;
+			
+			bool pressed = false;
+			
+			if(msg.lParam == button)
+				pressed = true;
+			if(button == ws::Mouse::Right && msg.lParam == WM_RBUTTONUP)
+				pressed = true;
+			if(button == ws::Mouse::Left && msg.lParam == WM_LBUTTONUP)
+				pressed = true;
+			
+			if(pressed)
+				*msgPtr = MSG{}; 
+			return pressed;
+		}
+
+		bool showBalloon(const std::string& message, const std::string& title,DWORD infoFlags = NIIF_USER, int timeoutMs = 5000)
+		{
+			if(myID == -1) return false;
+
+			// copy of the nid with info flags set
+			NOTIFYICONDATA nid = m_nid;
+			nid.uFlags |= NIF_INFO;   // update the info
+			nid.dwInfoFlags = infoFlags;
+			wcscpy_s(nid.szInfo, ws::WIDE(message).c_str());
+			wcscpy_s(nid.szInfoTitle, ws::WIDE(title).c_str());
+			nid.uTimeout = timeoutMs;
+
+			return Shell_NotifyIcon(NIM_MODIFY, &nid) == TRUE;
+		}		
+		
+	};
+	
+
+
+
+	
 	
 
 }

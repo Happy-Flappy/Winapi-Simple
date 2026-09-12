@@ -8,6 +8,9 @@
 #pragma comment(lib, "winmm.lib")
 #endif
 
+#include <filesystem>
+#include <fstream>
+
 namespace ws 
 {
 	
@@ -20,22 +23,35 @@ namespace ws
 		bool blocking = true;
 		std::string ID = "";
 		std::string extension = "none";
-			
-		// Destructor: closes the MCI device if it was opened.
+		
+		private:
+		
+		bool isMemoryLoaded = false;
+		std::string tempFilePath = "";	
+		ws::Timer progressTimer;
+		float progress = 0;
+		float totalLength = 0;
+		bool isPlaying = false;
+		int volume = 100;
+		
+		public:
+		
 		~Wav()
 		{
-		    // Clean up
+			// Clean up
 		    if(!ID.empty())
 		    {
-		        std::string status = getChannelStatus(channel);
-		        if (status != "error") {
+		        std::string status = getChannelStatus();
+		        if(status != "error") {
 		            std::string command = "close " + ID;
 		            mciSendStringA(command.c_str(), NULL, 0, NULL);
 		        }
-			}
+			}			
+			
+			if(!tempFilePath.empty())
+				std::filesystem::remove(tempFilePath);
 		}
 
-		// Constructor: stores the audio file path, channel, and blocking flag.
 		Wav(std::string path = "",int channel = 0,bool blocking = true)
 		{
 			this->path = path;
@@ -45,7 +61,6 @@ namespace ws
 		
 		private:
 		
-		// Sends an MCI command and optionally reports errors; returns success status.
 		static bool mciSimple(std::string command,bool sendError = true)
 		{
 			MCIERROR err = mciSendStringA(TO_LPCSTR(command),NULL,0,NULL);
@@ -62,7 +77,6 @@ namespace ws
 			return true;		
 		}
 		
-		// Checks file extension and warns about potentially unsupported formats.
 		static void isSupported(std::string m_path)
 		{
 			std::filesystem::path p(m_path);
@@ -89,54 +103,53 @@ namespace ws
 		
 		public:
 
-		// Finds and returns an available MCI channel index (0‑99).
+
 		static int getFreeChannel()
 		{
 			int channel = -1;
 			for(int a=0;a<100;a++)
 			{
-				if(getChannelStatus(a) != "playing" && getChannelStatus(a) != "paused")
-				{
-					if(a != -1)
-					{
-						channel = a;
-						break;
-					}
-				} 
+				std::string status = getChannelStatusMCI(a);
+				if(status == "playing" || status == "paused")
+					continue;				
+				channel = a;
+				break;
 			}
 			if(channel == -1)
-			{
 				std::cerr << "A sound channel could not be auto detected! \nThis means that either the maximum number of device\n sound contexts have been created OR that the range of channel\n ID's from 0 to 100 are all in use.\n Try using a number below or above the minimum and maximum attempted values.\n";
-			}
 			
 			return channel;
 		}
 
-		// Retrieves the current status ("playing", "stopped", etc.) of an MCI channel.
-		static std::string getChannelStatus(int m_channel)
+
+		std::string getChannelStatus()
+		{
+			if(ID.empty()) return "error";
+			return isPlaying ? "playing" : "stopped";
+		}
+		
+		
+		static std::string getChannelStatusMCI(int m_channel)
 		{
 			
 			std::string m_ID = std::to_string(m_channel);
 			
 			
-			
 		    char returnBuffer[128]; // Buffer to store the status string
 		    std::string command = "status " + m_ID + " mode";
 		    
-		     memset(returnBuffer, 0, sizeof(returnBuffer));
+		    memset(returnBuffer, 0, sizeof(returnBuffer));
 		   
 		    
 		    // Send the command and check for errors
-		    if (mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL) == 0) {
+		    if (mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL) == 0) 
 		        return returnBuffer; // Returns "playing", "stopped", etc.
-		    } else {
-		        return "error";
-		    }
 		    return "error";
 		}
 		
+		
 
-		// Plays a sound file on a given channel without opening it first.
+		
 		static bool PlayFree(std::string m_path,int m_channel,bool m_blocking = false)
 		{
 			
@@ -151,6 +164,7 @@ namespace ws
 	            return false;
 	        }
 			
+
 
 			//Get shortened path name because mciSendStringA does not support long paths.
 			std::wstring wpath = GetShortPathNameSafe(WIDE(m_path));
@@ -170,17 +184,45 @@ namespace ws
 				return false;
 			
 			
-			//Make command for playing the file.
-			command = "play "+m_ID;
-			
-			//play the file
+			command = "play " + m_ID;
 			if(!mciSimple(command))
 				return false;
 			
 			return true;
 		}
+
+		//saves a temporary file so that the program can open and play that file as sound. - Extension must be given!
+		bool loadFromMemory(const void* data, size_t size, int m_channel, bool m_blocking,std::string extension) 
+		{
+			std::filesystem::path tempDir = std::filesystem::current_path();
+			tempFilePath = (tempDir / ("ws_audio_" + std::to_string(rand()) + "_" + std::to_string(clock()) + extension)).string();
+
+			std::ofstream file(tempFilePath, std::ios::binary);
+			if(!file.write(static_cast<const char*>(data), size)) 
+			{
+				std::cerr << "Failed to write audio buffer to temporary file.\n";
+				return false;
+			}
+			file.close();
+
+			if(!open(tempFilePath, m_channel, m_blocking)) 
+			{
+				std::cerr << "Failed to open temporary audio file.\n";
+				std::filesystem::remove(tempFilePath);
+				return false;
+			}
+
+			isMemoryLoaded = true;
+			
+			char buf[128];
+			mciSendStringA(("status " + ID + " length").c_str(), buf, sizeof(buf), NULL);
+			totalLength = atof(buf);   
+			progress = 0.0f;
+			isPlaying = false;			
+			
+			return true;
+		}
 		
-		// Opens a sound file on a specific channel, preparing it for playback.
 		bool open(std::string m_path,int m_channel,bool m_blocking = true)
 		{
 			isSupported(m_path);
@@ -204,7 +246,6 @@ namespace ws
 	        mciSimple(command,false);//close channel without error report.			
 			
 			
-			
 
 			//Get shortened path name because mciSendStringA does not support long paths.
 			std::wstring wpath = GetShortPathNameSafe(WIDE(path));
@@ -226,56 +267,65 @@ namespace ws
 				return false;			
 			
 			
+			char buf[128];
+			mciSendStringA(("status " + ID + " length").c_str(), buf, sizeof(buf), NULL);
+			totalLength = atof(buf);   
+			progress = 0.0f;
+			isPlaying = false;			
 			
 			return true;
 		}
 		
-		// Starts playback of the currently opened audio file.
 		void play()
 		{
-
-			if(getChannelStatus(channel) == "error")
+			if(ID.empty())
 			{
 				std::cerr<<"Sound attempted to play but was not initialized! Use open() before play().\n";
 				return;
 			}
 			
 			
-			if(getChannelStatus(channel) == "playing" && blocking)
+			if(isPlaying && blocking)
 				return;
 			
-			std::string command = "";
+			std::string command = "play " + ID;
+			if(!mciSimple(command))
+				return;		
 			
-	        // Start playback
-	        command = "play " + ID;
-	        
-	        if(!mciSimple(command))
-				return;
+			// Restart the timer to measure from this moment
+			progressTimer.restart();
+			isPlaying = true;
 		}
 		
-		// Static method: pauses playback on the given channel.
+		
+		
 		static void stop(int m_channel)
 		{
 			std::string m_ID = std::to_string(m_channel);
-			
 			std::string command = "pause "+ m_ID;
-			
 			mciSimple(command);
 		}
 		
-		// Pauses playback of the currently opened audio on its channel.
 		void stop()
 		{
-			std::string command = "pause "+ ID;
+			if(isPlaying) 
+			{
+				//accumilate the previous elapsed time so that the true time will be backed up.
+				progress += progressTimer.restart();   
+				isPlaying = false;
+			}
 			
+			std::string command = "pause "+ ID;
 			mciSimple(command);
 		}
 		
-		// Sets the playback volume as a percentage (0‑100); returns success.
+		
+		
+		
 	    bool setVolume(int percent)
 	    {
 	    	
-	    	if(getChannelStatus(channel) == "error")
+	    	if(ID.empty())
 	    	{
 	    		std::cerr << "Unsupported Audio Action: setVolume cannot be used before using open()\n";
 	    		return false;
@@ -284,158 +334,105 @@ namespace ws
 			if(extension == ".mid" || extension == ".midi")
 			{
 				std::cerr << "Unsupported Audio Action: An attempt was made to set the volume of a midi file!\n";
+				return false;
 			}
-				    	
-	    	
+			
+			
 	        // Convert percentage back to MCI volume (0-1000)
-	        int volume = (percent * 1000) / 100;
-	        
-	        if(getChannelStatus(channel) == "error") return false;
-	        
-	        // Clamp volume to valid range
-	        volume = std::max(0, std::min(1000, volume));
+	        int volume2 = (percent * 1000) / 100;
+	        volume2 = std::max(0, std::min(1000, volume2));
 	        
 	        // Try different MCI volume commands in order
 	        std::string commands[] = {
-	            "set " + ID + " audio volume to " + std::to_string(volume),
-	            "setaudio " + ID + " volume to " + std::to_string(volume), 
-	            "set " + ID + " volume " + std::to_string(volume)
+	            "set " + ID + " audio volume to " + std::to_string(volume2),
+	            "setaudio " + ID + " volume to " + std::to_string(volume2), 
+	            "set " + ID + " volume " + std::to_string(volume2)
 	        };
 	        
-	        for (const auto& cmd : commands) {
-	            if (mciSimple(cmd, false)) {  
-	                return true;
-	            }
-	        }
+	        for(const auto& cmd : commands) 
+	        if(mciSimple(cmd, false))   
+	        {
+				volume = percent;
+				return true;
+			}
 	        
 	        std::cerr << "Volume control not supported on this system\n";
 	        return false;
 	    }
 	    
-	    // Returns the current volume as a percentage (0‑100).
 	    int getVolume()
 	    {
 
-	    	if(getChannelStatus(channel) == "error")
+	    	if(ID.empty())
 	    	{
 	    		std::cerr << "Unsupported Audio Action: getVolume cannot be used before using open()\n";
-	    		return false;
+	    		return 0;
 			}
 	    	
 			if(extension == ".mid" || extension == ".midi")
 			{
 				std::cerr << "Unsupported Action: An attempt was made to get the volume of a midi file!\n";
+				return 100;
 			}
 			
-	        if(getChannelStatus(channel) == "error") return 0;
-	        
-	        char returnBuffer[128];
-	        memset(returnBuffer, 0, sizeof(returnBuffer));
-	        
-	        std::string command = "status " + ID + " volume";
-	        MCIERROR err = mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL);
-	        
-	        if(err)
-	        	return 0;
-	        	
-	        int volume = atoi(returnBuffer);			
-			
-			
-			
-	        if(volume == 0)
-	        	return 0;
-	        // MCI volume range is 0 - 1000 but this returns percentage of that.
-	        return (volume * 100) / 1000;
+			return volume;
 	    }
 		
-		// Seeks to a specific time position in seconds; returns success.
+		
 		bool setProgress(long seconds)
 		{
-			std::string status = getChannelStatus(channel);
-	    	if(status == "error")
+			if(ID.empty())
 	    	{
 	    		std::cerr << "Unsupported Audio Action: setProgress cannot be used before using open()\n";
 	    		return false;
 			}
-						
-		    std::string command;
-		    if (status == "playing") {
+			
+			std::string command = "";
+		    if(isPlaying) 
 		        command = "play " + ID + " from " + std::to_string(seconds * 1000);
-		    } else {
+		    else 
 		        command = "seek " + ID + " to " + std::to_string(seconds * 1000);
-		    }
 		    
-			return mciSimple(command);
+		    
+			if(!mciSimple(command))
+				return false;
+			
+			progress = static_cast<float>(seconds * 1000);
+			
+			if(isPlaying)     
+				progressTimer.restart();
+			return true;
 		}
 		
-		// Returns the current playback position in seconds.
+		
 		long getProgress()
 		{
-	    	if(getChannelStatus(channel) == "error")
-	    	{
-	    		std::cerr << "Unsupported Audio Action: getProgress cannot be used before using open()\n";
-	    		return false;
-			}
-						
-			char returnBuffer[128];
-			memset(returnBuffer, 0, sizeof(returnBuffer));
-			
-			std::string command = "status "+ ID + " position";
-			
-			MCIERROR err = mciSendStringA(TO_LPCSTR(command), returnBuffer, sizeof(returnBuffer), NULL);
-	        if (err) 
-			{
-				char errorBuf[128];
-		        mciGetErrorStringA(err, errorBuf, sizeof(errorBuf));
-		        std::cerr << "Sound Error of type MCI error: " << errorBuf << " - Command: " << command << "\n";
-	            
-				return 0;
-	        }			
-	        
-		    // Convert string to long
-		    char *end_ptr;
-		    long result = std::strtol(returnBuffer, &end_ptr, 10);
-		    
-		    // Check if conversion was successful
-		    if (returnBuffer == end_ptr) {
-		        return 0; // conversion error
-		    }
-	        	
-	        return result / 1000;//return in seconds
+			if(isPlaying)
+				return progress + static_cast<long>(progressTimer.getMilliSeconds());
+			else
+				return static_cast<long>(progress);
 		}	
 		
-		// Returns the total length of the audio file in seconds.
-		long getLength()
+		
+		
+		float getLength()
 		{
-	    	if(getChannelStatus(channel) == "error")
-	    	{
-	    		std::cerr << "Unsupported Audio Action: getLength() cannot be used before using open()\n";
-	    		return 0;
-			}
-		    
-		    char returnBuffer[128];
-		    memset(returnBuffer, 0, sizeof(returnBuffer));
-		    
-		    std::string command = "status " + ID + " length";
-		    MCIERROR err = mciSendStringA(command.c_str(), returnBuffer, sizeof(returnBuffer), NULL);
-			
-			if(err)
-			{
-				return 0;
-			}
-			return (atol(returnBuffer) - 10)/1000; // return in seconds
-		    
+	    	return totalLength;
 		}
 	
-		// Returns true if playback has reached the end of the file.
 		bool isFinished()
 		{
-			if(getChannelStatus(channel) == "error")
+			if(ID.empty())
 	    	{
 	    		std::cerr << "Unsupported Audio Action: isFinished() cannot be used before using open()\n";
 	    		return false;
 			}
-			return (getProgress() >= getLength());
+			if(getProgress() >= getLength())
+			{
+				if(isPlaying) stop();
+				return true;
+			}
+			return false;
 		}
 		
 	};		

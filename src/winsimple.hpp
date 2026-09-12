@@ -1,4 +1,4 @@
-//WINSIMPLE VERSION 1.6
+//WINSIMPLE VERSION 1.7
 #ifndef WINSIMPLE_HPP
 #define WINSIMPLE_HPP
 
@@ -64,11 +64,115 @@ typedef unsigned long PROPID;
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "ole32.lib")
 #endif
 
 namespace ws
 {
+	
+	
+	static bool debugMode = true;
+	void warning(std::string str)
+	{
+		if(debugMode)
+			std::cerr << str << std::endl;
+	}
+	
+	
+	std::string getWindowsVersion()
+	{
+		static std::string windowsVersion = "";
+		
+		if(!windowsVersion.empty())
+			return windowsVersion;
+		
+		HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+		if(!hKernel32)
+		{
+			windowsVersion = "UNKNOWN";
+			return "UNKNOWN";
+		}
+		if(!GetProcAddress(hKernel32, "AttachConsole"))
+		{
+			windowsVersion = "PRE_XP";
+			return "PRE_XP";
+		}
+
+		HMODULE hNtdll = LoadLibraryW(L"ntdll.dll");
+		if(!hNtdll)
+		{
+			windowsVersion = "UNKNOWN";
+			return "UNKNOWN";
+		}
+		typedef LONG (WINAPI *RtlGetVersionFunc)(PRTL_OSVERSIONINFOW);
+		RtlGetVersionFunc pRtlGetVersion = (RtlGetVersionFunc)GetProcAddress(hNtdll, "RtlGetVersion");
+
+		if(!pRtlGetVersion)
+		{
+			FreeLibrary(hNtdll);
+			windowsVersion = "UNKNOWN";
+			return "UNKNOWN";
+		}
+
+
+		RTL_OSVERSIONINFOW osvi = {};
+		osvi.dwOSVersionInfoSize = sizeof(osvi);
+
+		LONG result = pRtlGetVersion(&osvi);
+		FreeLibrary(hNtdll);
+
+		if(result != 0)
+		{
+			windowsVersion = "UNKNOWN";
+			return "UNKNOWN";
+		}
+		if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
+		{
+			windowsVersion = "XP";
+			return "XP";
+		}
+
+		if (osvi.dwMajorVersion == 6)
+		{
+			if(osvi.dwMinorVersion == 0)
+			{
+				windowsVersion = "Vista";
+				return "Vista";
+			}
+			if (osvi.dwMinorVersion == 1)
+			{
+				windowsVersion = "7";
+				return "7";
+			}
+			if (osvi.dwMinorVersion == 2)
+			{
+				windowsVersion = "8";
+				return "8";
+			}
+			if (osvi.dwMinorVersion == 3)
+			{
+				windowsVersion = "8.1";
+				return "8.1";
+			}
+		}
+
+		if (osvi.dwMajorVersion == 10)
+		{
+			if (osvi.dwBuildNumber >= 22000)
+			{
+				windowsVersion = "11";
+				return "11";
+			}
+			else
+			{
+				windowsVersion = "10";
+				return "10";
+			}
+		}		
+		windowsVersion = "10";
+		return "10";
+	}
+	
+	
 	//All forward declares
 	class Child;
 	class WindowManager;
@@ -206,524 +310,255 @@ namespace ws
         return true;
     }
 	
-
-	// Data Type Conversion Operators
-	
-	
-	// Vector type traits
+	//For ws::Vec2
 	template<typename T, typename = void>
 	struct has_xy_members : std::false_type {};
-	
+
 	template<typename T>
 	struct has_xy_members<T, std::void_t<
-	    decltype(std::declval<T>().x), 
-	    decltype(std::declval<T>().y)>>
-	    : std::true_type {};
-	
+		decltype(std::declval<T>().x), 
+		decltype(std::declval<T>().y)>>
+		: std::true_type {};	
+		
+	//For ws::Vec3
 	template<typename T, typename = void>
 	struct has_xyz_members : std::false_type {};
-	
+
 	template<typename T>
 	struct has_xyz_members<T, std::void_t<
-	    decltype(std::declval<T>().x), 
-	    decltype(std::declval<T>().y),
-	    decltype(std::declval<T>().z)>>
-	    : std::true_type {};
-	
-	// Rect type traits
+		decltype(std::declval<T>().x),
+		decltype(std::declval<T>().y),
+		decltype(std::declval<T>().z)>>
+		: std::true_type {};
+
+	//ws::Rect 
 	template<typename T, typename = void>
 	struct has_width_height_style : std::false_type {};
 	
 	template<typename T>
 	struct has_width_height_style<T, std::void_t<
-	    decltype(std::declval<T>().left), 
-	    decltype(std::declval<T>().top),
-	    decltype(std::declval<T>().width),
-	    decltype(std::declval<T>().height)>> 
-	    : std::true_type {};
-	
+		decltype(std::declval<T>().left), 
+		decltype(std::declval<T>().top),
+		decltype(std::declval<T>().width),
+		decltype(std::declval<T>().height)>> 
+		: std::true_type {};	
+	//Also for ws::Rect
 	template<typename T, typename = void>
 	struct has_right_bottom_style : std::false_type {};
-	
+
 	template<typename T>
 	struct has_right_bottom_style<T, std::void_t<
-	    decltype(std::declval<T>().left), 
-	    decltype(std::declval<T>().top),
-	    decltype(std::declval<T>().right),
-	    decltype(std::declval<T>().bottom)>>
-	    : std::true_type {};
+		decltype(std::declval<T>().left), 
+		decltype(std::declval<T>().top),
+		decltype(std::declval<T>().right),
+		decltype(std::declval<T>().bottom)>>
+		: std::true_type {};	
+
+
+
+	template<typename T> 
+	struct Vec2 
+	{
+		T x, y;
+
+		Vec2() = default;
+
+		// From two arithmetic values
+		template<typename U, typename V, typename = std::enable_if_t<std::is_arithmetic_v<U> && std::is_arithmetic_v<V>>>
+		Vec2(U x_, V y_) : x(static_cast<T>(x_)), y(static_cast<T>(y_)) {}
+
+		// From any type with .x and .y members (conversion constructor)
+		template<typename U, typename = std::enable_if_t<ws::has_xy_members<U>::value>>
+		Vec2(const U& other) : x(static_cast<T>(other.x)), y(static_cast<T>(other.y)) {}
+
+		// ----- Conversion to other types with .x and .y members -----
+		template<typename U, typename = std::enable_if_t<ws::has_xy_members<U>::value>>
+		operator U() const {
+			U result;
+			result.x = static_cast<decltype(U::x)>(x);
+			result.y = static_cast<decltype(U::y)>(y);
+			return result;
+		}
+
+		// Special POINT pointer conversions
+		operator POINT*() { return reinterpret_cast<POINT*>(this); }
+		operator const POINT*() const { return reinterpret_cast<const POINT*>(this); }
+
+		// ----- Compound assignments -----
+		Vec2& operator+=(const Vec2& rhs) { x += rhs.x; y += rhs.y; return *this; }
+		Vec2& operator-=(const Vec2& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
+		Vec2& operator*=(T scalar)        { x *= scalar; y *= scalar; return *this; }
+		Vec2& operator/=(T scalar)        { if(scalar != 0) { x /= scalar; y /= scalar; } return *this; }
+		Vec2& operator*=(const Vec2& rhs) { x *= rhs.x; y *= rhs.y; return *this; }
+		Vec2& operator/=(const Vec2& rhs) {
+			if(rhs.x != 0) x /= rhs.x;
+			if(rhs.y != 0) y /= rhs.y;
+			return *this;
+		}
+
+		// ----- Binary operators
+		Vec2 operator+(const Vec2& rhs) const { return Vec2(x + rhs.x, y + rhs.y); }
+		Vec2 operator-(const Vec2& rhs) const { return Vec2(x - rhs.x, y - rhs.y); }
+		Vec2 operator*(T scalar) const        { return Vec2(x * scalar, y * scalar); }
+		Vec2 operator/(T scalar) const        { if(scalar == 0) return *this; return Vec2(x / scalar, y / scalar); }
+		Vec2 operator*(const Vec2& rhs) const { return Vec2(x * rhs.x, y * rhs.y); }
+		Vec2 operator/(const Vec2& rhs) const {
+			if(rhs.x == 0 || rhs.y == 0) return *this;
+			return Vec2(x / rhs.x, y / rhs.y);
+		}
+
+		// ----- Unary operators -----
+		Vec2 operator+() const { return *this; }
+		Vec2 operator-() const { return Vec2(-x, -y); }
+	};
 	
+	using Vec2i = Vec2<int>;
+	using Vec2f = Vec2<float>;
+	using Vec2d = Vec2<double>;
+	using Vec2u = Vec2<unsigned int>;
+
+
+	template<typename T> 
+	struct Vec3 
+	{
+		T x, y, z;
+
+		Vec3() = default;
+
+		// From three arithmetic values
+		template<typename U, typename V, typename W, typename = std::enable_if_t<std::is_arithmetic_v<U> && std::is_arithmetic_v<V> && std::is_arithmetic_v<W>>>
+		Vec3(U x_, V y_, W z_) : x(static_cast<T>(x_)), y(static_cast<T>(y_)), z(static_cast<T>(z_)) {}
+
+		// From any type with .x, .y and .z members (conversion constructor)
+		template<typename U, typename = std::enable_if_t<ws::has_xyz_members<U>::value>>
+		Vec3(const U& other) : x(static_cast<T>(other.x)), y(static_cast<T>(other.y)), z(static_cast<T>(other.z)) {}
+
+		// ----- Conversion to other types with .x, .y and .z members -----
+		template<typename U, typename = std::enable_if_t<ws::has_xyz_members<U>::value>>
+		operator U() const {
+			U result;
+			result.x = static_cast<decltype(U::x)>(x);
+			result.y = static_cast<decltype(U::y)>(y);
+			result.z = static_cast<decltype(U::z)>(z);
+			return result;
+		}
+
+		// ----- Compound assignments -----
+		Vec3& operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; return *this; }
+		Vec3& operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; return *this; }
+		Vec3& operator*=(T scalar)        { x *= scalar; y *= scalar; z *= scalar; return *this; }
+		Vec3& operator/=(T scalar)        { if(scalar != 0) { x /= scalar; y /= scalar; z /= scalar; } return *this; }
+		Vec3& operator*=(const Vec3& rhs) { x *= rhs.x; y *= rhs.y; z *= rhs.z; return *this; }
+		Vec3& operator/=(const Vec3& rhs) {
+			if(rhs.x != 0) x /= rhs.x;
+			if(rhs.y != 0) y /= rhs.y;
+			if(rhs.z != 0) z /= rhs.z;
+			return *this;
+		}
+
+		// ----- Binary operators
+		Vec3 operator+(const Vec3& rhs) const { return Vec3(x + rhs.x, y + rhs.y, z + rhs.z); }
+		Vec3 operator-(const Vec3& rhs) const { return Vec3(x - rhs.x, y - rhs.y, z - rhs.z); }
+		Vec3 operator*(T scalar) const        { return Vec3(x * scalar, y * scalar, z * scalar); }
+		Vec3 operator/(T scalar) const        { if(scalar == 0) return *this; return Vec3(x / scalar, y / scalar, z / scalar); }
+		Vec3 operator*(const Vec3& rhs) const { return Vec3(x * rhs.x, y * rhs.y, z * rhs.z); }
+		Vec3 operator/(const Vec3& rhs) const {
+			if(rhs.x == 0 || rhs.y == 0 || rhs.z == 0) return *this;
+			return Vec3(x / rhs.x, y / rhs.y, z / rhs.z);
+		}
+
+		// ----- Unary operators -----
+		Vec3 operator+() const { return *this; }
+		Vec3 operator-() const { return Vec3(-x, -y, -z); }
+		
+		
+	};
+
+	using Vec3i = Vec3<int>;
+	using Vec3f = Vec3<float>;
+	using Vec3d = Vec3<double>;
+	using Vec3u = Vec3<unsigned int>;	
+
+
 	template<typename T>
-	struct is_rect_like : std::integral_constant<bool, 
-	    has_width_height_style<T>::value || has_right_bottom_style<T>::value> {};
-	
-	// ==================== VEC2I ====================
-	
-	struct Vec2i {
-	    int x, y;
-	    
-	    Vec2i() = default;
-	    
-	    // Constructor for any two arithmetic types
-	    template<typename T, typename U,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
-	                                         std::is_arithmetic_v<U>>>
-	    Vec2i(T x_val, U y_val) 
-	        : x(static_cast<int>(x_val)), 
-	          y(static_cast<int>(y_val)) {}
-	    
-	    // Constructor for any type with .x and .y members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xy_members<T>::value>>
-	    Vec2i(const T& other) 
-	        : x(static_cast<int>(other.x)), 
-	          y(static_cast<int>(other.y)) {}
-	    
-	    // Conversion operator to any type with .x and .y members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xy_members<T>::value>>
-	    operator T() const {
-	        T result;
-	        result.x = static_cast<decltype(T::x)>(x);
-	        result.y = static_cast<decltype(T::y)>(y);
-	        return result;
-	    }
-	    
-	    // Special POINT pointer conversions (only if layout matches!)
-	    operator POINT*() { 
-	        return reinterpret_cast<POINT*>(this); 
-	    }
-	    
-	    operator const POINT*() const { 
-	        return reinterpret_cast<const POINT*>(this); 
-	    }
-	};
-	
-	// ==================== VEC2F ====================
-	
-	struct Vec2f {
-	    float x, y;
-	    
-	    Vec2f() = default;
-	    
-	    // Constructor for any two arithmetic types
-	    template<typename T, typename U,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
-	                                         std::is_arithmetic_v<U>>>
-	    Vec2f(T x_val, U y_val) 
-	        : x(static_cast<float>(x_val)), 
-	          y(static_cast<float>(y_val)) {}
-	    
-	    // Constructor for any type with .x and .y members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xy_members<T>::value>>
-	    Vec2f(const T& other) 
-	        : x(static_cast<float>(other.x)), 
-	          y(static_cast<float>(other.y)) {}
-	    
-	    // Conversion operator to any type with .x and .y members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xy_members<T>::value>>
-	    operator T() const {
-	        T result;
-	        result.x = static_cast<decltype(T::x)>(x);
-	        result.y = static_cast<decltype(T::y)>(y);
-	        return result;
-	    }
-	    
-	    // Special POINT pointer conversions
-	    operator POINT*() { 
-	        return reinterpret_cast<POINT*>(this); 
-	    }
-	    
-	    operator const POINT*() const { 
-	        return reinterpret_cast<const POINT*>(this); 
-	    }
-	};
-	
-	// ==================== VEC2D ====================
-	
-	struct Vec2d {
-	    double x, y;
-	    
-	    Vec2d() = default;
-	    
-	    // Constructor for any two arithmetic types
-	    template<typename T, typename U,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
-	                                         std::is_arithmetic_v<U>>>
-	    Vec2d(T x_val, U y_val) 
-	        : x(static_cast<double>(x_val)), 
-	          y(static_cast<double>(y_val)) {}
-	    
-	    // Constructor for any type with .x and .y members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xy_members<T>::value>>
-	    Vec2d(const T& other) 
-	        : x(static_cast<double>(other.x)), 
-	          y(static_cast<double>(other.y)) {}
-	    
-	    // Conversion operator to any type with .x and .y members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xy_members<T>::value>>
-	    operator T() const {
-	        T result;
-	        result.x = static_cast<decltype(T::x)>(x);
-	        result.y = static_cast<decltype(T::y)>(y);
-	        return result;
-	    }
-	    
-	    // Special POINT pointer conversions
-	    operator POINT*() { 
-	        return reinterpret_cast<POINT*>(this); 
-	    }
-	    
-	    operator const POINT*() const { 
-	        return reinterpret_cast<const POINT*>(this); 
-	    }
-	};
-	
-	// ==================== VEC3I ====================
-	
-	struct Vec3i {
-	    int x, y, z;
-	    
-	    Vec3i() = default;
-	    
-	    // Constructor for any three arithmetic types
-	    template<typename T, typename U, typename V,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
-	                                         std::is_arithmetic_v<U> &&
-	                                         std::is_arithmetic_v<V>>>
-	    Vec3i(T x_val, U y_val, V z_val) 
-	        : x(static_cast<int>(x_val)), 
-	          y(static_cast<int>(y_val)), 
-	          z(static_cast<int>(z_val)) {}
-	    
-	    // Constructor for any type with .x, .y and .z members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xyz_members<T>::value>>
-	    Vec3i(const T& other) 
-	        : x(static_cast<int>(other.x)), 
-	          y(static_cast<int>(other.y)), 
-	          z(static_cast<int>(other.z)) {}
-	    
-	    // Conversion operator to any type with .x, .y and .z members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xyz_members<T>::value>>
-	    operator T() const {
-	        T result;
-	        result.x = static_cast<decltype(T::x)>(x);
-	        result.y = static_cast<decltype(T::y)>(y);
-	        result.z = static_cast<decltype(T::z)>(z);
-	        return result;
-	    }
-	};
-	
-	// ==================== VEC3F ====================
-	
-	struct Vec3f {
-	    float x, y, z;
-	    
-	    Vec3f() = default;
-	    
-	    // Constructor for any three arithmetic types
-	    template<typename T, typename U, typename V,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
-	                                         std::is_arithmetic_v<U> &&
-	                                         std::is_arithmetic_v<V>>>
-	    Vec3f(T x_val, U y_val, V z_val) 
-	        : x(static_cast<float>(x_val)), 
-	          y(static_cast<float>(y_val)), 
-	          z(static_cast<float>(z_val)) {}
-	    
-	    // Constructor for any type with .x, .y and .z members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xyz_members<T>::value>>
-	    Vec3f(const T& other) 
-	        : x(static_cast<float>(other.x)), 
-	          y(static_cast<float>(other.y)), 
-	          z(static_cast<float>(other.z)) {}
-	    
-	    // Conversion operator to any type with .x, .y and .z members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xyz_members<T>::value>>
-	    operator T() const {
-	        T result;
-	        result.x = static_cast<decltype(T::x)>(x);
-	        result.y = static_cast<decltype(T::y)>(y);
-	        result.z = static_cast<decltype(T::z)>(z);
-	        return result;
-	    }
-	};
-	
-	// ==================== VEC3D ====================
-	
-	struct Vec3d {
-	    double x, y, z;
-	    
-	    Vec3d() = default;
-	    
-	    // Constructor for any three arithmetic types
-	    template<typename T, typename U, typename V,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T> && 
-	                                         std::is_arithmetic_v<U> &&
-	                                         std::is_arithmetic_v<V>>>
-	    Vec3d(T x_val, U y_val, V z_val) 
-	        : x(static_cast<double>(x_val)), 
-	          y(static_cast<double>(y_val)), 
-	          z(static_cast<double>(z_val)) {}
-	    
-	    // Constructor for any type with .x, .y and .z members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xyz_members<T>::value>>
-	    Vec3d(const T& other) 
-	        : x(static_cast<double>(other.x)), 
-	          y(static_cast<double>(other.y)), 
-	          z(static_cast<double>(other.z)) {}
-	    
-	    // Conversion operator to any type with .x, .y and .z members
-	    template<typename T,
-	             typename = std::enable_if_t<has_xyz_members<T>::value>>
-	    operator T() const {
-	        T result;
-	        result.x = static_cast<decltype(T::x)>(x);
-	        result.y = static_cast<decltype(T::y)>(y);
-	        result.z = static_cast<decltype(T::z)>(z);
-	        return result;
-	    }
-	};
-	
-	// ==================== INTRECT ====================
-	
-	struct IntRect {
-	    int left, top, width, height;
-	    
-	    IntRect() = default;
-	    
-	    // Constructor for any four arithmetic types
-	    template<typename T1, typename T2, typename T3, typename T4,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
-	                                         std::is_arithmetic_v<T2> &&
-	                                         std::is_arithmetic_v<T3> &&
-	                                         std::is_arithmetic_v<T4>>>
-	    IntRect(T1 l, T2 t, T3 w, T4 h) 
-	        : left(static_cast<int>(l)), 
-	          top(static_cast<int>(t)),
-	          width(static_cast<int>(w)), 
-	          height(static_cast<int>(h)) {}
-	    
-	    // Constructor for any rect-like type
-	    template<typename T,
-	             typename = std::enable_if_t<is_rect_like<T>::value>>
-	    IntRect(const T& other) {
-	        if constexpr (has_width_height_style<T>::value) {
-	            // Width/height style (e.g., sf::IntRect, your own rect types)
-	            left = static_cast<int>(other.left);
-	            top = static_cast<int>(other.top);
-	            width = static_cast<int>(other.width);
-	            height = static_cast<int>(other.height);
-	        } else {
-	            // Right/bottom style (e.g., RECT)
-	            left = static_cast<int>(other.left);
-	            top = static_cast<int>(other.top);
-	            width = static_cast<int>(other.right - other.left);
-	            height = static_cast<int>(other.bottom - other.top);
-	        }
-	    }
-	    
-	    // Conversion operator to any rect-like type
-	    template<typename T,
-	             typename = std::enable_if_t<is_rect_like<T>::value>>
-	    operator T() const {
-	        T result;
-	        
-	        if constexpr (has_width_height_style<T>::value) {
-	            // Convert to width/height style
-	            result.left = static_cast<decltype(T::left)>(left);
-	            result.top = static_cast<decltype(T::top)>(top);
-	            result.width = static_cast<decltype(T::width)>(width);
-	            result.height = static_cast<decltype(T::height)>(height);
-	        } else {
-	            // Convert to right/bottom style
-	            result.left = static_cast<decltype(T::left)>(left);
-	            result.top = static_cast<decltype(T::top)>(top);
-	            result.right = static_cast<decltype(T::right)>(left + width);
-	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
-	        }
-	        
-	        return result;
-	    }
-		
-        // Checks if a point lies inside the rectangle.
-        bool contains(const ws::Vec2i& point) const 
-		{
-            return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
-        }
-        bool contains(const ws::Vec2f& point) const 
-		{
-            return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
-        }
-        bool operator==(const IntRect& other) const 
-		{
-            return left == other.left && top == other.top && width == other.width && height == other.height;
-        }
-        bool operator!=(const IntRect& other) const 
-		{
-            return !(*this == other);
-        }		
-	};
-	
-	// ==================== FLOATRECT ====================
-	
-	struct FloatRect {
-	    float left, top, width, height;
-	    
-	    FloatRect() = default;
-	    
-	    // Constructor for any four arithmetic types
-	    template<typename T1, typename T2, typename T3, typename T4,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
-	                                         std::is_arithmetic_v<T2> &&
-	                                         std::is_arithmetic_v<T3> &&
-	                                         std::is_arithmetic_v<T4>>>
-	    FloatRect(T1 l, T2 t, T3 w, T4 h) 
-	        : left(static_cast<float>(l)), 
-	          top(static_cast<float>(t)),
-	          width(static_cast<float>(w)), 
-	          height(static_cast<float>(h)) {}
-	    
-	    // Constructor for any rect-like type
-	    template<typename T,
-	             typename = std::enable_if_t<is_rect_like<T>::value>>
-	    FloatRect(const T& other) {
-	        if constexpr (has_width_height_style<T>::value) {
-	            left = static_cast<float>(other.left);
-	            top = static_cast<float>(other.top);
-	            width = static_cast<float>(other.width);
-	            height = static_cast<float>(other.height);
-	        } else {
-	            left = static_cast<float>(other.left);
-	            top = static_cast<float>(other.top);
-	            width = static_cast<float>(other.right - other.left);
-	            height = static_cast<float>(other.bottom - other.top);
-	        }
-	    }
-	    
-	    // Conversion operator to any rect-like type
-	    template<typename T,
-	             typename = std::enable_if_t<is_rect_like<T>::value>>
-	    operator T() const {
-	        T result;
-	        
-	        if constexpr (has_width_height_style<T>::value) {
-	            result.left = static_cast<decltype(T::left)>(left);
-	            result.top = static_cast<decltype(T::top)>(top);
-	            result.width = static_cast<decltype(T::width)>(width);
-	            result.height = static_cast<decltype(T::height)>(height);
-	        } else {
-	            result.left = static_cast<decltype(T::left)>(left);
-	            result.top = static_cast<decltype(T::top)>(top);
-	            result.right = static_cast<decltype(T::right)>(left + width);
-	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
-	        }
-	        
-	        return result;
-	    }
-		
-        bool contains(const ws::Vec2i& point) const 
-		{
-            return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
-        }
-        bool contains(const ws::Vec2f& point) const 
-		{
-            return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
-        }
-        bool operator==(const FloatRect& other) const 
-		{
-            return left == other.left && top == other.top && width == other.width && height == other.height;
-        }
-        bool operator!=(const FloatRect& other) const 
-		{
-            return !(*this == other);
-        }				
-	};
-	
-	// ==================== DOUBLERECT ====================
-	
-	struct DoubleRect {
-	    double left, top, width, height;
-	    
-	    DoubleRect() = default;
-	    
-	    // Constructor for any four arithmetic types
-	    template<typename T1, typename T2, typename T3, typename T4,
-	             typename = std::enable_if_t<std::is_arithmetic_v<T1> && 
-	                                         std::is_arithmetic_v<T2> &&
-	                                         std::is_arithmetic_v<T3> &&
-	                                         std::is_arithmetic_v<T4>>>
-	    DoubleRect(T1 l, T2 t, T3 w, T4 h) 
-	        : left(static_cast<double>(l)), 
-	          top(static_cast<double>(t)),
-	          width(static_cast<double>(w)), 
-	          height(static_cast<double>(h)) {}
-	    
-	    // Constructor for any rect-like type
-	    template<typename T,
-	             typename = std::enable_if_t<is_rect_like<T>::value>>
-	    DoubleRect(const T& other) {
-	        if constexpr (has_width_height_style<T>::value) {
-	            left = static_cast<double>(other.left);
-	            top = static_cast<double>(other.top);
-	            width = static_cast<double>(other.width);
-	            height = static_cast<double>(other.height);
-	        } else {
-	            left = static_cast<double>(other.left);
-	            top = static_cast<double>(other.top);
-	            width = static_cast<double>(other.right - other.left);
-	            height = static_cast<double>(other.bottom - other.top);
-	        }
-	    }
-	    
-	    // Conversion operator to any rect-like type
-	    template<typename T,
-	             typename = std::enable_if_t<is_rect_like<T>::value>>
-	    operator T() const {
-	        T result;
-	        
-	        if constexpr (has_width_height_style<T>::value) {
-	            result.left = static_cast<decltype(T::left)>(left);
-	            result.top = static_cast<decltype(T::top)>(top);
-	            result.width = static_cast<decltype(T::width)>(width);
-	            result.height = static_cast<decltype(T::height)>(height);
-	        } else {
-	            result.left = static_cast<decltype(T::left)>(left);
-	            result.top = static_cast<decltype(T::top)>(top);
-	            result.right = static_cast<decltype(T::right)>(left + width);
-	            result.bottom = static_cast<decltype(T::bottom)>(top + height);
-	        }
-	        
-	        return result;
-	    }
+	struct Rect {
+		T left, top, width, height;
 
-        bool contains(const ws::Vec2i& point) const 
+		Rect() = default;
+
+		template<typename U, typename V, typename W, typename X,
+				 typename = std::enable_if_t<std::is_arithmetic_v<U> &&
+											 std::is_arithmetic_v<V> &&
+											 std::is_arithmetic_v<W> &&
+											 std::is_arithmetic_v<X>>>
+		Rect(U l, V t, W w, X h)
+			: left(static_cast<T>(l)), top(static_cast<T>(t)),
+			  width(static_cast<T>(w)), height(static_cast<T>(h)) {}
+
+		template<typename U,
+				 typename = std::enable_if_t<ws::has_width_height_style<U>::value ||
+											 ws::has_right_bottom_style<U>::value>>
+		Rect(const U& other) {
+			if constexpr (ws::has_width_height_style<U>::value) {
+				left = static_cast<T>(other.left);
+				top = static_cast<T>(other.top);
+				width = static_cast<T>(other.width);
+				height = static_cast<T>(other.height);
+			} else {
+				left = static_cast<T>(other.left);
+				top = static_cast<T>(other.top);
+				width = static_cast<T>(other.right - other.left);
+				height = static_cast<T>(other.bottom - other.top);
+			}
+		}
+
+		template<typename U,
+				 typename = std::enable_if_t<ws::has_width_height_style<U>::value ||
+											 ws::has_right_bottom_style<U>::value>>
+		operator U() const {
+			U result;
+			if constexpr (ws::has_width_height_style<U>::value) {
+				result.left = static_cast<decltype(U::left)>(left);
+				result.top = static_cast<decltype(U::top)>(top);
+				result.width = static_cast<decltype(U::width)>(width);
+				result.height = static_cast<decltype(U::height)>(height);
+			} else {
+				result.left = static_cast<decltype(U::left)>(left);
+				result.top = static_cast<decltype(U::top)>(top);
+				result.right = static_cast<decltype(U::right)>(left + width);
+				result.bottom = static_cast<decltype(U::bottom)>(top + height);
+			}
+			return result;
+		}
+
+		bool intersects(const Rect& other) const
 		{
-            return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
-        }
-        bool contains(const ws::Vec2f& point) const 
-		{
-            return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
-        }
-        bool operator==(const DoubleRect& other) const 
-		{
-            return left == other.left && top == other.top && width == other.width && height == other.height;
-        }
-        bool operator!=(const DoubleRect& other) const 
-		{
-            return !(*this == other);
-        }				
+			return !(other.left > left + width || other.top > top + height || other.left + other.width < left || other.top + other.height < top);
+		}
+
+		bool contains(const ws::Vec2i& point) const {
+			return point.x >= left && point.x < left + width &&
+				   point.y >= top && point.y < top + height;
+		}
+		bool contains(const ws::Vec2f& point) const {
+			return point.x >= left && point.x < left + width &&
+				   point.y >= top && point.y < top + height;
+		}
+
+		bool operator==(const Rect& other) const {
+			return left == other.left && top == other.top &&
+				   width == other.width && height == other.height;
+		}
+		bool operator!=(const Rect& other) const {
+			return !(*this == other);
+		}
 	};
 
+	using IntRect = Rect<int>;
+	using FloatRect = Rect<float>;
+	using DoubleRect = Rect<double>;
+	using UnsignedRect = Rect<unsigned int>;
+	
 
 	
 	class Hue
@@ -800,46 +635,92 @@ namespace ws
 		
 		
 		struct HSV {
+			
+			HSV(float h2,float s2,float v2)
+			{
+				h = h2;
+				s = s2;
+				v = v2;
+			}
+			HSV()
+			{}
+			
 			float h;  
 			float s; 
 			float v; 
+		
+			// Creates a Hue from HSV values (h in degrees, s,v in [0,1]).
+			ws::Hue toHue(int alpha = 255) 
+			{
+				
+				// h: 0..360 degrees, s: 0..1, v: 0..1
+				float c = v * s;
+				float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
+				float m = v - c;
+
+				float r1 = 0, g1 = 0, b1 = 0;
+				if (h < 60) {
+					r1 = c; g1 = x; b1 = 0;
+				} else if (h < 120) {
+					r1 = x; g1 = c; b1 = 0;
+				} else if (h < 180) {
+					r1 = 0; g1 = c; b1 = x;
+				} else if (h < 240) {
+					r1 = 0; g1 = x; b1 = c;
+				} else if (h < 300) {
+					r1 = x; g1 = 0; b1 = c;
+				} else {
+					r1 = c; g1 = 0; b1 = x;
+				}
+
+				int r = static_cast<int>((r1 + m) * 255);
+				int g = static_cast<int>((g1 + m) * 255);
+				int b = static_cast<int>((b1 + m) * 255);
+
+				return ws::Hue(r, g, b, alpha);
+			}		
+			
+			
+			// Checks if the given HSV value falls within a hue range (with tolerance and min saturation/value).
+			bool inHueRange(float hue,float tolerance = 60,float minSaturation = 0.1,float minValue = 0.2)
+			{
+				float lower = hue - tolerance;
+				float upper = hue + tolerance;
+
+				bool hueInRange = false;
+				if (lower < 0) {
+					hueInRange = (h >= (360.0f + lower) || h <= upper);
+				} else if (upper > 360) {
+					hueInRange = (h >= lower || h <= (upper - 360.0f));
+				} else {
+					hueInRange = (h >= lower && h <= upper);
+				}
+
+
+				return (hueInRange && (s >= minSaturation) && (v >= minValue));				
+			}
+
+			void setHue(float h2)
+			{
+				h = fmod(h2, 360.0f);
+				if (h < 0) h += 360.0f;
+			}
+			void setSaturation(float sat)
+			{
+				s = sat;
+				if(sat < 0.0f) s = 0.0f;
+				if(sat > 1.0f) s = 1.0f;				
+			}
+			void setValue(float val)
+			{
+				v = val;
+				if(val < 0.0f) v = 0.0f;
+				if(val > 1.0f) v = 1.0f;				
+			}
 			
 		};
 		
-		// Creates an Hue from HSV values (h in degrees, s,v in [0,1]).
-		static Hue fromHSV(float h, float s, float v, int alpha = 255) {
-			// h: 0..360 degrees, s: 0..1, v: 0..1
-			float c = v * s;
-			float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
-			float m = v - c;
-
-			float r1 = 0, g1 = 0, b1 = 0;
-			if (h < 60) {
-				r1 = c; g1 = x; b1 = 0;
-			} else if (h < 120) {
-				r1 = x; g1 = c; b1 = 0;
-			} else if (h < 180) {
-				r1 = 0; g1 = c; b1 = x;
-			} else if (h < 240) {
-				r1 = 0; g1 = x; b1 = c;
-			} else if (h < 300) {
-				r1 = x; g1 = 0; b1 = c;
-			} else {
-				r1 = c; g1 = 0; b1 = x;
-			}
-
-			int r = static_cast<int>((r1 + m) * 255);
-			int g = static_cast<int>((g1 + m) * 255);
-			int b = static_cast<int>((b1 + m) * 255);
-
-			return Hue(r, g, b, alpha);
-		}		
 		
-		
-		static Hue fromHSV(HSV hsv,int alpha = 255)
-		{
-			return fromHSV(hsv.h,hsv.s,hsv.v,alpha);
-		}
 		
 		// Converts this color to HSV representation.
 		HSV toHSV() const {
@@ -869,37 +750,8 @@ namespace ws
 		}	
 
 
-		// Checks if the given HSV value falls within a hue range (with tolerance and min saturation/value).
-		static bool inHueRange(float hue,ws::Hue::HSV hsv,float tolerance = 60,float minSaturation = 0.1,float minValue = 0.2)
-		{
-			float lower = hue - tolerance;
-			float upper = hue + tolerance;
-
-			bool hueInRange = false;
-			if (lower < 0) {
-				hueInRange = (hsv.h >= (360.0f + lower) || hsv.h <= upper);
-			} else if (upper > 360) {
-				hueInRange = (hsv.h >= lower || hsv.h <= (upper - 360.0f));
-			} else {
-				hueInRange = (hsv.h >= lower && hsv.h <= upper);
-			}
-
-
-			return (hueInRange && (hsv.s >= minSaturation) && (hsv.v >= minValue));				
-		}
 		
-		// Replaces a given hue range with a new hue, preserving saturation and value.
-		static ws::Hue replaceHue(float hue,float replacement,ws::Hue rgb)
-		{
-			HSV hsv = rgb.toHSV();
-			
-			if(ws::Hue::inHueRange(hue,hsv))
-			{
-				ws::Hue rgb2 = fromHSV(replacement,hsv.s,hsv.v,rgb.a);
-				return rgb2;
-			}
-			return fromHSV(hsv.h,hsv.s,hsv.v,rgb.a);
-		}
+
 		
 	};
 	
@@ -916,6 +768,330 @@ namespace ws
 	const Hue Hue::black = Hue(0, 0, 0, 255);
 	const Hue Hue::white = Hue(255, 255, 255, 255);
 	const Hue Hue::transparent = Hue(0,0,0,0);	
+
+
+	//KEYBOARD AND MOUSE BUTTON EQUIVALENTS TO WINAPI TYPES - Use these in ws::Global::getButton() or use the winapi equivalents.
+	class Key 
+	{
+		
+		public:
+		// Letters
+		static const int
+			A = 'A',
+			B = 'B',
+			C = 'C',
+			D = 'D',
+			E = 'E',
+			F = 'F',
+			G = 'G',
+			H = 'H',
+			I = 'I',
+			J = 'J',
+			K = 'K',
+			L = 'L',
+			M = 'M',
+			N = 'N',
+			O = 'O',
+			P = 'P',
+			Q = 'Q',
+			R = 'R',
+			S = 'S',
+			T = 'T',
+			U = 'U',
+			V = 'V',
+			W = 'W',
+			X = 'X',
+			Y = 'Y',
+			Z = 'Z';
+
+		// Digits (top row)
+		static const int
+			Num0 = '0',
+			Num1 = '1',
+			Num2 = '2',
+			Num3 = '3',
+			Num4 = '4',
+			Num5 = '5',
+			Num6 = '6',
+			Num7 = '7',
+			Num8 = '8',
+			Num9 = '9';
+
+		// Numpad
+		static const int
+			NumPad0 = 0x60,
+			NumPad1 = 0x61,
+			NumPad2 = 0x62,
+			NumPad3 = 0x63,
+			NumPad4 = 0x64,
+			NumPad5 = 0x65,
+			NumPad6 = 0x66,
+			NumPad7 = 0x67,
+			NumPad8 = 0x68,
+			NumPad9 = 0x69,
+			Multiply = 0x6A,
+			Add = 0x6B,
+			Separator = 0x6C,
+			Subtract = 0x6D,
+			Decimal = 0x6E,
+			Divide = 0x6F;
+
+		// Function keys
+		static const int
+			F1 = 0x70,
+			F2 = 0x71,
+			F3 = 0x72,
+			F4 = 0x73,
+			F5 = 0x74,
+			F6 = 0x75,
+			F7 = 0x76,
+			F8 = 0x77,
+			F9 = 0x78,
+			F10 = 0x79,
+			F11 = 0x7A,
+			F12 = 0x7B,
+			F13 = 0x7C,
+			F14 = 0x7D,
+			F15 = 0x7E,
+			F16 = 0x7F,
+			F17 = 0x80,
+			F18 = 0x81,
+			F19 = 0x82,
+			F20 = 0x83,
+			F21 = 0x84,
+			F22 = 0x85,
+			F23 = 0x86,
+			F24 = 0x87;
+
+		// Modifiers (generic)
+		static const int
+			Shift = 0x10,
+			Control = 0x11,
+			Alt = 0x12;
+
+		// Modifiers (left/right specific)
+		static const int
+			LeftShift = 0xA0,
+			RightShift = 0xA1,
+			LeftControl = 0xA2,
+			RightControl = 0xA3,
+			LeftAlt = 0xA4,
+			RightAlt = 0xA5;
+
+		// Windows keys & Application key
+		static const int
+			LeftWin = 0x5B,
+			RightWin = 0x5C,
+			Application = 0x5D;
+
+		// Navigation & Editing
+		static const int
+			Backspace = 0x08,
+			Tab = 0x09,
+			Clear = 0x0C,
+			Enter = 0x0D,
+			Pause = 0x13,
+			CapsLock = 0x14,
+			Escape = 0x1B,
+			Space = 0x20,
+			PageUp = 0x21,
+			PageDown = 0x22,
+			End = 0x23,
+			Home = 0x24,
+			Left = 0x25,
+			Up = 0x26,
+			Right = 0x27,
+			Down = 0x28,
+			Select = 0x29,
+			Print = 0x2A,
+			Execute = 0x2B,
+			Snapshot = 0x2C,
+			Insert = 0x2D,
+			Delete = 0x2E,
+			Help = 0x2F;
+
+		// Lock keys
+		static const int
+			NumLock = 0x90,
+			ScrollLock = 0x91;
+
+		// OEM specific keys (US keyboard layout)
+		static const int
+			OemSemicolon = 0xBA,
+			OemPlus = 0xBB,
+			OemComma = 0xBC,
+			OemMinus = 0xBD,
+			OemPeriod = 0xBE,
+			OemQuestion = 0xBF,
+			OemTilde = 0xC0,
+			OemOpenBrackets = 0xDB,
+			OemBackslash = 0xDC,
+			OemCloseBrackets = 0xDD,
+			OemQuotes = 0xDE,
+			Oem8 = 0xDF;
+
+		// Browser / Media keys
+		static const int
+			BrowserBack = 0xA6,
+			BrowserForward = 0xA7,
+			BrowserRefresh = 0xA8,
+			BrowserStop = 0xA9,
+			BrowserSearch = 0xAA,
+			BrowserFavorites = 0xAB,
+			BrowserHome = 0xAC,
+			VolumeMute = 0xAD,
+			VolumeDown = 0xAE,
+			VolumeUp = 0xAF,
+			MediaNextTrack = 0xB0,
+			MediaPrevTrack = 0xB1,
+			MediaStop = 0xB2,
+			MediaPlayPause = 0xB3,
+			LaunchMail = 0xB4,
+			LaunchMediaSelect = 0xB5,
+			LaunchApp1 = 0xB6,
+			LaunchApp2 = 0xB7;
+
+		static const std::vector<int>& GetAllKeys() 
+		{
+			static const std::vector<int> keys = {
+				// Letters
+				A, B, C, D, E, F, G, H, I, J, K, L, M,
+				N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+				// Digits
+				Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9,
+				// Numpad
+				NumPad0, NumPad1, NumPad2, NumPad3, NumPad4,
+				NumPad5, NumPad6, NumPad7, NumPad8, NumPad9,
+				Multiply, Add, Separator, Subtract, Decimal, Divide,
+				// Function keys
+				F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
+				F11, F12, F13, F14, F15, F16, F17, F18, F19, F20,
+				F21, F22, F23, F24,
+				// Modifiers
+				Shift, Control, Alt,
+				LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt,
+				// Windows / Application
+				LeftWin, RightWin, Application,
+				// Navigation & Editing
+				Backspace, Tab, Clear, Enter, Pause, CapsLock, Escape, Space,
+				PageUp, PageDown, End, Home, Left, Up, Right, Down,
+				Select, Print, Execute, Snapshot, Insert, Delete, Help,
+				// Lock keys
+				NumLock, ScrollLock,
+				// OEM specific
+				OemSemicolon, OemPlus, OemComma, OemMinus, OemPeriod,
+				OemQuestion, OemTilde, OemOpenBrackets, OemBackslash,
+				OemCloseBrackets, OemQuotes, Oem8,
+				// Browser / Media
+				BrowserBack, BrowserForward, BrowserRefresh, BrowserStop,
+				BrowserSearch, BrowserFavorites, BrowserHome,
+				VolumeMute, VolumeDown, VolumeUp,
+				MediaNextTrack, MediaPrevTrack, MediaStop, MediaPlayPause,
+				LaunchMail, LaunchMediaSelect, LaunchApp1, LaunchApp2
+			};
+			return keys;
+		}
+		
+		static const int GetKeyCount()
+		{
+			return GetAllKeys().size();
+		}
+
+		static std::string GetKeyName(int keyCode) 
+		{
+			static const std::unordered_map<int, std::string> nameMap = []{
+				std::unordered_map<int, std::string> map;
+				// Use a macro or manual entries to avoid repetition.
+				// I'll show manual entries for clarity.
+				#define ADD_KEY(k) map[k] = #k
+				ADD_KEY(A); ADD_KEY(B); ADD_KEY(C); ADD_KEY(D); ADD_KEY(E);
+				ADD_KEY(F); ADD_KEY(G); ADD_KEY(H); ADD_KEY(I); ADD_KEY(J);
+				ADD_KEY(K); ADD_KEY(L); ADD_KEY(M); ADD_KEY(N); ADD_KEY(O);
+				ADD_KEY(P); ADD_KEY(Q); ADD_KEY(R); ADD_KEY(S); ADD_KEY(T);
+				ADD_KEY(U); ADD_KEY(V); ADD_KEY(W); ADD_KEY(X); ADD_KEY(Y);
+				ADD_KEY(Z);
+				ADD_KEY(Num0); ADD_KEY(Num1); ADD_KEY(Num2); ADD_KEY(Num3); ADD_KEY(Num4);
+				ADD_KEY(Num5); ADD_KEY(Num6); ADD_KEY(Num7); ADD_KEY(Num8); ADD_KEY(Num9);
+				ADD_KEY(NumPad0); ADD_KEY(NumPad1); ADD_KEY(NumPad2); ADD_KEY(NumPad3); ADD_KEY(NumPad4);
+				ADD_KEY(NumPad5); ADD_KEY(NumPad6); ADD_KEY(NumPad7); ADD_KEY(NumPad8); ADD_KEY(NumPad9);
+				ADD_KEY(Multiply); ADD_KEY(Add); ADD_KEY(Separator); ADD_KEY(Subtract);
+				ADD_KEY(Decimal); ADD_KEY(Divide);
+				ADD_KEY(F1); ADD_KEY(F2); ADD_KEY(F3); ADD_KEY(F4); ADD_KEY(F5);
+				ADD_KEY(F6); ADD_KEY(F7); ADD_KEY(F8); ADD_KEY(F9); ADD_KEY(F10);
+				ADD_KEY(F11); ADD_KEY(F12); ADD_KEY(F13); ADD_KEY(F14); ADD_KEY(F15);
+				ADD_KEY(F16); ADD_KEY(F17); ADD_KEY(F18); ADD_KEY(F19); ADD_KEY(F20);
+				ADD_KEY(F21); ADD_KEY(F22); ADD_KEY(F23); ADD_KEY(F24);
+				ADD_KEY(Shift); ADD_KEY(Control); ADD_KEY(Alt);
+				ADD_KEY(LeftShift); ADD_KEY(RightShift); ADD_KEY(LeftControl);
+				ADD_KEY(RightControl); ADD_KEY(LeftAlt); ADD_KEY(RightAlt);
+				ADD_KEY(LeftWin); ADD_KEY(RightWin); ADD_KEY(Application);
+				ADD_KEY(Backspace); ADD_KEY(Tab); ADD_KEY(Clear); ADD_KEY(Enter);
+				ADD_KEY(Pause); ADD_KEY(CapsLock); ADD_KEY(Escape); ADD_KEY(Space);
+				ADD_KEY(PageUp); ADD_KEY(PageDown); ADD_KEY(End); ADD_KEY(Home);
+				ADD_KEY(Left); ADD_KEY(Up); ADD_KEY(Right); ADD_KEY(Down);
+				ADD_KEY(Select); ADD_KEY(Print); ADD_KEY(Execute); ADD_KEY(Snapshot);
+				ADD_KEY(Insert); ADD_KEY(Delete); ADD_KEY(Help);
+				ADD_KEY(NumLock); ADD_KEY(ScrollLock);
+				ADD_KEY(OemSemicolon); ADD_KEY(OemPlus); ADD_KEY(OemComma);
+				ADD_KEY(OemMinus); ADD_KEY(OemPeriod); ADD_KEY(OemQuestion);
+				ADD_KEY(OemTilde); ADD_KEY(OemOpenBrackets); ADD_KEY(OemBackslash);
+				ADD_KEY(OemCloseBrackets); ADD_KEY(OemQuotes); ADD_KEY(Oem8);
+				ADD_KEY(BrowserBack); ADD_KEY(BrowserForward); ADD_KEY(BrowserRefresh);
+				ADD_KEY(BrowserStop); ADD_KEY(BrowserSearch); ADD_KEY(BrowserFavorites);
+				ADD_KEY(BrowserHome); ADD_KEY(VolumeMute); ADD_KEY(VolumeDown);
+				ADD_KEY(VolumeUp); ADD_KEY(MediaNextTrack); ADD_KEY(MediaPrevTrack);
+				ADD_KEY(MediaStop); ADD_KEY(MediaPlayPause); ADD_KEY(LaunchMail);
+				ADD_KEY(LaunchMediaSelect); ADD_KEY(LaunchApp1); ADD_KEY(LaunchApp2);
+				#undef ADD_KEY
+				return map;
+			}();
+			auto it = nameMap.find(keyCode);
+			if (it != nameMap.end())
+				return it->second;
+			return "Unknown(" + std::to_string(keyCode) + ")";
+		}
+		
+
+		// Prevent instantiation
+		Key() = delete;
+	};
+
+	class Mouse {
+	public:
+		static const int
+			Left = 0x01,
+			Right = 0x02,
+			Middle = 0x04,
+			XButton1 = 0x05,
+			XButton2 = 0x06;
+
+		static const std::vector<int>& GetAllButtons() 
+		{
+			static const std::vector<int> buttons = { Left, Right, Middle, XButton1, XButton2 };
+			return buttons;
+		}
+
+		static std::string GetButtonName(int buttonCode) {
+			static const std::unordered_map<int, std::string> nameMap = []{
+				std::unordered_map<int, std::string> map;
+				#define ADD_BTN(b) map[b] = #b
+				ADD_BTN(Left);
+				ADD_BTN(Right);
+				ADD_BTN(Middle);
+				ADD_BTN(XButton1);
+				ADD_BTN(XButton2);
+				#undef ADD_BTN
+				return map;
+			}();
+			auto it = nameMap.find(buttonCode);
+			if (it != nameMap.end())
+				return it->second;
+			return "UnknownMouseButton(" + std::to_string(buttonCode) + ")";
+		}		
+
+		Mouse() = delete;
+	};
+
 	
 
 	//============VIEW==============
@@ -924,8 +1100,8 @@ namespace ws
 		private:
 		
 		float rotation = 0.0f;
-		ws::IntRect port = {0,0,0,0}; //Port is always in screen coordinates.
-		ws::IntRect world = {0,0,0,0}; //World is the world coordinate section of the world that is sent to the view.
+		ws::FloatRect port = {0,0,0,0}; //Port is always in screen coordinates.
+		ws::FloatRect world = {0,0,0,0}; //World is the world coordinate section of the world that is sent to the view.
 		ws::Vec2i portOrigin = {0,0};//This is the point of rotation. It does NOT effect the view position.
 		Gdiplus::Matrix matrix;
 		float zoom = 0;		
@@ -1018,41 +1194,41 @@ namespace ws
 		}
 		
 		// Initialises from an IntRect.
-		void init(ws::IntRect rect)
+		void init(ws::FloatRect rect)
 		{	
 			init(rect.left,rect.top,rect.width,rect.height);
 		}
 		
 		
-		[[nodiscard]] ws::IntRect getRect()
+		[[nodiscard]] ws::FloatRect getRect()
 		{
 			return world;
 		}
 		
-		void setRect(ws::IntRect rect)
+		void setRect(ws::FloatRect rect)
 		{
 			world = rect;
 		}
 
 		void setRect(int left,int top,int width,int height)
 		{
-			setRect(ws::IntRect(left,top,width,height));
+			setRect(ws::FloatRect(left,top,width,height));
 		}
 		
 		
-		[[nodiscard]] ws::IntRect getPortRect()
+		[[nodiscard]] ws::FloatRect getPortRect()
 		{
 			return port;
 		}
 		
-		void setPortRect(ws::IntRect rect)
+		void setPortRect(ws::FloatRect rect)
 		{
 			port = rect;
 		}
 		
 		void setPortRect(int left,int top,int width,int height)
 		{
-			setPortRect(ws::IntRect(left,top,width,height));
+			setPortRect(ws::FloatRect(left,top,width,height));
 		}
 		
 		
@@ -1164,21 +1340,14 @@ namespace ws
 		// Moves the world by a floating-point delta.
 		void move(float dx,float dy)
 		{
-			world.left += static_cast<int>(dx);
-			world.top += static_cast<int>(dy);
+			world.left += dx;
+			world.top += dy;
 		}
 		
 		void move(ws::Vec2f dir)
 		{
 			move(dir.x,dir.y);
 		}
-
-		// Moves the world by an integer delta.
-		void move(int dx,int dy)
-		{
-			world.left += dx;
-			world.top += dy;
-		}		
 		
 	    // Copies the internal transformation matrix into the given matrix.
 	    void getTransform(Gdiplus::Matrix &m) const
@@ -1202,53 +1371,37 @@ namespace ws
 		// Converts screen coordinates to world coordinates, accounting for view transform.
 		[[nodiscard]] ws::Vec2i toWorld(ws::Vec2i screenPos, ws::Vec2i screenSize) 
 		{
-			// First account for window stretching
-			ws::Vec2i stretchedPos;
-			stretchedPos.x = static_cast<int>(static_cast<float>(screenPos.x) * 
-											 (static_cast<float>(world.width) / static_cast<float>(screenSize.x)));
-			stretchedPos.y = static_cast<int>(static_cast<float>(screenPos.y) * 
-											 (static_cast<float>(world.height) / static_cast<float>(screenSize.y)));
-			
-			// Calculate the visible world center
-			float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
-			float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
-			
-			// Calculate the port center
-			float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-			float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-			
-			// Calculate scale to fit world into port
-			float scaleX = static_cast<float>(port.width) / world.width;
-			float scaleY = static_cast<float>(port.height) / world.height;
-			
-			// Apply zoom
-			float zoomFactor = std::pow(2.0f, zoom);
-			scaleX *= zoomFactor;
-			scaleY *= zoomFactor;
-			
-			// Apply inverse transformation
-			float worldX = static_cast<float>(stretchedPos.x);
-			float worldY = static_cast<float>(stretchedPos.y);
-			
-			// Reverse transformations in opposite order
-			worldX -= portCenterX;
-			worldY -= portCenterY;
-			
-			if (rotation != 0) {
-				Gdiplus::Matrix rotMatrix;
-				rotMatrix.Rotate(-rotation);
-				Gdiplus::PointF point(worldX, worldY);
-				rotMatrix.TransformPoints(&point, 1);
-				worldX = point.X;
-				worldY = point.Y;
+			// 1. Map screen (client) coords to viewport (port) local coords
+			float portX = static_cast<float>(screenPos.x) * (port.width / static_cast<float>(screenSize.x));
+			float portY = static_cast<float>(screenPos.y) * (port.height / static_cast<float>(screenSize.y));
+
+			// 2. Viewport local center
+			float portCenterX = port.width / 2.0f;
+			float portCenterY = port.height / 2.0f;
+
+			// 3. World center
+			float worldCenterX = world.left + world.width / 2.0f;
+			float worldCenterY = world.top + world.height / 2.0f;
+
+			// 4. Scale from world to port (including zoom)
+			float scaleX = (port.width / world.width) * std::pow(2.0f, zoom);
+			float scaleY = (port.height / world.height) * std::pow(2.0f, zoom);
+
+			// 5. Invert the world→port transform (without rotation first)
+			float worldX = (portX - portCenterX) / scaleX + worldCenterX;
+			float worldY = (portY - portCenterY) / scaleY + worldCenterY;
+
+			// 6. Apply inverse rotation (if any)
+			if (rotation != 0.0f) {
+				float dx = worldX - worldCenterX;
+				float dy = worldY - worldCenterY;
+				float rad = -rotation * static_cast<float>(M_PI) / 180.0f;
+				float cosA = std::cos(rad);
+				float sinA = std::sin(rad);
+				worldX = dx * cosA - dy * sinA + worldCenterX;
+				worldY = dx * sinA + dy * cosA + worldCenterY;
 			}
-			
-			worldX /= scaleX;
-			worldY /= scaleY;
-			
-			worldX += visibleWorldCenterX;
-			worldY += visibleWorldCenterY;
-			
+
 			return ws::Vec2i(static_cast<int>(worldX), static_cast<int>(worldY));
 		}
 	    
@@ -1261,56 +1414,36 @@ namespace ws
 		// Converts world coordinates to screen coordinates.
 	    [[nodiscard]] ws::Vec2i toScreen(ws::Vec2i worldPos,ws::Vec2i screenSize) 
 	    {
-		        
-	        // Apply the transformation (scaled by zoom)
-	        float zoomFactor = std::pow(2.0f, zoom);
-	        
-	        // Calculate the visible world center
-	        float visibleWorldCenterX = static_cast<float>(world.left) + world.width / 2.0f;
-	        float visibleWorldCenterY = static_cast<float>(world.top) + world.height / 2.0f;
-	        
-	        // Calculate the port center
-	        float portCenterX = static_cast<float>(port.left) + port.width / 2.0f;
-	        float portCenterY = static_cast<float>(port.top) + port.height / 2.0f;
-	        
-	        // Calculate scale to fit visible world into port
-	        float visibleWorldWidth = static_cast<float>(world.width) / zoomFactor;
-	        float visibleWorldHeight = static_cast<float>(world.height) / zoomFactor;
-	        
-	        float scaleX = static_cast<float>(port.width) / visibleWorldWidth;
-	        float scaleY = static_cast<float>(port.height) / visibleWorldHeight;
-	        
-	        // Apply transformation
-	        float screenX = static_cast<float>(worldPos.x);
-	        float screenY = static_cast<float>(worldPos.y);
-	        
-	        // 1. Translate world center to origin
-	        screenX -= visibleWorldCenterX;
-	        screenY -= visibleWorldCenterY;
-	        
-	        // 2. Apply scale
-	        screenX *= scaleX;
-	        screenY *= scaleY;
-	        
-	        // 3. Apply rotation
-	        if (rotation != 0) {
-	            Gdiplus::Matrix rotMatrix;
-	            rotMatrix.Rotate(rotation);
-	            Gdiplus::PointF point(screenX, screenY);
-	            rotMatrix.TransformPoints(&point, 1);
-	            screenX = point.X;
-	            screenY = point.Y;
-	        }
-	        
-	        // 4. Translate to port center
-	        screenX += portCenterX;
-	        screenY += portCenterY;
-	        
-	        // Now account for window stretching
-	        screenX *= (static_cast<float>(screenSize.x) / static_cast<float>(world.width));
-	        screenY *= (static_cast<float>(screenSize.y) / static_cast<float>(world.height));
-	        
-	        return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
+			// 1. World center
+			float worldCenterX = world.left + world.width / 2.0f;
+			float worldCenterY = world.top + world.height / 2.0f;
+
+			// 2. Translate to origin
+			float dx = static_cast<float>(worldPos.x) - worldCenterX;
+			float dy = static_cast<float>(worldPos.y) - worldCenterY;
+
+			// 3. Apply rotation
+			if (rotation != 0.0f) {
+				float rad = rotation * static_cast<float>(M_PI) / 180.0f;
+				float cosA = std::cos(rad);
+				float sinA = std::sin(rad);
+				float newX = dx * cosA - dy * sinA;
+				float newY = dx * sinA + dy * cosA;
+				dx = newX;
+				dy = newY;
+			}
+
+			// 4. Apply scale (world → port)
+			float scaleX = (port.width / world.width) * std::pow(2.0f, zoom);
+			float scaleY = (port.height / world.height) * std::pow(2.0f, zoom);
+			float portX = dx * scaleX + port.width / 2.0f;
+			float portY = dy * scaleY + port.height / 2.0f;
+
+			// 5. Map port → screen (client) coordinates (inverse of the initial stretch)
+			float screenX = portX * (static_cast<float>(screenSize.x) / port.width);
+			float screenY = portY * (static_cast<float>(screenSize.y) / port.height);
+
+			return ws::Vec2i(static_cast<int>(screenX), static_cast<int>(screenY));
 	    }
 	
 	    
@@ -1598,7 +1731,7 @@ namespace ws
 			ReleaseDC(nullptr, hdcScreen);
 
 			if (!m_hDIB) {
-				std::cerr << "Texture::create failed to create DIBSection\n";
+				ws::warning("Texture::create failed to create DIBSection");
 				return false;
 			}
 
@@ -1608,7 +1741,7 @@ namespace ws
 			bitmap = new Gdiplus::Bitmap(w, h, w * 4, PixelFormat32bppARGB, (BYTE*)m_dibBits);
 
 			if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
-				std::cerr << "Texture::create failed to create GDI+ wrapper\n";
+				ws::warning("Texture::create failed to create GDI+ wrapper");
 				destroyDIB();
 				return false;
 			}
@@ -1649,6 +1782,7 @@ namespace ws
 			return m_dibBits;
 		}
 		
+		//returns whether this is a fast DIB section under the hood or is a GDI HBITMAP only.
 		bool isFastDIB() const
 		{
 			return m_isFast;
@@ -1666,7 +1800,7 @@ namespace ws
 
 			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
 			{
-				std::cerr << "Failed to load image at " << std::quoted(path) << ".\n";
+				ws::warning("Failed to load image at (" + path + ")");
 				if (temp) { delete temp; }
 				return false;
 			}
@@ -1709,7 +1843,7 @@ namespace ws
 			Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromStream(pStream);
 			pStream->Release();
 
-			if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
+			if(!temp || temp->GetLastStatus() != Gdiplus::Ok)
 			{
 				if (temp) { delete temp; }
 				return false;
@@ -1719,7 +1853,7 @@ namespace ws
 			int h = temp->GetHeight();
 
 			// Create DIBSection of the same size
-			if (!create(w, h))
+			if(!create(w, h))
 			{
 				delete temp;
 				return false;
@@ -1742,7 +1876,7 @@ namespace ws
 			if (w <= 0 || h <= 0) return false;
 
 			// Create DIBSection of the same size
-			if (!create(w, h))
+			if(!create(w, h))
 				return false;
 
 			// Draw source bitmap into the DIBSection via GDI+
@@ -1803,6 +1937,32 @@ namespace ws
 				bitmap->SetPixel(xIndex, yIndex, color);
 			}
 		}
+
+		template<typename Func>
+		void editAllPixels(Func&& action, int start = 0,int end = -1)
+		{
+			start = std::max(0,start);
+			
+			if(end <= 0)
+				end = width * height;
+			
+			end = std::min(end,width * height);
+			
+			if(end <= start)
+				return;
+			
+			
+			
+			if(!m_isFast || !m_dibBits) 
+				return;
+
+			uint8_t* pixel = static_cast<uint8_t*>(m_dibBits) + start * 4;
+			for(int a = start; a < end; a++) {
+				action(pixel,a);          
+				pixel += 4;
+			}
+		}
+
 	    
 	    // Gets a pixel using 1D index.
 		ws::Hue getPixel(int index)
@@ -1887,13 +2047,13 @@ namespace ws
 		{
 		    if (!bitmap || width <= 0 || height <= 0)
 		    {
-		        std::cerr << "Cannot save: Invalid bitmap\n";
+		        ws::warning("Cannot save: Invalid bitmap");
 		        return false;
 		    }
 		
 		    if (!ResolveRelativePath(path))
 		    {
-		        std::cerr << "Failed to resolve path: " << path << "\n";
+		        ws::warning("Failed to resolve path (" + path + ")");
 		        return false;
 		    }
 		    
@@ -1931,7 +2091,7 @@ namespace ws
 		    else
 		    {
 		        // default to PNG if extension not recognized
-		        std::cerr << "Unsupported format. Using PNG.\n";
+		        ws::warning("Unsupported format. Using PNG.");
 		        GetEncoderClsid(L"image/png", &encoderClsid);
 		        path += ".png"; // Add extension
 		    }
@@ -1941,7 +2101,7 @@ namespace ws
 		    
 		    if (status != Gdiplus::Ok)
 		    {
-			    std::cerr << "Failed to save image to: " << path << "\n";
+			    ws::warning("Failed to save image to (" + path + ")");
 				return false;
 			}
 			return true;
@@ -2002,10 +2162,17 @@ namespace ws
 		{
 			fontFilePath.clear();
 			isCustomFont = false;
-			
+
 			fontCollection.reset(new Gdiplus::PrivateFontCollection());
 			
 			fontName = name;
+
+			family.reset(new Gdiplus::FontFamily(ws::WIDE(name).c_str()));
+			if(family->GetLastStatus() != Gdiplus::Ok) 
+			{
+				family.reset(new Gdiplus::FontFamily(L"Arial"));
+				fontName = "Arial";
+			}
 			
 			return update();
 			
@@ -2061,7 +2228,38 @@ namespace ws
 			return update();
 		}
 		
-		
+		//Load a font from memory.
+		bool loadFromMemory(const void* data, size_t size)
+		{
+			fontCollection.reset(new Gdiplus::PrivateFontCollection());
+
+			Gdiplus::Status status = fontCollection->AddMemoryFont(data, static_cast<UINT>(size));
+			if(status != Gdiplus::Ok)
+				return false;
+
+			int familyCount = fontCollection->GetFamilyCount();
+			if(familyCount <= 0)
+				return false;
+
+			foundFamily = 0;
+			fontCollection->GetFamilies(1, family.get(), &foundFamily);
+			if (foundFamily == 0)
+				return false;
+
+			wchar_t familyName[LF_FACESIZE];
+			if(family->GetFamilyName(familyName) != Gdiplus::Ok)
+				return false;
+
+			std::string name = ws::SHORT(familyName);
+			if(!name.empty() && name.back() == '\0')
+				name.pop_back();
+
+			fontName = name;
+			fontFilePath.clear();
+			isCustomFont = true; 
+
+			return update();
+		}		
 		
 		// Returns true if the font object is valid.
 		bool isValid()
@@ -2093,11 +2291,10 @@ namespace ws
 			}
 			else
 			{
-				
-				gdiFont.reset(new Gdiplus::Font(ws::WIDE(fontName).c_str(), 
-	            24, 
-	            Gdiplus::FontStyleRegular, 
-	            Gdiplus::UnitPixel));
+				gdiFont.reset(new Gdiplus::Font(family.get(),
+				24, 
+				Gdiplus::FontStyleRegular, 
+				Gdiplus::UnitPixel));
 			}
 			
 			
@@ -2257,6 +2454,21 @@ namespace ws
 			return (point.x >= left && point.x <= right && point.y >= top && point.y <= bottom);
 	    }
 	    
+		bool intersects(ws::IntRect box)
+		{
+			int left, top, right, bottom;
+	        getBounds(left, top, right, bottom);
+	        
+			int boxLeft = box.left;
+			int boxRight = box.left + box.width;
+			int boxTop = box.top;
+			int boxBottom = box.top + box.height;
+			
+			if(boxRight < left || boxLeft > right || boxTop > bottom || boxBottom < top)
+				return false;
+			return true;
+		}
+		
 	    // Draws the object in world space by applying the local transform matrix.
 		virtual void drawGlobal(Gdiplus::Graphics* graphics)
 	    {
@@ -2297,13 +2509,32 @@ namespace ws
 	        
 	        graphics->Restore(state);
 	    }
+		
 	    
 	    // Pure virtual - draw the content in local space
 	    virtual void draw(Gdiplus::Graphics* graphics) = 0;
-	    
+		
+		//draws to a texture with full transforms using GDI+ DrawImage. - ignores window view transforms!
+		void drawToTexture(ws::Texture& target) 
+		{
+			if (!target.isValid()) return;
+			Gdiplus::Graphics graphics(target.getHDC());
+			drawGlobal(&graphics);
+		}
+		
 	    virtual ~Drawable() = default;
 	};
 
+	//dynamically loaded function for AlphaBlend drawing.
+    typedef BOOL (WINAPI *AlphaBlendFunc)(
+        HDC hdcDest,
+        int xDest, int yDest,
+        int cxDest, int cyDest,
+        HDC hdcSrc,
+        int xSrc, int ySrc,
+        int cxSrc, int cySrc,
+        BLENDFUNCTION blendFunction
+    );
 	//============SPRITE=============
 	class Sprite : public Drawable
 	{
@@ -2348,6 +2579,7 @@ namespace ws
 	        if (!textureRef || !textureRef->isValid()) 
 	            return;
 	        
+				
 	        Gdiplus::Rect destRect(0,0, width, height);
 	        Gdiplus::Rect srcRect(texLeft, texTop, texWidth, texHeight);
 			
@@ -2420,8 +2652,72 @@ namespace ws
 	        return textureRef != nullptr;
 	    }		
 		
-		
+		//Draws to a texture using AlphaBlend function -  this does not support complex transforms. - ignores window view transforms!
+		void drawBlend(ws::Texture &dest,float alphaEffect = 255,DWORD stretchMode = 0)
+		{
+			if(!textureRef || !textureRef->isValid()) return;
 
+			if(scale.x < 0 || scale.y < 0)
+			{
+				ws::warning("Warning! Attempted to drawBlend with negative scale. Defaulting to GDI+ draw for negative scaling support.(This will be slower)");
+				drawToTexture(dest);
+				return;
+			}
+
+			int destX = static_cast<int>(x - origin.x * scale.x);
+			int destY = static_cast<int>(y - origin.y * scale.y);
+			int destW = static_cast<int>(texWidth * scale.x);
+			int destH = static_cast<int>(texHeight * scale.y);
+
+			int srcX = texLeft, srcY = texTop;
+			int srcW = texWidth, srcH = texHeight;
+
+			BLENDFUNCTION blend = { AC_SRC_OVER, 0, static_cast<unsigned char>(alphaEffect), AC_SRC_ALPHA };
+
+			static AlphaBlendFunc pAlphaBlend = []() -> AlphaBlendFunc {
+				HMODULE hMsimg32 = LoadLibraryW(L"msimg32.dll");
+				if (hMsimg32) {
+					return (AlphaBlendFunc)GetProcAddress(hMsimg32, "AlphaBlend");
+				}
+				return nullptr;
+			}();
+			
+			
+			
+			if(stretchMode != 0)
+				SetStretchBltMode(dest.getHDC(), stretchMode);
+
+			if (pAlphaBlend) 
+			{
+				pAlphaBlend(dest.getHDC(), destX, destY, destW, destH,
+							textureRef->getHDC(), srcX, srcY, srcW, srcH,
+							blend);
+			}
+		}
+		//Draws sprite data to a texture but discards all rotation transforms and negative scale. - ignores window view transforms!
+		void Blt(ws::Texture &dest,DWORD stretchMode = COLORONCOLOR)
+		{
+			if (!textureRef || !textureRef->isValid()) return;
+
+			int destX = static_cast<int>(x - origin.x * scale.x);
+			int destY = static_cast<int>(y - origin.y * scale.y);
+			int destW = static_cast<int>(texWidth * scale.x);
+			int destH = static_cast<int>(texHeight * scale.y);
+
+			int srcX = texLeft, srcY = texTop;
+			int srcW = texWidth, srcH = texHeight;
+
+			// (COLORONCOLOR is fastest, HALFTONE gives better quality)
+			SetStretchBltMode(dest.getHDC(), stretchMode);
+
+			StretchBlt(
+				dest.getHDC(),
+				destX, destY, destW, destH,
+				textureRef->getHDC(),
+				srcX, srcY, srcW, srcH,
+				SRCCOPY
+			);			
+		}
 		
 		
 		public:
@@ -3010,6 +3306,62 @@ namespace ws
 	    }
 	};	
 	
+	
+	class Rectangle : public ws::Drawable
+	{
+		public:
+		Rectangle()
+		{
+			width = 1;
+			height = 1;
+		}
+		Rectangle(int w,int h)
+		{
+			setSize(w,h);
+		}
+		
+		//Setters
+		void setFillColor(ws::Hue color)     { m_fillColor = color; }
+		void setBorderColor(ws::Hue color)   { m_borderColor = color; }
+		void setBorderWidth(int width)              { m_borderWidth = width; }
+		void setBorderStyle(Gdiplus::DashStyle style) { m_borderStyle = style; }		
+		
+		//Getters
+		ws::Hue getFillColor() const         { return m_fillColor.GetValue(); }
+		ws::Hue getBorderColor() const       { return m_borderColor.GetValue(); }
+		int getBorderWidth() const                  { return m_borderWidth; }
+		Gdiplus::DashStyle getBorderStyle() const   { return m_borderStyle; }	
+		
+		//draw the rectangle in local coordinates
+		virtual void draw(Gdiplus::Graphics* canvas) override
+		{
+			Gdiplus::RectF rect(0.0f, 0.0f,
+			static_cast<Gdiplus::REAL>(width),
+			static_cast<Gdiplus::REAL>(height));
+
+			if(m_fillColor.GetA() > 0)
+			{
+				Gdiplus::SolidBrush fillBrush(m_fillColor);
+				canvas->FillRectangle(&fillBrush, rect);
+			}
+
+			if(m_borderWidth > 0 && m_borderColor.GetA() > 0)
+			{
+				Gdiplus::Pen borderPen(m_borderColor,
+				static_cast<Gdiplus::REAL>(m_borderWidth));
+				borderPen.SetDashStyle(m_borderStyle);
+				canvas->DrawRectangle(&borderPen, rect);
+			}
+		}		
+		
+		private:
+		
+		Gdiplus::Color m_fillColor = Gdiplus::Color(255, 255, 255, 255); // white
+		Gdiplus::Color m_borderColor = Gdiplus::Color(255, 0, 0, 0);      // black
+		int m_borderWidth = 1;
+		Gdiplus::DashStyle m_borderStyle = Gdiplus::DashStyleSolid;		
+	};
+	
 	//===============TEXT==================
 	class Text : public ws::Drawable
 	{
@@ -3029,26 +3381,38 @@ namespace ws
 		
 		
 		void setFont(ws::Font &newFont)
-		{ fontRef = &newFont; }
+		{ 
+			fontRef = &newFont; 
+			getLocalBounds();
+		}
 		
 		ws::Font* getFont()
 		{ return fontRef; }
 		
 		void setString(std::string str)
-		{ text = str; }
+		{
+			text = str; 
+			getLocalBounds();
+		}
 		
 		std::string getString()
 		{ return text; }
 		
 		
 		void setCharacterSize(int size)
-		{ charSize = size;}
+		{ 
+			charSize = size;
+			getLocalBounds();
+		}
 		
 		int getCharacterSize()
 		{ return charSize; }	
 		
 		void setStyle(Gdiplus::FontStyle fontStyle)
-		{ style = fontStyle;}
+		{ 
+			style = fontStyle;
+			getLocalBounds();
+		}
 		
 		Gdiplus::FontStyle getStyle()
 		{ return style; }		
@@ -3066,7 +3430,10 @@ namespace ws
 		{ return borderColor; }
 		
 		void setBorderWidth(int w)
-		{ borderWidth = w; }
+		{ 
+			borderWidth = w; 
+			getLocalBounds();
+		}
 		
 		int getBorderWidth()
 		{ return borderWidth; }
@@ -3083,12 +3450,15 @@ namespace ws
 		// Draws the text with outline and fill.
 		virtual void draw(Gdiplus::Graphics* canvas) override 
 		{
-			
-			Gdiplus::FontFamily &family = *fontRef->getFamilyHandle();
-			
+			if(!fontRef)
+				return;
+			Gdiplus::FontFamily* familyPtr = fontRef->getFamilyHandle();
+			if (!familyPtr) return;
+			Gdiplus::FontFamily &family = *familyPtr;
+
 			if(!family.IsStyleAvailable(style))
             {
-            	std::cerr << "Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed."<<std::endl;
+            	ws::warning("Font style not available! Defaulting to whatever style can be found. If nothing is found, the text will not be displayed.");
                 if(family.IsStyleAvailable(Gdiplus::FontStyleRegular))
                     style = Gdiplus::FontStyleRegular;
                 else if(family.IsStyleAvailable(Gdiplus::FontStyleBold))
@@ -3115,10 +3485,12 @@ namespace ws
 			Gdiplus::PointF(0,0), 
 			&format
 			);
-    
-    		Gdiplus::Pen outlinePen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
-    		outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
-		    
+			
+			
+			Gdiplus::Pen outlinePen(borderColor, static_cast<Gdiplus::REAL>(borderWidth));
+			outlinePen.SetLineJoin(Gdiplus::LineJoinRound);  
+			
+			
 		    Gdiplus::RectF bounds;
 		    path.GetBounds(&bounds, NULL, &outlinePen);
 		    
@@ -3134,12 +3506,47 @@ namespace ws
 		    Gdiplus::SolidBrush fillBrush(fillColor);
     
     		// Draw the outline
-    		canvas->DrawPath(&outlinePen, &path);
+    		if(borderWidth > 0)
+				canvas->DrawPath(&outlinePen, &path);
     		
     		// Fill the text
     		canvas->FillPath(&fillBrush, &path);
     		
 		} 
+
+		ws::IntRect getLocalBounds() const
+		{
+			if (!fontRef) return {0,0,0,0};
+
+			Gdiplus::GraphicsPath path;
+			Gdiplus::StringFormat format(Gdiplus::StringFormat::GenericTypographic());
+			format.SetFormatFlags(format.GetFormatFlags() | Gdiplus::StringFormatFlagsNoFitBlackBox | Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
+
+			path.AddString(
+				ws::WIDE(text).c_str(), 
+				static_cast<INT>(text.length()),
+				fontRef->getFamilyHandle(), 
+				style, 
+				static_cast<Gdiplus::REAL>(charSize), 
+				Gdiplus::PointF(0,0), 
+				&format
+			);
+
+			Gdiplus::RectF bounds;
+			path.GetBounds(&bounds, NULL, NULL);
+
+			// Update the drawable's width and height
+			const_cast<ws::Text*>(this)->width  = static_cast<int>(bounds.Width);
+			const_cast<ws::Text*>(this)->height = static_cast<int>(bounds.Height);
+
+
+			return ws::IntRect(
+				static_cast<int>(bounds.X),
+				static_cast<int>(bounds.Y),
+				static_cast<int>(bounds.Width),
+				static_cast<int>(bounds.Height)
+			);					
+		}		
 		
 		
 		private:
@@ -3171,8 +3578,8 @@ namespace ws
 			poly.setClosed();
 			poly.setFilled();
 			make();
-			origin.x = radius;
-			origin.y = radius;
+			origin.x = 0;
+			origin.y = 0;
 		}
 		
 		// Regenerates vertices for the radial shape.
@@ -3187,7 +3594,7 @@ namespace ws
 				double angle = a;
 				int resx = static_cast<int>(std::cos(angle) * static_cast<double>(radius));
 				int resy = static_cast<int>(std::sin(angle) * static_cast<double>(radius));
-				poly.addVertex(resx + radius, resy + radius);
+				poly.addVertex(resx, resy);
 			}
 			m_points = points;
 			
@@ -3195,39 +3602,8 @@ namespace ws
 			width = 2 * radius;
 			height = 2 * radius;
 
-			// Update position based on center
-			x = static_cast<float>(center.x - origin.x);
-			y = static_cast<float>(center.y - origin.y);
 		}
 		
-		
-		// Sets center position.
-		void setPosition(int posx,int posy)
-		{
-			center = {posx,posy};
-			x = static_cast<float>(center.x - origin.x);
-			y = static_cast<float>(center.y - origin.y);
-		}
-		
-		void setPosition(ws::Vec2i pos)
-		{
-			setPosition(pos.x, pos.y);
-		}
-		
-		
-		// Moves center by delta.
-		void move(ws::Vec2i delta)
-		{
-			center.x += delta.x;
-			center.y += delta.y;
-			x = static_cast<float>(center.x - origin.x);
-			y = static_cast<float>(center.y - origin.y);
-		}
-		
-		void move(int deltaX,int deltaY)
-		{
-			move(ws::Vec2i(deltaX, deltaY));
-		}
 		
 		// Sets point count and rebuilds.
 		void setPointCount(int count)
@@ -3264,11 +3640,6 @@ namespace ws
 			return radius;
 		}
 		
-		ws::Vec2i getPosition()
-		{
-			return center;
-		}
-		
 		int getPointCount()
 		{
 			return m_points;
@@ -3297,7 +3668,6 @@ namespace ws
 		
 	
 		private:
-		ws::Vec2i center = {0, 0};
 		int m_points = 500;
 		int radius = 10;
 	};
@@ -3569,7 +3939,7 @@ namespace ws
 		{
 			animated = false;
 			srcPath.clear();			
-			if (handle)
+			if(handle)
 			{
 				DestroyCursor(handle);
 				handle = nullptr;
@@ -3578,12 +3948,12 @@ namespace ws
 			std::wstring wfilename = ws::WIDE(filename);
 
 			// just detect it from the extension, no reason to make the caller do this
-			bool isAni = wfilename.size() >= 4 &&
-						 _wcsicmp(wfilename.c_str() + wfilename.size() - 4, L".ani") == 0;
+			bool isAni = wfilename.size() >= 4 && _wcsicmp(wfilename.c_str() + wfilename.size() - 4, L".ani") == 0;
 
-			if (isAni) {
+			if(isAni)
 				handle = LoadCursorFromFileW(wfilename.c_str());
-			} else {
+			else
+			{
 				handle = (HCURSOR)LoadImageW(
 					nullptr,
 					wfilename.c_str(),
@@ -3592,9 +3962,9 @@ namespace ws
 					LR_LOADFROMFILE | LR_DEFAULTSIZE
 				);
 			}
-
-			if (!handle) {
-				std::cerr << "Failed to load cursor from file: " << filename << std::endl;
+			if(!handle) 
+			{
+				ws::warning("Failed to load cursor from file (" + filename + ")");
 				animated = false;
 				srcPath.clear();
 				return false;
@@ -3616,9 +3986,9 @@ namespace ws
 		// Copy constructor.
 		Cursor(const Cursor& other) : animated(other.animated), srcPath(other.srcPath)
 		{
-			if (other.handle)
+			if(other.handle)
 			{
-				if (other.animated && !other.srcPath.empty())
+				if(other.animated && !other.srcPath.empty())
 				{
 					// CopyIcon loses animation frames, reload from file instead
 					handle = LoadCursorFromFileW(other.srcPath.c_str());
@@ -3626,9 +3996,7 @@ namespace ws
 						handle = (HCURSOR)CopyIcon((HICON)other.handle); // fallback just in case
 				}
 				else
-				{
 					handle = (HCURSOR)CopyIcon((HICON)other.handle);
-				}
 			}
 		}
 
@@ -3637,26 +4005,22 @@ namespace ws
 		{
 			if (this != &other)
 			{
-				if (handle) DestroyCursor(handle);
+				if(handle) DestroyCursor(handle);
 				animated = other.animated;
 				srcPath  = other.srcPath;
-				if (other.handle)
+				if(other.handle)
 				{
-					if (other.animated && !other.srcPath.empty())
+					if(other.animated && !other.srcPath.empty())
 					{
 						handle = LoadCursorFromFileW(other.srcPath.c_str());
 						if (!handle)
 							handle = (HCURSOR)CopyIcon((HICON)other.handle);
 					}
 					else
-					{
 						handle = (HCURSOR)CopyIcon((HICON)other.handle);
-					}
 				}
 				else
-				{
 					handle = nullptr;
-				}
 			}
 			return *this;
 		}
@@ -3672,9 +4036,9 @@ namespace ws
 		// Move assignment operator.
 		Cursor& operator=(Cursor&& other) noexcept
 		{
-			if (this != &other)
+			if(this != &other)
 			{
-				if (handle) DestroyCursor(handle);
+				if(handle) DestroyCursor(handle);
 				handle         = other.handle;
 				animated       = other.animated;
 				srcPath        = std::move(other.srcPath);
@@ -3684,6 +4048,229 @@ namespace ws
 			return *this;
 		}
 	};	
+
+
+
+	class Icon
+	{
+		private:
+		HICON hIcon = nullptr;
+		
+		public:
+		
+		Icon() = default;
+		//constructor loads from file
+		Icon(std::string path)
+		{
+			loadFromFile(path);
+		}
+		//contructor loads from memory
+		Icon(const void* buffer,size_t bufferSize)
+		{
+			loadFromMemory(buffer,bufferSize);
+		}
+		//copy constructor that makes this icon the same as another icon - NOT A POINTER.
+		Icon(HICON icon) : hIcon(nullptr) 
+		{
+			if(icon)
+				hIcon = CopyIcon(icon);
+		}
+		~Icon()
+		{
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+		}
+		//operator that makes an HICON take on pointer address of this icons HICON.
+		operator HICON() const {return hIcon;}
+		
+		//copy operation from HICON replaces this icon.
+		Icon& operator=(HICON icon) 
+		{
+			if(hIcon) 
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+			if(icon) 
+				hIcon = CopyIcon(icon);
+			return *this;
+		}		
+
+		// Copy constructor – copies the icon from another Icon
+		Icon(const Icon& other) : hIcon(nullptr) 
+		{
+			if(other.hIcon)
+				hIcon = CopyIcon(other.hIcon);
+		}
+
+		// Copy assignment – replaces current icon with a copy of the other's icon
+		Icon& operator=(const Icon& other) 
+		{
+			if(this != &other) 
+			{
+				if (hIcon) 
+				{
+					DestroyIcon(hIcon);
+					hIcon = nullptr;
+				}
+				if(other.hIcon)
+					hIcon = CopyIcon(other.hIcon);
+			}
+			return *this;
+		}
+
+		// Move constructor – steals the handle from other; other becomes empty
+		Icon(Icon&& other) noexcept : hIcon(other.hIcon) {
+			other.hIcon = nullptr;
+		}
+
+		// Move assignment – replaces current icon with other's, leaves other empty
+		Icon& operator=(Icon&& other) noexcept {
+			if(this != &other) 
+			{
+				if(hIcon) 
+				{
+					DestroyIcon(hIcon);
+					hIcon = nullptr;
+				}
+				// Steal the handle
+				hIcon = other.hIcon;
+				other.hIcon = nullptr;
+			}
+			return *this;
+		}
+
+		
+		HICON getHandle()
+		{
+			return hIcon;
+		}
+		
+		
+		
+		//load the icon from an .ico file.
+		bool loadFromFile(std::string path)
+		{
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+			
+			hIcon = (HICON)LoadImageA(
+				NULL,
+				path.c_str(),
+				IMAGE_ICON,
+				0,
+				0,
+				LR_LOADFROMFILE | LR_SHARED
+			);
+			if(!hIcon)
+				return false;
+			return true;
+		}
+		//load the icon from a block of memory.
+		bool loadFromMemory(const void* buffer,size_t bufferSize)
+		{
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}
+			
+			
+			HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
+			if (!hGlobal)
+				return false;
+
+			void* pData = GlobalLock(hGlobal);
+			if (!pData) {
+				GlobalFree(hGlobal);
+				return false;
+			}
+			memcpy(pData, buffer, bufferSize);
+			GlobalUnlock(hGlobal);
+
+			IStream* pStream = nullptr;
+			HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pStream); // TRUE = free on release
+			if (FAILED(hr)) {
+				GlobalFree(hGlobal);
+				return false;
+			}
+			
+			
+			Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream);
+			if(!pBitmap || pBitmap->GetLastStatus() != Gdiplus::Ok)
+				return false;
+			
+			pBitmap->GetHICON(&hIcon);
+			delete pBitmap;
+
+			pStream->Release();
+			
+			if(!hIcon)
+				return false;
+			return true;			
+		}
+		
+		bool isValid()
+		{
+			if(!hIcon)
+				return false;
+			return true;
+		}
+		
+		//get a texture copy of the icon at a specific size.
+		ws::Texture getTexture(int width,int height)
+		{
+			ws::Texture tex;
+			if(!tex.create(width,height))
+				return tex;
+			HDC hdc = tex.getHDC();
+			if(!hdc)
+				return tex;
+			BOOL result = DrawIconEx(
+			hdc,
+			0,0,
+			hIcon,
+			width,height,
+			0,
+			NULL,
+			DI_NORMAL
+			);
+			
+			if(!result)
+				return ws::Texture(); 
+			return tex;
+		}
+		
+		
+		//get a texture copy of the icon at a specific size. - if you pass in a single number it will be treated as a square size.
+		ws::Texture getTexture(DWORD size = ICON_SMALL)
+		{
+			if(!isValid())
+				return ws::Texture();
+		    int width,height;
+			if(size == ICON_SMALL) {
+				width  = GetSystemMetrics(SM_CXSMICON);
+				height = GetSystemMetrics(SM_CYSMICON);
+			}
+			else if(size == ICON_BIG) 
+			{
+				width  = GetSystemMetrics(SM_CXICON);
+				height = GetSystemMetrics(SM_CYICON);
+			} 
+			else 
+				width = height = static_cast<int>(size);
+			
+			return getTexture(width,height);
+		}
+	};
+
+
 
 
 	//=============== WINDOW ==============
@@ -3723,6 +4310,7 @@ namespace ws
 		std::queue<MSG> msgQ;
 
 		ws::Cursor cursor; 
+		HICON hIcon = nullptr;
 
 		// Default notify stub that just passes to DefWindowProc.
 		static LRESULT defaultNotifyStub(Window* window, NMHDR* pnmh, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -3730,6 +4318,7 @@ namespace ws
 			return DefWindowProc(window->hwnd, uMsg, wParam, lParam);
 		}
 		
+		ws::Vec2i srcPos = {0,0};
 		
 		
 		public:		
@@ -3760,8 +4349,7 @@ namespace ws
 		{
 			if(clientWidth <= 0 || clientHeight <= 0)
 			{
-				std::cerr << "Error: Attempted to create a window with an invalid size!" << std::endl;
-				MessageBoxA(NULL,"Error: Attempted to create a window with an invalid size!","Developer Error",MB_OK);
+				ws::warning("Error: Attempted to create a window with an invalid size!");
 			}
 			
 			if (hwnd && IsWindow(hwnd)) 
@@ -3816,7 +4404,7 @@ namespace ws
 			
 			
 		    if (hwnd == nullptr) {
-		        std::cerr << "Failed to create window!" << std::endl;
+		        ws::warning("Failed to create window!");
 				exit(-1);
 		    }			
 			
@@ -3834,23 +4422,29 @@ namespace ws
 		// Destructor – destroys the window and cleans up resources.
         ~Window()
         {
-			RevokeDragDrop(hwnd);//just in case the window does use dragndrop. You have to call the revoke function for the window before it gets destroyed. Placing revoke elsewhere could result in a crash.
-
+			if (hwnd && IsWindow(hwnd))
+			{
+				pRevokeDragDrop(hwnd);//just in case the window does use dragndrop. You have to call the revoke function for the window before it gets destroyed. Placing revoke elsewhere could result in a crash.
+				DestroyWindow(hwnd);
+			}			
+			
 
 			if (canvas) {
 				delete canvas;
 				canvas = nullptr;
 			}
 
-			if (hwnd && IsWindow(hwnd)) {
-				DestroyWindow(hwnd);
+			if(hIcon)
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
 			}
         }
 		
 		// Immediately destroys the window.
 		void close()
 		{
-		    if (hwnd && IsWindow(hwnd)) {
+		    if(hwnd && IsWindow(hwnd)) {
 		        DestroyWindow(hwnd);
 		    }
 		    isRunning = false;
@@ -3863,10 +4457,11 @@ namespace ws
 				return false;
 			
 			MSG msg;
-			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
+			while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
 			{
 				
-				if (msg.message == WM_QUIT) {
+				if(msg.message == WM_QUIT) 
+				{
 					isRunning = false;
 					return false;
 				}
@@ -3874,12 +4469,10 @@ namespace ws
 				
 				bool isOurs = (msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd));
 				
-				if (isOurs) 
-				{
+				if(isOurs) 
 					msgQ.push(msg);
-				}
 				
-				if (isOurs && !IsDialogMessage(hwnd, &msg)) 
+				if(isOurs && !IsDialogMessage(hwnd, &msg)) 
 				{
 					TranslateMessage(&msg);
 					DispatchMessage(&msg);
@@ -3895,10 +4488,10 @@ namespace ws
 		}
 		
 		// Pops the next queued message; returns false if queue empty.
-	    bool pollEvent(MSG &message) {
-	        if (msgQ.empty()) {
+	    bool pollEvent(MSG &message) 
+		{
+	        if (msgQ.empty())
 	            return false;
-	        }
 	        
 	        message = msgQ.front();
 	        msgQ.pop();
@@ -3906,13 +4499,13 @@ namespace ws
 	    }	
 		
 		// Clears the back buffer to the given color, recreating if needed.
-	    void clear(Gdiplus::Color color = Gdiplus::Color(255,0,0,0)) 
+	    void clear(ws::Hue color = ws::Hue::transparent) 
 		{
-			if (!hwnd) return;
+			if(!hwnd) return;
 
-			ws::Vec2i needed = view.getSize();
+			ws::Vec2i needed = view.getPortSize();;
 
-			if (!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
+			if(!canvas || backBuffer.getSize().x != needed.x || backBuffer.getSize().y != needed.y)
 			{
 				delete canvas;
 				canvas = nullptr;
@@ -3923,7 +4516,7 @@ namespace ws
 				canvas->SetSmoothingMode(Gdiplus::SmoothingModeNone);
 			}
 
-			if (canvas)
+			if(canvas)
 				canvas->Clear(color);		
 	    }
 		
@@ -3931,8 +4524,6 @@ namespace ws
 		void draw(Drawable &draw)
 		{
 			if(!canvas || !hwnd) return;
-
-
 
 
 
@@ -3962,10 +4553,10 @@ namespace ws
 		// Updates the layered window for per‑pixel alpha when enabled.
 		void updateLayeredWindow()
 		{
-			if (!m_perPixelAlpha || !hwnd) return;
+			if(!m_perPixelAlpha || !hwnd) return;
 
 			HDC hdc = backBuffer.getHDC();
-			if (!hdc) return;
+			if(!hdc) return;
 
 			SIZE size = { backBuffer.getSize().x, backBuffer.getSize().y };
 			POINT ptSrc = { 0, 0 };
@@ -3981,7 +4572,7 @@ namespace ws
 		
 		public:
 		
-		// Invalidates and updates the window (and possibly layered window).
+		// Invalidates and updates the window
 	    void display() 
 		{
 			if(m_perPixelAlpha && hwnd)
@@ -4031,7 +4622,7 @@ namespace ws
 			view = v;
 		}
 		
-		ws::View getView()
+		ws::View &getView()
 		{
 			return view;
 		}
@@ -4070,7 +4661,7 @@ namespace ws
 		// Places this window after another in Z-order.
 		void setLayerAfter(HWND lastHwnd)
 		{
-			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
+			SetWindowPos(hwnd,lastHwnd,0,0,0,0,SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
 		}
 		
 		// Adds a window style.
@@ -4081,7 +4672,6 @@ namespace ws
 			
 			DWORD s = getStyle();
 			s |= style;
-			
 				
 			SetWindowLongA(hwnd,GWL_STYLE,s);		
 		}
@@ -4147,27 +4737,30 @@ namespace ws
 			SetWindowLongA(hwnd,GWL_EXSTYLE,style);			
 		}
 
+		//returns the extended window styles for this window
 		DWORD getExStyle() const
 		{	
 			return GetWindowLong(hwnd, GWL_EXSTYLE);
 		}
 	    
+		//returns the non-extended window styles for this window.
 	    DWORD getStyle() const
 	    {
 	    	return GetWindowLong(hwnd, GWL_STYLE);
             
 		}
 	    
+		//checks if a certain individual style exists for this window.
 	    bool hasStyle(DWORD checkStyle)
 	    {
 	    	return (getStyle() & checkStyle);
 		}
-		
+		//checks if a certain individual extended style exists for this window.
 		bool hasExStyle(DWORD checkStyle)
 	    {
 	    	return (getExStyle() & checkStyle);
 		}
-		
+		// Sets the window size (client area dimensions). - Overload for ws::Vec2i
 		void setSize(ws::Vec2i size)
 		{
 			setSize(size.x,size.y);
@@ -4179,7 +4772,7 @@ namespace ws
 	    	if(screenWidth <= 0 || screenHeight <= 0)
 			{
 				setVisible(false);
-				std::cerr << "Warning! You tried to set a window to an invalid size. This has been converted into a safe setVisible(false) command. Try using the setVisible function as a better practice.\n";
+				ws::warning("Warning! You tried to set a window to an invalid size. This has been converted into a safe setVisible(false) command. Try using the setVisible function as a better practice.");
 				return;
 			}
 	    	SetWindowPos(hwnd, 
@@ -4204,6 +4797,7 @@ namespace ws
 			return ws::Vec2i(width,height);			
 		}
 		
+		//sets the window position - overload
 		void setPosition(ws::Vec2i pos)
 		{
 			setPosition(pos.x,pos.y);
@@ -4326,13 +4920,50 @@ namespace ws
 				isFullscreen = false;
 			}
 		}
-	    
+		
+		//checks if window is in fullscreen styling.
 	    bool getFullscreen() const {
 	        return isFullscreen;
 	    }
 
+		//force all clicks to pass through this window as if it does not exist.
+		void disableAnyClicks()
+		{
+			addMessageHandler([](MSG msg) -> LRESULT{
+				if(msg.message == WM_NCHITTEST)
+				{
+					return HTTRANSPARENT;   // mouse passes through
+				}
+				return 0;
+			});			
+		}
+
+
+		//Choose what color should represent emptiness and any click will pass through that color as if nothing is there.
+		void disableSomeClicks(ws::Hue hue)
+		{
+			addMessageHandler([this,hue](MSG msg) -> LRESULT{
+				if(msg.message == WM_NCHITTEST)
+				{
+					
+					POINT p;
+					if(!GetCursorPos(&p))
+					{
+						p.x = -1000;
+						p.y = -1000;
+					}
+					ScreenToClient(hwnd, &p); // Convert to client coordinates
+					
+					ws::Vec2f MP = toWorld(p);
+					if(getPixel(MP.x,MP.y) == hue)
+						return HTTRANSPARENT;   // mouse passes through
+				}
+				return 0;				
+			});
+		}
+		
 		// Enables chroma key transparency (legacy per-pixel or simple).
-		void enableChromaKey(ws::Hue hue,bool legacy = false)//losing window control for some reason
+		void enableChromaKey(ws::Hue hue,bool legacy = false)
 		{
 			m_perPixelAlpha = legacy;				
 			
@@ -4342,6 +4973,7 @@ namespace ws
 				SetLayeredWindowAttributes(hwnd,RGB(hue.r,hue.g,hue.b),static_cast<BYTE>(hue.a),LWA_COLORKEY | LWA_ALPHA);
 		}
 		
+		//disables the chroma keying that causes window transparency. - also disables alpha only.
 		void disableChromaKey()
 		{
 			removeExStyle(WS_EX_LAYERED);
@@ -4355,9 +4987,64 @@ namespace ws
 				SetLayeredWindowAttributes(hwnd,0,static_cast<BYTE>(alpha),LWA_ALPHA);			
 		}
 		
+		//Disables alpha only transparency - also disables chroma key.
 		void disableAlphaOnly()
 		{
 			disableChromaKey();
+		}
+		
+		//Sets the window behind the desktop icons. (WARNING -  this will override many window settings and styles to produce a functional desktop window.)
+		static bool setBehindIcons(HWND source)
+		{
+			HWND progman   = FindWindowW(L"Progman", nullptr);
+			HWND workerW   = FindWindowExW(progman, nullptr, L"WorkerW", nullptr);
+			HWND shellView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
+			if (!progman || !workerW || !shellView)
+			{
+				ws::warning("Could not locate Progman / WorkerW / SHELLDLL_DefView. Failed to set Window behind icons!");
+				return false;
+			}
+			
+			//for windows 11
+			
+			#ifndef WS_EX_NOREDIRECTIONBITMAP
+			#define WS_EX_NOREDIRECTIONBITMAP 0x00200000L
+			#endif
+			
+			bool raised = (GetWindowLongPtr(progman, GWL_EXSTYLE) & WS_EX_NOREDIRECTIONBITMAP) != 0;
+			if(!raised)
+			{
+				ws::warning("Can't set window behind icons on this computer due to imcompatible desktop design.");
+				return false;
+			}
+			
+			
+			//SetAllStyle
+			SetWindowLongA(source,GWL_STYLE,0);
+			SetWindowLongA(source,GWL_STYLE,WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN);
+			
+			SetParent(source, workerW);
+			
+			//add WS_EX_LAYERED
+			DWORD exStyle = GetWindowLong(source, GWL_EXSTYLE);
+			exStyle |= WS_EX_LAYERED;
+			SetWindowLongA(source,GWL_EXSTYLE,exStyle);
+			
+			
+			//enable alpha only
+			SetLayeredWindowAttributes(source,0,255,LWA_ALPHA);
+			
+			ShowWindow(source,SW_SHOW);
+			
+			//setLayerAfter shellView
+			SetWindowPos(source,shellView,0,0,0,0,SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+			return true;			
+		}
+		
+		//overload that sets this window behind the icons.
+		bool setBehindIcons()
+		{
+			return setBehindIcons(hwnd);
 		}
 		
 		// Converts screen coordinates to world.
@@ -4365,7 +5052,7 @@ namespace ws
 		{
 			return view.toWorld(x,y,getSize());
 		}
-		
+		// Converts screen coordinates to world. - overload
 		ws::Vec2i toWorld(ws::Vec2i pos)
 		{
 			return toWorld(pos.x,pos.y);
@@ -4376,10 +5063,27 @@ namespace ws
 		{
 			return view.toScreen(x,y,getSize());
 		}
-		
+		// Converts world coordinates to screen. - overload
 		ws::Vec2i toScreen(ws::Vec2i pos)
 		{
 			return toScreen(pos.x,pos.y);
+		}
+		
+		//You really shouldn't mess with this.
+		// Sets where in texture coordinates the backbuffer is drawn on the window client area. 
+		void setSourcePos(ws::Vec2i pos)
+		{
+			srcPos = pos;
+		}
+		// Sets where in texture coordinates the backbuffer is drawn on the window client area. - overload
+		void setSourcePos(int x,int y)
+		{
+			srcPos = {x,y};
+		}
+		//returns the position where the backbuffer is drawn to the window client area.
+		ws::Vec2i getSourcePos()
+		{
+			return srcPos;
 		}
 
 		//Child Management - Declared here but defined in the controls header if included.
@@ -4399,17 +5103,78 @@ namespace ws
 			return cursor;
 		}
 		
+		//Sets the window icon to a given HICON. - This function is not responsible for cleanup of your HICON handle.
+		bool setIcon(HICON icon,DWORD size = ICON_SMALL)
+		{
+			
+			if(!icon)
+				return false;
+		
+			if(hIcon) 
+			{
+				DestroyIcon(hIcon);
+				hIcon = nullptr;
+			}			
+
+			hIcon = icon;
+			SendMessage(hwnd, WM_SETICON, size, (LPARAM)hIcon);	
+			return true;			
+		}
+		
+		//Sets the window icon to a given .ico file.
+		bool setIcon(std::string file,DWORD size = ICON_SMALL)
+		{
+			
+			HICON m_hIcon = (HICON)LoadImageA(
+				NULL,
+				file.c_str(),
+				IMAGE_ICON,
+				0, 0,
+				LR_LOADFROMFILE | LR_DEFAULTSIZE
+			);
+			bool res = setIcon(m_hIcon,size);
+			DestroyIcon(m_hIcon);
+			m_hIcon = nullptr;	
+			return res;
+		}
+		
+		
+		HICON getIcon()
+		{
+			return hIcon;
+		}			
+		
 		// Adds a custom message handler.
 		void addMessageHandler(std::function<LRESULT(MSG msg)> handler)
 		{
 			customHandlers.push_back(std::move(handler));
 		}
+		
+		std::vector<std::function<LRESULT(MSG msg)>> getMessageHandlers()
+		{
+			return customHandlers;
+		}
 
-		void clearMessageHandlers() {
-			customHandlers.clear();
+		private:
+		
+		//cleanup dragndrop whether it was used or not.
+		void pRevokeDragDrop(HWND &targetHwnd)
+		{
+			typedef HRESULT (WINAPI *Ptr)(HWND);
+			
+			HMODULE hOle32 = LoadLibrary(TEXT("Ole32.dll"));
+			if(hOle32 == nullptr)
+				return;
+			Ptr ptr = (Ptr)GetProcAddress(hOle32,"RevokeDragDrop");
+			if(ptr == nullptr)
+			{
+				FreeLibrary(hOle32);
+				return;
+			}
+			ptr(targetHwnd);
+			FreeLibrary(hOle32);
 		}
 		
-		private:
 		std::vector<std::function<LRESULT(MSG msg)>> customHandlers;
 		
 		// Handles messages; called by the global window procedure.
@@ -4427,21 +5192,31 @@ namespace ws
 					return lresult;//if result is not zero that means that the message was handled.
 			}			
 
-            switch (uMsg) {
-	            case WM_DESTROY:
+            switch(uMsg) {
+	            
+				case WM_NCLBUTTONDBLCLK:
+					if(wParam == HTSYSMENU)
+						return 0;
+					break;
+				
+				case WM_DESTROY:
 					WindowManager::removeWindow(hwnd);
 					isRunning = false;
-					if (WindowManager::windows.empty())
+					if(WindowManager::windows.empty())
 						PostQuitMessage(0);
 	                return 0;
 	            
+				case WM_SYSCOMMAND:
+					if(wParam == SC_CLOSE && HIWORD(lParam) == 0 /* from menu */)
+						return 0;
+					break;
+				
 				case WM_CLOSE:
 					DestroyWindow(hwnd);
 					return 0;
 				
 				case WM_NOTIFY:
 				{
-					
 					NMHDR* pnmh = reinterpret_cast<NMHDR*>(lParam);
 					return s_handleNotifyForChildren(this, pnmh, uMsg, wParam, lParam);		
 				}
@@ -4471,7 +5246,7 @@ namespace ws
 	            case WM_PAINT: 
 				{
 	            	
-					if (m_perPixelAlpha)
+					if(m_perPixelAlpha)
 					{
 						PAINTSTRUCT ps;
 						BeginPaint(hwnd, &ps);
@@ -4485,16 +5260,27 @@ namespace ws
 						HDC hdc = BeginPaint(hwnd, &ps);
 
 						if (backBuffer.isFastDIB()) {
-							ws::Vec2i screenSize = getSize();
-							ws::Vec2i worldSize  = view.getSize();
 
-							if (screenSize.x == worldSize.x && screenSize.y == worldSize.y)
-								BitBlt(hdc, 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, backBuffer.getHDC(), 0, 0, SRCCOPY);
-							else
-							{
-								SetStretchBltMode(hdc, COLORONCOLOR);
-								StretchBlt(hdc, 0, 0, screenSize.x, screenSize.y, backBuffer.getHDC(), 0, 0, backBuffer.getSize().x, backBuffer.getSize().y, SRCCOPY);
-							}
+							RECT clientRect;
+							GetClientRect(hwnd, &clientRect);
+							int dstW = clientRect.right - clientRect.left;
+							int dstH = clientRect.bottom - clientRect.top;
+
+							int bufW = backBuffer.getSize().x;
+							int bufH = backBuffer.getSize().y;
+
+							int srcH = bufH - srcPos.y;
+							int srcW = bufW - srcPos.x;
+							if(srcH < 1) srcH = 1;   // safety
+
+							SetStretchBltMode(hdc, COLORONCOLOR);
+							StretchBlt(
+								hdc,
+								0, 0, dstW, dstH,               // destination = full client area
+								backBuffer.getHDC(),
+								srcPos.x, srcPos.y, bufW, srcH,            // source = everything below the menu
+								SRCCOPY
+							);
 						}
 						EndPaint(hwnd, &ps);
 					}
@@ -4535,7 +5321,7 @@ namespace ws
 		std::wstring wclassName = ws::WIDE(className);
 		
 		// Check if already registered
-		if (registeredClasses.find(wclassName) != registeredClasses.end())
+		if(registeredClasses.find(wclassName) != registeredClasses.end())
 			return true;   // already exists, nothing to do
 
 		HINSTANCE instance = GetModuleHandle(nullptr);
@@ -4545,10 +5331,10 @@ namespace ws
 		wc.lpszClassName = wclassName.c_str();
 		wc.hCursor = NULL;
 		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
+		
 		if (!RegisterClass(&wc))
 		{
-			std::cerr << "Failed to register window class: " << className << std::endl;
+			ws::warning("Failed to register window class " + className);
 			return false;
 		}
 
@@ -4625,11 +5411,13 @@ namespace ws
 		    {
 		        return {0,0};
 		    }
+			ScreenToClient(window.hwnd, &p); // Convert to client coordinates
 		    
-		    ScreenToClient(window.hwnd, &p); // Convert to client coordinates
-
-
-		    return p;
+			p.x += window.getSourcePos().x;
+			p.y += window.getSourcePos().y;
+			
+			
+			return p;
 		}
 		
 		// Returns global mouse position.
@@ -4653,18 +5441,6 @@ namespace ws
 				return true;
 			return false;			
 		}
-		
-		//depreciated functions. Avoid using these!
-		bool getMouseButton(int vmButton)
-		{
-			return getButton(vmButton);
-		}
-		bool getKey(int vmKey)
-		{
-			return getButton(vmKey);
-		}
-		
-		
 		
 	}
 
@@ -4817,8 +5593,7 @@ namespace ws
 		
 		// Returns the system DPI scaling factor.
 		float getDPI()
-		{
-			SetProcessDPIAware();			
+		{		
 			HDC hdc = GetDC(nullptr);
 			if (!hdc) return 1.0f;
 			int dpi = GetDeviceCaps(hdc, LOGPIXELSX);
@@ -4836,7 +5611,7 @@ namespace ws
 		
 	};
 
-
+	typedef BOOL (WINAPI *SetDPIAwareProc)(void);
 	class GDIPInit
 	{
 		public:	
@@ -4852,7 +5627,15 @@ namespace ws
 		{
 			//GDI+
 			Gdiplus::GdiplusStartup(&gdiplustoken,&gdiplusstartup,nullptr);	
-			SetProcessDPIAware();
+			//get a handle to the already loaded user32.dll
+ 			HMODULE hUser32 = LoadLibraryW(L"user32.dll");
+			if(hUser32)
+			{
+				SetDPIAwareProc pSetDPIAware = (SetDPIAwareProc)GetProcAddress(hUser32, "SetProcessDPIAware");
+				//only call the function if it exists. - On windows xp or below, this does not exist but is also not needed.
+				if(pSetDPIAware != NULL)
+					pSetDPIAware();
+			}
 		}
 		
 		// Shuts down GDI+.
@@ -4861,6 +5644,7 @@ namespace ws
 			//Gdi+
 			Gdiplus::GdiplusShutdown(gdiplustoken);
 		}
+		
 		
 	}gdipInit;
 	
