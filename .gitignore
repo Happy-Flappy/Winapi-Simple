@@ -16,3 +16,21 @@ ProjectSettings.json
 slnx.sqlite
 VSWorkspaceState.json
 *.sqlite-journal
+*.sln
+*.suo
+*.ipch
+DocumentLayout.backup.json
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.tlog
+*.recipe
+*.ilk
+*.log
+*.obj
+*.idb
+*.pdb
+
+
+#files to ignore
+main.cpp
