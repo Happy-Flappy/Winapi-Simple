@@ -620,11 +620,11 @@ namespace ws
 			COUNT = 159
 		};
 
-		static const std::vector<Keyboard::Key>& GetAllKeys();
+		static const std::vector<Keyboard::Key>& getAllKeys();
 		
-		static const unsigned char GetKeyCount();
+		static const unsigned char getKeyCount();
 
-		static const std::string_view GetKeyName(Keyboard::Key keyCode);
+		static const std::string_view getKeyName(Keyboard::Key keyCode);
 
 		// Prevent instantiation
 		Keyboard() = delete;
@@ -644,8 +644,8 @@ namespace ws
 		};
 
 		// @CDevJoud no need for this method
-		//static const std::vector<int>& GetAllButtons();
-		static const std::string_view GetButtonName(Mouse::Button buttonCode);
+		static const std::vector<Mouse::Button>& getAllButtons();
+		static const std::string_view getButtonName(Mouse::Button buttonCode);
 
 		Mouse() = delete;
 	};
@@ -2152,7 +2152,7 @@ namespace ws
 		return { hue, saturation, value };
 	}
 
-	const std::vector<Keyboard::Key>& Keyboard::GetAllKeys() {
+	const std::vector<Keyboard::Key>& Keyboard::getAllKeys() {
 		static const std::vector<Keyboard::Key> keys = {
 			// Letters
 			A, B, C, D, E, F, G, H, I, J, K, L, M,
@@ -2192,11 +2192,11 @@ namespace ws
 		return keys;
 	}
 
-	const unsigned char Keyboard::GetKeyCount() {
+	const unsigned char Keyboard::getKeyCount() {
 		return static_cast<unsigned char>(Keyboard::Key::COUNT);
 	}
 
-	const std::string_view Keyboard::GetKeyName(Keyboard::Key code) {
+	const std::string_view Keyboard::getKeyName(Keyboard::Key code) {
 		static const std::unordered_map<Keyboard::Key, std::string> nameMap = [] {
 			std::unordered_map<Keyboard::Key, std::string> map;
 			// Use a macro or manual entries to avoid repetition.
@@ -2251,7 +2251,14 @@ namespace ws
 		return "";
 	}
 
-	const std::string_view Mouse::GetButtonName(Mouse::Button buttonCode) {
+	const std::vector<Mouse::Button>& Mouse::getAllButtons() {
+		static std::vector<Mouse::Button> btns = {
+			Mouse::Button::Left, Mouse::Button::Right, Mouse::Button::Middle, Mouse::Button::XButton1, Mouse::Button::XButton2
+		};
+		return btns;
+	}
+
+	const std::string_view Mouse::getButtonName(Mouse::Button buttonCode) {
 		static const std::unordered_map<Mouse::Button, std::string> nameMap = [] {
 			std::unordered_map<Mouse::Button, std::string> map;
 #define ADD_BTN(b) map[b] = #b
