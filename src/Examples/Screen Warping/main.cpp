@@ -1,3 +1,4 @@
+#define WINSIMPLE_IMPL
 #include "winsimple.hpp"
 
 int main()
@@ -42,7 +43,6 @@ int main()
     {
 		
 		float dt = timer.restart();
-		
 		phase -= dt;
 
 		if(ws::Global::getButton(VK_ESCAPE) && (ws::Global::getButton(VK_LCONTROL) || ws::Global::getButton(VK_RCONTROL)))
@@ -52,12 +52,12 @@ int main()
 
 		ws::Texture back = screen.getSnapshot();
 		back.setSize({width,height});
-		
+
+		window.clear();
+
 		HDC srcDC = back.getHDC();
 		HDC dstDC = window.backBuffer.getHDC();
 
-
-		window.clear();
 		
 		float sinPhase = std::sin(phase);
 		float cosPhase = std::cos(phase);		
