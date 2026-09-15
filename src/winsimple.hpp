@@ -21,7 +21,7 @@
 #endif
 
 #define GetAValue(value) (LOBYTE((value)>>24))
-#define RGBA(value) ((COLORREF)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16))|((((DWORD)(BYTE)(b))<<24)))
+#define RGBA(r, g, b, a) ((COLORREF)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16))|((((DWORD)(BYTE)(a))<<24)))
 
 #include <windows.h>
 #include <windowsx.h>
@@ -935,6 +935,8 @@ namespace ws
 	    ws::Vec2i origin = {0, 0};
 	    //Degrees
 	    float rotation = 0.0f;
+	    
+		virtual ~Drawable() = default;
 
 	    ws::Vec2i getSize() const;
 	    ws::Vec2f getPosition() const;
@@ -981,7 +983,6 @@ namespace ws
 		//draws to a texture with full transforms using GDI+ DrawImage. - ignores window view transforms!
 		void drawToTexture(ws::Texture& target);
 		
-	    virtual ~Drawable() = default;
 	};
 
 	//dynamically loaded function for AlphaBlend drawing.
@@ -3373,14 +3374,11 @@ namespace ws
 	}
 	//============SPRITE=============
 
-	Sprite::Sprite() {
-		ZeroMemory(this, sizeof(Sprite));
-	}
+	Sprite::Sprite() : textureRef(nullptr), texLeft(0), texTop(0), texWidth(0), texHeight(0) {}
 
-	Sprite::Sprite(ws::Texture& texture) {
-		ZeroMemory(this, sizeof(Sprite));
+	Sprite::Sprite(ws::Texture& texture) : textureRef(nullptr), texLeft(0), texTop(0), texWidth(0), texHeight(0) {
 		textureRef = &texture;
-		setTextureRect({ 0,0,texture.getSize().x,texture.getSize().y });
+		setTextureRect({ 0, 0, texture.getSize().x, texture.getSize().y });
 	}
 
 	// Checks if point lies inside sprite bounds.
@@ -4984,8 +4982,6 @@ namespace ws
 	// Draws a Drawable object using the current view transform.
 	void Window::draw(Drawable& draw) {
 		if (!canvas || !hwnd) return;
-
-
 
 		Gdiplus::Matrix originalMatrix; //Get the original untransformed matrix so that the drawable can be drawn in world coordinates. 
 		canvas->GetTransform(&originalMatrix);
