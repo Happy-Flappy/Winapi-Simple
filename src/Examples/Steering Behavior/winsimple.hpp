@@ -381,7 +381,7 @@ namespace ws
 		float getMicroSeconds() const;
 	private:
 		LONGLONG startTime = 0;
-		float frequency = 1.0;		
+		double frequency = 1.0;		
 	};
 	
 	
@@ -1911,41 +1911,29 @@ namespace ws
 
 	Timer::Timer() {
 		LARGE_INTEGER freq;
-		QueryPerformanceFrequency(&freq);
-
-		Timer::frequency = freq.QuadPart;
-		Timer::startTime = 0;
-
+		QueryPerformanceCounter(&freq);
+		Timer::frequency = static_cast<double>(freq.QuadPart);
 		Timer::restart();
 	}
 
 	float Timer::restart() {
 		float sec = getSeconds();
-
 		LARGE_INTEGER counter;
 		QueryPerformanceCounter(&counter);
-
 		Timer::startTime = counter.QuadPart;
-
 		return sec;
 	}
 
 	float Timer::getSeconds() const {
 		LARGE_INTEGER currentTime;
 		QueryPerformanceCounter(&currentTime);
-
-		return static_cast<float>(
-			static_cast<double>(currentTime.QuadPart - Timer::startTime) /
-			static_cast<double>(Timer::frequency)
-			);
+		return static_cast<double>(currentTime.QuadPart - Timer::startTime) / Timer::frequency;
 	}
-
 	float Timer::getMilliSeconds() const {
-		return getSeconds() * 1000.0f;
+		return Timer::getSeconds() * 1000.f;
 	}
-
 	float Timer::getMicroSeconds() const {
-		return getSeconds() * 1000000.0f;
+		return Timer::getMilliSeconds() * 1000.f;
 	}
 
 	std::wstring toUTF16(const std::string& str) {

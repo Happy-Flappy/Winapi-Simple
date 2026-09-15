@@ -1,4 +1,6 @@
+#define WINSIMPLE_IMPL
 #include "winsimple.hpp"
+#define WINSIMPLE_CONTROLS_IMPL
 #include "winsimple-controls.hpp"
 
 

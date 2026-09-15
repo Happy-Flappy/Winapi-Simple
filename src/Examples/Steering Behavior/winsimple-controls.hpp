@@ -384,10 +384,6 @@ namespace ws
 		ws::Window* getParent();
 		
 		bool open(ws::Vec2i mouse);
-		//This opens a menu on the screen even if its outside of the window client and it closes it when finiahed. 
-		// Useful if in WS_EX_LAYERED mode(when other closing clicks not detectable) or displaying outside of window client.
-		bool openAtScreen(ws::Vec2i screenPt);
-
 		
 	private:
 		int command = 0;	
@@ -586,7 +582,8 @@ namespace ws
 		if (hwnd && IsWindow(hwnd)) {
 			HWND cParent = GetParent(hwnd);
 			if (cParent && cParent != phwnd) {
-				ws::log("Error: Child already parented to a different window. Remove it from the current container first.\n");
+				std::cerr << "Error: Child already parented to a different window. "
+					<< "Remove it from the current container first.\n";
 				MessageBoxA(NULL, "Error: Child already parented to a different window. Remove it from the current container first.\n", "Error", MB_OK | MB_ICONINFORMATION);
 				return false;
 			}
@@ -614,7 +611,7 @@ namespace ws
 		);
 
 		if (!hwnd) {
-			ws::log("Failed to create child control: " + m_className);
+			std::cerr << "Failed to create child control: " << m_className << std::endl;
 			return false;
 		}
 
@@ -1595,45 +1592,6 @@ namespace ws
         return true;
 	}
 
-	bool ClickMenu::openAtScreen(ws::Vec2i screenPt)
-	{
-		if(parentRef == nullptr)
-		{
-			MessageBoxA(NULL,"Attempted to show a ClickMenu without referencing a parent window! Use Init().","Failed init!",MB_OK | MB_ICONINFORMATION);
-			return false;
-		}
-		HMENU hMenu = CreatePopupMenu();
-		if(!hMenu)
-			return false;
-		
-		for(size_t a=0;a<list.size();a++)
-		{
-			AppendMenu(hMenu, MF_STRING, 1+a, ws::WIDE(list[a]).c_str());
-		}
-		
-		SetForegroundWindow(parentRef->hwnd);
-
-		POINT pt = screenPt;
-		command = TrackPopupMenu(
-			hMenu, 
-			flags,
-			pt.x,
-			pt.y,
-			0,
-			parentRef->hwnd,
-			NULL
-		);
-
-		
-
-		DestroyMenu(hMenu); 
-		
-		//close the action that SetForegroundWindow does.
-		PostMessage(parentRef->hwnd, WM_NULL, 0, 0);
-		return true;
-	}				
-	
-
 
 	FileWindow::FileWindow() : 
 		  flags(OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NODEREFERENCELINKS | OFN_NOCHANGEDIR | OFN_EXPLORER)
@@ -1708,7 +1666,7 @@ namespace ws
 			while (parent->pollEvent(m)) {}
 		}
 		else
-			ws::log("Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n");
+			std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
 
 		if (GetOpenFileNameW(&ofn)) {
 			fileName = ws::toUTF8(szFile);
@@ -1755,7 +1713,7 @@ namespace ws
 			while (parent->pollEvent(m)) {}
 		}
 		else
-			ws::log("Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n");
+			std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
 
 		if (GetSaveFileNameW(&ofn)) {
 			fileName = ws::toUTF8(szFile);
@@ -1822,7 +1780,8 @@ namespace ws
 			while (parent->pollEvent(m)) {}
 		}
 		else
-			ws::log("Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n");
+			std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+
 
 		LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
 		if (pidl != nullptr) {

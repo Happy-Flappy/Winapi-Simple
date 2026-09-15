@@ -269,7 +269,7 @@
 * Fixed ws::Text offset
 
 
-## V1.7 - Beta
+## V1.7
 
 * Removed void clearMessageHandlers()
 * Added std::vector<std::function<LRESULT(MSG msg)>> getMessageHandlers() - allows erasure of a custom handler.
@@ -343,6 +343,7 @@
 * Added Kinematics Demo
 * Added SWP_NOACTIVATE to the setLayerAfter() method in ws::Window to avoid automatic activation.
 * Added setBehindIcons() to set window behind desktop icons. (only works on windows 11 for now)
+
 
 
 
