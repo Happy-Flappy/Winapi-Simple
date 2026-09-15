@@ -472,7 +472,6 @@ namespace ws
 	class Keyboard
 	{
 	public:
-		Keyboard() = default;
 		enum Key : unsigned char {
 			A = 'A',
 			B = 'B',
@@ -621,49 +620,7 @@ namespace ws
 			COUNT = 159
 		};
 
-		//@CDevJoud deprecating and removing GetAllKeys() as it seems
-		// to be that it doesnt server a purpose rather than counting
-		// how many keys are supported by the library
-		//static const std::vector<Keyboard::Key>& GetAllKeys() 
-		//{
-		//	static const std::vector<> keys = {
-		//		// Letters
-		//		A, B, C, D, E, F, G, H, I, J, K, L, M,
-		//		N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
-		//		// Digits
-		//		Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9,
-		//		// Numpad
-		//		NumPad0, NumPad1, NumPad2, NumPad3, NumPad4,
-		//		NumPad5, NumPad6, NumPad7, NumPad8, NumPad9,
-		//		Multiply, Add, Separator, Subtract, Decimal, Divide,
-		//		// Function keys
-		//		F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
-		//		F11, F12, F13, F14, F15, F16, F17, F18, F19, F20,
-		//		F21, F22, F23, F24,
-		//		// Modifiers
-		//		Shift, Control, Alt,
-		//		LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt,
-		//		// Windows / Application
-		//		LeftWin, RightWin, Application,
-		//		// Navigation & Editing
-		//		Backspace, Tab, Clear, Enter, Pause, CapsLock, Escape, Space,
-		//		PageUp, PageDown, End, Home, Left, Up, Right, Down,
-		//		Select, Print, Execute, Snapshot, Insert, Delete, Help,
-		//		// Lock keys
-		//		NumLock, ScrollLock,
-		//		// OEM specific
-		//		OemSemicolon, OemPlus, OemComma, OemMinus, OemPeriod,
-		//		OemQuestion, OemTilde, OemOpenBrackets, OemBackslash,
-		//		OemCloseBrackets, OemQuotes, Oem8,
-		//		// Browser / Media
-		//		BrowserBack, BrowserForward, BrowserRefresh, BrowserStop,
-		//		BrowserSearch, BrowserFavorites, BrowserHome,
-		//		VolumeMute, VolumeDown, VolumeUp,
-		//		MediaNextTrack, MediaPrevTrack, MediaStop, MediaPlayPause,
-		//		LaunchMail, LaunchMediaSelect, LaunchApp1, LaunchApp2
-		//	};
-		//	return keys;
-		//}
+		static const std::vector<Keyboard::Key>& GetAllKeys();
 		
 		static const unsigned char GetKeyCount();
 
@@ -672,6 +629,7 @@ namespace ws
 		// Prevent instantiation
 		Keyboard() = delete;
 	};
+	using Key = Keyboard;
 
 	class Mouse {
 	public:
@@ -691,8 +649,6 @@ namespace ws
 
 		Mouse() = delete;
 	};
-
-	
 
 	//============VIEW==============
 	class View
@@ -790,28 +746,22 @@ namespace ws
 	//==========TEXTURE===========
 	class Texture
 	{
-		enum class ScaleMode;
 	public:
 		
+		enum class ScaleMode {
+			NearestNeighbor,   // sharp edges, pixelated
+			Bilinear,          // smooth, linear filter
+			Bicubic,           // smoother, slightly more expensive
+			HighQualityBicubic // best quality, slowest
+		};
+
 		Texture();
 
 		// Constructs and loads from file.
 		Texture(const std::string& path);
 
 	    // Destructor cleans up GDI+ bitmap and possible DIB.
-	    ~Texture()
-	    {
-			destroyDIB();
-			
-			//this will only cleanup if destroyDIB hasn't already cleanedup and made bitmap null.
-			if (bitmap) {
-				delete bitmap;
-				bitmap = nullptr;
-			}
-
-			width  = 0;
-			height = 0;
-	    }		
+		~Texture();
 
 		// Copy constructor
 		Texture(const Texture& other);
@@ -874,8 +824,6 @@ namespace ws
 			if(end <= start)
 				return;
 			
-			
-			
 			if(!m_isFast || !m_dibBits) 
 				return;
 
@@ -923,12 +871,7 @@ namespace ws
 		bool    m_isFast;
 		public:
 
-		enum class ScaleMode {
-			NearestNeighbor,   // sharp edges, pixelated
-			Bilinear,          // smooth, linear filter
-			Bicubic,           // smoother, slightly more expensive
-			HighQualityBicubic // best quality, slowest
-		};
+		
 
 		ScaleMode scaleMode = ScaleMode::HighQualityBicubic;
 
@@ -1009,8 +952,8 @@ namespace ws
 	    void setOrigin(int posx, int posy);
 	    void setRotation(float degrees);
 
-        void move(float dx, float dy) { x += dx; y += dy; }
-        void move(const ws::Vec2f& delta) { x += delta.x; y += delta.y; }
+		void move(float dx, float dy);
+		void move(const ws::Vec2f& delta);
 	    
 	    // Returns visual width after scaling (absolute).
 		int getVisualWidth() const;
@@ -1057,7 +1000,7 @@ namespace ws
 	public:
 		
 		// Default constructor.
-		Sprite() = default;
+		Sprite();
 		
 		// Constructs with a texture, setting the rect to full texture.
 		Sprite(ws::Texture& texture);
@@ -1439,9 +1382,7 @@ namespace ws
 		// Loads a cursor from a .cur or .ani file.
 		bool loadFromFile(const std::string& filename);
 
-		HCURSOR getHandle() {
-			return handle;
-		}
+		HCURSOR getHandle();
 	private:
 		HCURSOR handle = nullptr;
 		bool animated = false;
@@ -1814,7 +1755,7 @@ namespace ws
 		
 		// Shuts down GDI+.
 		~GDIPInit();
-	}gdipInit;
+	};
 	
 	//////////////////////////////////////////////////////////////////////////////
 	//							  DECLERATIONS
@@ -2209,6 +2150,46 @@ namespace ws
 		float value = maxVal;
 
 		return { hue, saturation, value };
+	}
+
+	const std::vector<Keyboard::Key>& Keyboard::GetAllKeys() {
+		static const std::vector<Keyboard::Key> keys = {
+			// Letters
+			A, B, C, D, E, F, G, H, I, J, K, L, M,
+			N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+			// Digits
+			Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9,
+			// Numpad
+			NumPad0, NumPad1, NumPad2, NumPad3, NumPad4,
+			NumPad5, NumPad6, NumPad7, NumPad8, NumPad9,
+			Multiply, Add, Separator, Subtract, Decimal, Divide,
+			// Function keys
+			F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
+			F11, F12, F13, F14, F15, F16, F17, F18, F19, F20,
+			F21, F22, F23, F24,
+			// Modifiers
+			Shift, Control, Alt,
+			LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt,
+			// Windows / Application
+			LeftWin, RightWin, Application,
+			// Navigation & Editing
+			Backspace, Tab, Clear, Enter, Pause, CapsLock, Escape, Space,
+			PageUp, PageDown, End, Home, Left, Up, Right, Down,
+			Select, Print, Execute, Snapshot, Insert, Delete, Help,
+			// Lock keys
+			NumLock, ScrollLock,
+			// OEM specific
+			OemSemicolon, OemPlus, OemComma, OemMinus, OemPeriod,
+			OemQuestion, OemTilde, OemOpenBrackets, OemBackslash,
+			OemCloseBrackets, OemQuotes, Oem8,
+			// Browser / Media
+			BrowserBack, BrowserForward, BrowserRefresh, BrowserStop,
+			BrowserSearch, BrowserFavorites, BrowserHome,
+			VolumeMute, VolumeDown, VolumeUp,
+			MediaNextTrack, MediaPrevTrack, MediaStop, MediaPlayPause,
+			LaunchMail, LaunchMediaSelect, LaunchApp1, LaunchApp2
+		};
+		return keys;
 	}
 
 	const unsigned char Keyboard::GetKeyCount() {
@@ -2744,7 +2725,7 @@ namespace ws
 		return *this;
 	}
 
-	bool Texture::create(int w, int h, Gdiplus::Color color = Gdiplus::Color(0, 0, 0, 0)) {
+	bool Texture::create(int w, int h, Gdiplus::Color color) {
 		destroyDIB();
 		if (bitmap) { delete bitmap; bitmap = nullptr; }
 
@@ -3436,7 +3417,7 @@ namespace ws
 	}
 
 	// Sets the texture and optionally resizes sprite to texture size.
-	void Sprite::setTexture(ws::Texture& texture, bool resize = true) {
+	void Sprite::setTexture(ws::Texture& texture, bool resize) {
 		textureRef = &texture;
 		if (resize)
 			setTextureRect({ 0,0,texture.getSize().x,texture.getSize().y });
@@ -3475,7 +3456,7 @@ namespace ws
 	}
 
 	//Draws to a texture using AlphaBlend function -  this does not support complex transforms. - ignores window view transforms!
-	void Sprite::drawBlend(ws::Texture& dest, float alphaEffect = 255, DWORD stretchMode = 0) {
+	void Sprite::drawBlend(ws::Texture& dest, float alphaEffect, DWORD stretchMode) {
 		if (!textureRef || !textureRef->isValid()) return;
 
 		if (scale.x < 0 || scale.y < 0) {
@@ -3512,7 +3493,7 @@ namespace ws
 		}
 	}
 	//Draws sprite data to a texture but discards all rotation transforms and negative scale. - ignores window view transforms!
-	void Sprite::Blt(ws::Texture& dest, DWORD stretchMode = COLORONCOLOR) {
+	void Sprite::Blt(ws::Texture& dest, DWORD stretchMode) {
 		if (!textureRef || !textureRef->isValid()) return;
 
 		int destX = static_cast<int>(x - origin.x * scale.x);
@@ -3535,7 +3516,7 @@ namespace ws
 		);
 	}
 	//==========LINE=============
-	Line::Line(ws::Vec2i start = { 0,0 }, ws::Vec2i end = { 0,0 }, int thewidth = 2, Gdiplus::Color color = { 255,0,0,255 }) {
+	Line::Line(ws::Vec2i start, ws::Vec2i end, int thewidth, Gdiplus::Color color) {
 		this->start = start;
 		this->end = end;
 		width = thewidth;
@@ -3595,7 +3576,7 @@ namespace ws
 		return false;
 	}
 	//==============POLY==================
-	Poly::Poly(std::vector<ws::Vec2i>& vertices, Gdiplus::Color fillColor = { 255,255,0,0 }, Gdiplus::Color borderColor = { 255,255,0,255 }, int borderWidth = 2, bool filled = true) {
+	Poly::Poly(std::vector<ws::Vec2i>& vertices, Gdiplus::Color fillColor, Gdiplus::Color borderColor, int borderWidth, bool filled) {
 		this->vertices = vertices;
 		this->fillColor = fillColor;
 		this->borderColor = borderColor;
@@ -3806,11 +3787,11 @@ namespace ws
 		return borderWidth;
 	}
 
-	void Poly::setFilled(bool b = true) {
+	void Poly::setFilled(bool b) {
 		filled = b;
 	}
 
-	void Poly::setClosed(bool b = true) {
+	void Poly::setClosed(bool b) {
 		closed = b;
 	}
 
@@ -4202,7 +4183,7 @@ namespace ws
 	}
 
 	// Regenerates vertices for the radial shape.
-	void Radial::make(int points = 8) {
+	void Radial::make(int points) {
 		poly.clear();
 
 		double inc = (2 * M_PI) / points;
@@ -4452,7 +4433,7 @@ namespace ws
 	}
 
 	// Creates a cursor from a Texture.
-	bool Cursor::loadFromTexture(const ws::Texture& texture, int hotSpotX = 0, int hotSpotY = 0) {
+	bool Cursor::loadFromTexture(const ws::Texture& texture, int hotSpotX, int hotSpotY) {
 		animated = false;
 		srcPath.clear();
 		if (!texture.isValid()) return false;
@@ -4616,24 +4597,24 @@ namespace ws
 		return *this;
 	}
 
-	// Move constructor – steals the handle from other; other becomes empty
-	Icon::Icon(Icon&& other) noexcept : hIcon(other.hIcon) {
-		other.hIcon = nullptr;
-	}
+	//// Move constructor – steals the handle from other; other becomes empty
+	//Icon::Icon(Icon&& other) noexcept : hIcon(other.hIcon) {
+	//	other.hIcon = nullptr;
+	//}
 
 	// Move assignment – replaces current icon with other's, leaves other empty
-	Icon& Icon::operator=(Icon&& other) noexcept {
-		if (this != &other) {
-			if (hIcon) {
-				DestroyIcon(hIcon);
-				hIcon = nullptr;
-			}
-			// Steal the handle
-			hIcon = other.hIcon;
-			other.hIcon = nullptr;
-		}
-		return *this;
-	}
+	//Icon& Icon::operator=(Icon&& other) noexcept {
+	//	if (this != &other) {
+	//		if (hIcon) {
+	//			DestroyIcon(hIcon);
+	//			hIcon = nullptr;
+	//		}
+	//		// Steal the handle
+	//		hIcon = other.hIcon;
+	//		other.hIcon = nullptr;
+	//	}
+	//	return *this;
+	//}
 
 	HICON Icon::getHandle() {
 		return hIcon;
@@ -4731,7 +4712,7 @@ namespace ws
 
 
 	//get a texture copy of the icon at a specific size. - if you pass in a single number it will be treated as a square size.
-	ws::Texture Icon::getTexture(DWORD size = ICON_SMALL) {
+	ws::Texture Icon::getTexture(DWORD size) {
 		if (!isValid())
 			return ws::Texture();
 		int width, height;
@@ -4835,12 +4816,12 @@ namespace ws
 	}
 
 	// Convenience constructor that calls create().
-	Window::Window(int width, int height, std::string title = "", DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0, const std::string& className = "Window") {
+	Window::Window(int width, int height, std::string title, DWORD style, DWORD exStyle, const std::string& className) {
 		create(width, height, title, style, exStyle, className);
 	}
 
 	// Creates the actual window with the given parameters.
-	void Window::create(int clientWidth, int clientHeight, std::string title = "", DWORD style = WS_OVERLAPPEDWINDOW, DWORD exStyle = 0, const std::string& className = "Window") {
+	void Window::create(int clientWidth, int clientHeight, std::string title, DWORD style, DWORD exStyle, const std::string& className) {
 		if (clientWidth <= 0 || clientHeight <= 0) {
 			ws::log("Error: Attempted to create a window with an invalid size!");
 		}
@@ -4974,7 +4955,7 @@ namespace ws
 	}
 
 	// Clears the back buffer to the given color, recreating if needed.
-	void Window::clear(ws::Hue color = ws::Hue::transparent) {
+	void Window::clear(ws::Hue color) {
 		if (!hwnd) return;
 
 		ws::Vec2i needed = view.getPortSize();;
@@ -5271,7 +5252,7 @@ namespace ws
 	}
 
 	// Returns the caption rectangle (title bar area).
-	ws::IntRect Window::getCaptionRect(bool excludeBorder = false) const {
+	ws::IntRect Window::getCaptionRect(bool excludeBorder) const {
 		if (!hwnd)
 			return { 0, 0, 0, 0 };
 
@@ -5296,7 +5277,7 @@ namespace ws
 	}
 
 	// Toggles fullscreen mode.
-	void Window::setFullscreen(bool fullscreen = true) {
+	void Window::setFullscreen(bool fullscreen) {
 		if (fullscreen == isFullscreen) return;
 
 		if (fullscreen) {
@@ -5363,7 +5344,7 @@ namespace ws
 	}
 
 	// Enables chroma key transparency (legacy per-pixel or simple).
-	void Window::enableChromaKey(ws::Hue hue, bool legacy = false) {
+	void Window::enableChromaKey(ws::Hue hue, bool legacy) {
 		m_perPixelAlpha = legacy;
 
 		addExStyle(WS_EX_LAYERED);
@@ -5480,7 +5461,7 @@ namespace ws
 	}
 
 	//Sets the window icon to a given HICON. - This function is not responsible for cleanup of your HICON handle.
-	bool Window::setIcon(HICON icon, DWORD size = ICON_SMALL) {
+	bool Window::setIcon(HICON icon, DWORD size) {
 
 		if (!icon)
 			return false;
@@ -5496,7 +5477,7 @@ namespace ws
 	}
 
 	//Sets the window icon to a given .ico file.
-	bool Window::setIcon(std::string file, DWORD size = ICON_SMALL) {
+	bool Window::setIcon(std::string file, DWORD size) {
 
 		HICON m_hIcon = (HICON)LoadImageA(
 			NULL,
@@ -5616,9 +5597,7 @@ namespace ws
 		case WM_SETCURSOR:
 		{
 			if (LOWORD(lParam) == HTCLIENT) {
-				SetClassLongPtr(hwnd, GCLP_HCURSOR,
-					(LONG_PTR)(cursor.getHandle() ? cursor.getHandle() : LoadCursor(nullptr, IDC_ARROW)));
-
+				SetClassLongPtr(hwnd, GCLP_HCURSOR, (LONG_PTR)(cursor.getHandle() ? cursor.getHandle() : LoadCursor(nullptr, IDC_ARROW)));
 			}
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
 		}
