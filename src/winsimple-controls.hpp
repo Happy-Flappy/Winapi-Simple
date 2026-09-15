@@ -582,8 +582,7 @@ namespace ws
 		if (hwnd && IsWindow(hwnd)) {
 			HWND cParent = GetParent(hwnd);
 			if (cParent && cParent != phwnd) {
-				std::cerr << "Error: Child already parented to a different window. "
-					<< "Remove it from the current container first.\n";
+				ws::log("Error: Child already parented to a different window. Remove it from the current container first.\n");
 				MessageBoxA(NULL, "Error: Child already parented to a different window. Remove it from the current container first.\n", "Error", MB_OK | MB_ICONINFORMATION);
 				return false;
 			}
@@ -611,7 +610,7 @@ namespace ws
 		);
 
 		if (!hwnd) {
-			std::cerr << "Failed to create child control: " << m_className << std::endl;
+			ws::log("Failed to create child control: " + m_className);
 			return false;
 		}
 
@@ -1666,7 +1665,7 @@ namespace ws
 			while (parent->pollEvent(m)) {}
 		}
 		else
-			std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+			ws::log("Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n");
 
 		if (GetOpenFileNameW(&ofn)) {
 			fileName = ws::toUTF8(szFile);
@@ -1713,7 +1712,7 @@ namespace ws
 			while (parent->pollEvent(m)) {}
 		}
 		else
-			std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
+			ws::log("Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n");
 
 		if (GetSaveFileNameW(&ofn)) {
 			fileName = ws::toUTF8(szFile);
@@ -1780,8 +1779,7 @@ namespace ws
 			while (parent->pollEvent(m)) {}
 		}
 		else
-			std::cerr << "Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n";
-
+			ws::log("Warning: Opening a dialog without specifying a parent window is discouraged due to the fact that dialogs block the message que of a window. \nIf you want to have a window and a dialog, you might want to empty the message queue after opening the dialog.\n");
 
 		LPITEMIDLIST pidl = SHBrowseForFolderW(&bi);
 		if (pidl != nullptr) {
